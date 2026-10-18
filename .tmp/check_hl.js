@@ -160,12 +160,12 @@ b = bbOf("nbB");
 nearHL(b.max.x - b.min.x, 0.3, 0.25, "桥台 nbB 高亮顺桥向跨=b腿");
 nearHL(b.max.z - b.min.z, 0, 0.25, "桥台 nbB 位于牛腿顶面(水平量线)");
 nearHL(b.max.y - b.min.y, 0, 0.25, "桥台 nbB 位于台帽端部(横向单线)");
-b = bbOf("nbH");
-nearHL(b.max.z - b.min.z, 0.3, 0.25, "桥台 nbH 高亮竖向跨=h端");
-nearHL(b.max.x - b.min.x, 0, 0.25, "桥台 nbH 位于牛腿外端竖面");
+b = bbOf("nbHt");
+nearHL(b.max.z - b.min.z, 0.3, 0.25, "桥台 nbHt 高亮竖向跨=牛腿高度0.3(外端竖面)");
+nearHL(b.max.x - b.min.x, 0, 0.25, "桥台 nbHt 位于牛腿外端竖面");
 b = bbOf("nbA");
-nearHL(b.max.z - b.min.z, 0.3, 0.25, "桥台 nbA 高亮竖向跨=h腋");
-nearHL(b.max.x - b.min.x, 0, 0.25, "桥台 nbA 位于背墙背面");
+nearHL(b.max.z - b.min.z, 0.3, 0.25, "桥台 nbA 高亮竖向跨=h腋(根部截面变化段)");
+nearHL(b.max.x - b.min.x, 0, 0.25, "桥台 nbA 位于根部下缘(贴背墙背面)");
 `;
 
 makeCheck("pier_harness.js", "桥墩", pierExpects);
