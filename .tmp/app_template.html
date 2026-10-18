@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>U型桥台三维参数化模型与工程量计算</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff; --line:#e3e8ee; --ink:#1f2937; --sub:#64748b;
+    --accent:#1d4ed8; --accent-soft:#eff4ff; --warn:#b45309;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.55;
+    padding:16px;
+  }
+  .wrap{max-width:1500px; margin:0 auto;}
+  header{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px;}
+  header h1{font-size:19px; font-weight:700; letter-spacing:1px;}
+  header .proj{margin-left:auto; display:flex; align-items:center; gap:8px;}
+  header input[type=text]{width:170px;}
+  .btn{
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;
+  }
+  .btn:hover{border-color:var(--accent); color:var(--accent);}
+  .layout{display:grid; grid-template-columns:370px 1fr; gap:14px; align-items:start;}
+  /* 左侧参数栏：完整展开，不产生内部滚动条/不被裁剪 */
+  /* 左侧参数栏：贴顶固定 + 独立滚动（输入下方参数时仍能看到模型） */
+  .side{position:sticky; top:16px; align-self:start; max-height:calc(100vh - 32px);
+        overflow-y:auto; overflow-x:hidden; padding-right:8px; overscroll-behavior:contain;
+        scrollbar-width:thin; scrollbar-color:#cbd5e1 transparent;}
+  .side::-webkit-scrollbar{width:9px;}
+  .side::-webkit-scrollbar-thumb{background:#cbd5e1; border-radius:5px;}
+  .side::-webkit-scrollbar-thumb:hover{background:#94a3b8;}
+  .side::-webkit-scrollbar-track{background:transparent;}
+  /* 信息卡折叠：点标题栏折叠/展开 */
+  .card h2{display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;}
+  .card h2 .tg{margin-left:auto; color:var(--sub); font-size:10px; transition:transform .15s;}
+  .card.collapsed h2 .tg{transform:rotate(-90deg);}
+  .card.collapsed .fields, .card.collapsed .note, .card.collapsed .chk,
+  .card.collapsed .tblnote, .card.collapsed .sub{display:none !important;}
+  .card.collapsed{padding-bottom:10px;}
+  @media(max-width:1000px){.layout{grid-template-columns:1fr;}}
+  @media(max-width:1000px){.side{position:static; max-height:none; overflow:visible;}}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; margin-bottom:12px;
+  }
+  .card h2{
+    font-size:13px; font-weight:700; margin-bottom:8px; padding-left:8px;
+    border-left:3px solid var(--accent); line-height:1.4;
+  }
+  .fields{display:grid; grid-template-columns:1fr; gap:0;}
+  .field{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0;}
+  .field + .field{border-top:1px dashed #cbd5e1;}
+  .field label{color:#334155; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .field small{color:var(--sub); font-size:10.5px;}
+  input[type=number]{
+    width:78px; padding:3px 6px; border:1px solid #96d3ab; border-radius:5px;
+    font-size:12.5px; text-align:right; background:#d6f2e0;
+  }
+  input[type=number]:focus{outline:none; border-color:#2e9e5b; background:#c2ecd2;}
+  input[type=number]:disabled{background:#eef2f6; border-color:var(--line);}
+  input[type=text]{padding:4px 8px; border:1px solid #96d3ab; border-radius:5px; font-size:13px; background:#d6f2e0;}
+  select{padding:3px 4px; border:1px solid #96d3ab; border-radius:5px; font-size:12.5px; background:#d6f2e0; width:118px; color:var(--ink);}
+  #view3d{
+    width:100%; height:560px; border:1px solid var(--line); border-radius:10px;
+    background:#eef2f6; position:relative; overflow:hidden; cursor:grab;
+  }
+  #view3d:active{cursor:grabbing;}
+  #viewTip{
+    position:absolute; left:10px; bottom:8px; font-size:11px; color:var(--sub);
+    background:rgba(255,255,255,.75); padding:3px 8px; border-radius:5px; pointer-events:none;
+  }
+  .toolbar{display:flex; gap:12px; align-items:center; margin:8px 2px; flex-wrap:wrap; font-size:12.5px; color:#334155;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{border:1px solid var(--line); padding:5px 7px; text-align:left;}
+  th{background:#f1f5f9; font-weight:600; white-space:nowrap;}
+  td.num{text-align:right; font-variant-numeric:tabular-nums;}
+  td.fx{color:var(--sub); font-size:11.5px;}
+  tr.total td{background:var(--accent-soft); font-weight:700;}
+  tr.sep td{background:#f8fafc; font-weight:600; color:var(--sub); font-size:11.5px;}
+  .neg{color:var(--warn);}
+  .note{
+    font-size:11.5px; color:var(--sub); background:#fffbeb; border:1px solid #fde68a;
+    border-radius:6px; padding:7px 9px; margin-top:8px;
+  }
+  .legend{display:flex; flex-wrap:wrap; gap:10px; font-size:11.5px; color:#334155; margin:6px 2px;}
+  .legend span{display:inline-flex; align-items:center; gap:4px;}
+  .sw{width:14px; height:14px; border-radius:3px; border:1px solid #475569; display:inline-block;}
+  footer{color:var(--sub); font-size:11.5px; text-align:center; margin-top:6px;}
+  @media print{
+    body{background:#fff; padding:0;}
+    .btn,.no-print{display:none;}
+    .card{border:none; page-break-inside:avoid;}
+    .layout{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>U型桥台三维参数化模型与工程量计算</h1>
+    <div class="proj no-print">
+      <a class="btn" href="桥墩三维参数化模型.html">桥墩计算页</a>
+      <label>项目名称</label>
+      <input type="text" id="projName" value="U型桥台">
+      <button class="btn" onclick="exportCSV()">导出CSV</button>
+      <button class="btn" onclick="window.print()">打印</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ===== 左侧参数 ===== -->
+    <div class="no-print side">
+      <div class="card">
+        <h2>总体参数</h2>
+        <div class="fields">
+          <div class="field"><label>桥台总宽 W <small>横桥向台身全宽＝侧墙外缘间</small></label><input type="number" id="W" value="12" step="0.01"></div>
+          <div class="field"><label>桥台顺桥向总长 B <small>顺桥向：前墙前缘→台尾</small></label><input type="number" id="L2" value="6" step="0.01"></div>
+          <div class="field"><label>原点绝对标高 <small>前墙底(0.000)对应高程</small></label><input type="number" id="elAbs" value="146" step="0.01"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>台帽（帽梁 + 背墙，L形）</h2>
+        <div class="fields">
+          <div class="field"><label>帽梁高 hc</label><input type="number" id="capH" value="0.60" step="0.01"></div>
+          <div class="field"><label>帽梁悬出长度 ec <small>帽梁悬挑出前墙的长度</small></label><input type="number" id="capCant" value="0.1" step="0.01"></div>
+          <div class="field"><label>帽梁宽度 bc <small>顺桥向</small></label><input type="number" id="capWid" value="1.3" step="0.01"></div>
+          <div class="field"><label>帽梁总长度 Lc <small>=W+2×ec，自动</small></label><input type="number" id="capLshow" value="" step="0.01" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>背墙总长度 Lb <small>=帽梁总长度，自动</small></label><input type="number" id="bwLshow" value="" step="0.01" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>背墙厚 tb <small>顺桥向，立于帽梁后端</small></label><input type="number" id="bwT" value="0.5" step="0.01"></div>
+          <div class="field"><label>背墙高 hb</label><input type="number" id="bwH" value="0.90" step="0.01"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>前墙（外面竖直，背坡放坡）</h2>
+        <div class="fields">
+          <div class="field"><label>前墙横桥向宽度 Wf <small>自动=桥台总宽 W</small></label><input type="number" id="Wf" value="24" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>前墙高 H1 <small>基础顶(墙底)→前墙顶(帽梁底)</small></label><input type="number" id="H1" value="5" step="0.01"></div>
+          <div class="field"><label>前墙顶宽 t1 <small>顺桥向，自动=帽梁宽−ec</small></label><input type="number" id="t1" value="0.7" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>前墙底宽 b1 <small>=t1+H1/m1，自动</small></label><input type="number" id="t1bshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>前墙背坡 m1 <small>竖:横=m1:1，0=竖直</small></label><input type="number" id="m1" value="3" step="0.5" min="0"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>侧墙（两道，外面竖直，分上段/下段，顶水平）</h2>
+        <div class="fields">
+          <div class="field"><label>侧墙总高 Hs <small>=背墙高+帽梁高+前墙高 H1，自动</small></label><input type="number" id="Hs" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>上段侧墙高 h2 <small>=hc+hb，自动</small></label><input type="number" id="swUpHshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>上段侧墙顶厚 t2 <small>横桥向墙厚，自外缘向内(最薄)</small></label><input type="number" id="t2" value="0.5" step="0.01"></div>
+          <div class="field"><label>上段侧墙的内坡 m2 <small>竖:横=m2:1，0=竖直</small></label><input type="number" id="m2" value="0" step="0.5" min="0"></div>
+          <div class="field"><label>上段侧墙顶宽/底宽 b2 <small>顺桥向=B−t1，自动</small></label><input type="number" id="swTopWshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>上段侧墙底厚 t2b <small>横桥向=t2+h2/m2，自动</small></label><input type="number" id="swBotWshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>下段侧墙顶宽 b3 <small>顺桥向=b2，自动</small></label><input type="number" id="swLowTopWshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>下段侧墙顶厚 t3 <small>横桥向=t2b，自动</small></label><input type="number" id="swLowTopTshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>下段侧墙高度 h3 <small>=Hs−h2，自动</small></label><input type="number" id="swLowHshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>下段侧墙的内坡 m3 <small>竖:横=m3:1，0=竖直</small></label><input type="number" id="m3" value="3" step="0.5" min="0"></div>
+          <div class="field"><label>下段侧墙底厚 t3b <small>横桥向=t3+h3/m3，自动</small></label><input type="number" id="swBotTshow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>下段侧墙底宽 b3b <small>顺桥向=b3−h3/m3，自动</small></label><input type="number" id="swLowBotWshow" value="" disabled style="background:#eef2f6;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>基础（按前墙+侧墙整体轮廓加襟边）</h2>
+        <div class="fields">
+          <div class="field"><label>一层厚度 d1</label><input type="number" id="fd1H" value="1.00" step="0.01"></div>
+          <div class="field"><label>一层横向襟边 x1 <small>两侧各加宽</small></label><input type="number" id="fd1X" value="1.00" step="0.01"></div>
+          <div class="field"><label>一层前襟边 zf1 <small>前墙前缘外</small></label><input type="number" id="fd1Zf" value="1.00" step="0.01"></div>
+          <div class="field"><label>一层后襟边 zb1 <small>侧墙尾端外</small></label><input type="number" id="fd1Zb" value="1.00" step="0.01"></div>
+        </div>
+        <div class="chk" style="margin:6px 0 4px;"><input type="checkbox" id="useFd2">
+          <label for="useFd2">设置第二层基础</label></div>
+        <div class="fields">
+          <div class="field"><label>二层厚度 d2</label><input type="number" id="fd2H" value="1.00" step="0.01"></div>
+          <div class="field"><label>二层横向襟边 x2 <small>在一层基础上再外放</small></label><input type="number" id="fd2X" value="1.00" step="0.01"></div>
+          <div class="field"><label>二层前襟边 zf2</label><input type="number" id="fd2Zf" value="1.00" step="0.01"></div>
+          <div class="field"><label>二层后襟边 zb2</label><input type="number" id="fd2Zb" value="1.00" step="0.01"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>材料</h2>
+        <div class="fields">
+          <div class="field"><label>台帽</label><select id="matCap">
+            <option>C15砼</option><option>C20砼</option><option>C25砼</option><option selected>C30砼</option><option>C35砼</option>
+            <option>C15片石砼</option><option>C20片石砼</option><option>C25片石砼</option><option>C30片石砼</option><option>C35片石砼</option>
+            <option>M10浆砌块石</option></select></div>
+          <div class="field"><label>前墙</label><select id="matFw">
+            <option>C15砼</option><option>C20砼</option><option>C25砼</option><option selected>C30砼</option><option>C35砼</option>
+            <option>C15片石砼</option><option>C20片石砼</option><option>C25片石砼</option><option>C30片石砼</option><option>C35片石砼</option>
+            <option>M10浆砌块石</option></select></div>
+          <div class="field"><label>侧墙</label><select id="matSw">
+            <option>C15砼</option><option>C20砼</option><option>C25砼</option><option selected>C30砼</option><option>C35砼</option>
+            <option>C15片石砼</option><option>C20片石砼</option><option>C25片石砼</option><option>C30片石砼</option><option>C35片石砼</option>
+            <option>M10浆砌块石</option></select></div>
+          <div class="field"><label>基础</label><select id="matFd">
+            <option>C15砼</option><option>C20砼</option><option selected>C25砼</option><option>C30砼</option><option>C35砼</option>
+            <option>C15片石砼</option><option>C20片石砼</option><option>C25片石砼</option><option>C30片石砼</option><option>C35片石砼</option>
+            <option>M10浆砌块石</option></select></div>
+          <div class="field"><label>回填</label><select id="matFill">
+            <option selected>砂砾石</option><option>砂性土</option><option>级配碎石</option></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>开挖土石方</h2>
+        <div class="fields">
+          <div class="field"><label>土方开挖坡比 m土 <small>竖:横=m土:1，0=竖直</small></label><input type="number" id="excMs" value="1" step="0.5" min="0"></div>
+          <div class="field"><label>石方开挖坡比 m石 <small>竖:横=m石:1，0=竖直</small></label><input type="number" id="excMr" value="1" step="0.5" min="0"></div>
+          <div class="field"><label>工作宽度 c <small>坑底每侧加宽</small></label><input type="number" id="excW" value="0.5" step="0.01"></div>
+          <div class="field"><label>开挖总高度 H挖 <small>地面至坑底</small></label><input type="number" id="excH" value="3" step="0.01"></div>
+          <div class="field"><label>土方高度 h土 <small>上层土层厚度</small></label><input type="number" id="excHs" value="1" step="0.01"></div>
+          <div class="field"><label>石方高度 h石 <small>=开挖总高度−土方高度，自动</small></label><input type="number" id="excHr" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>开挖分级高度 h分 <small>每级放坡高度</small></label><input type="number" id="excHst" value="5" step="0.1"></div>
+          <div class="field"><label>分级平台宽度 b平 <small>每级平台宽度</small></label><input type="number" id="excB" value="1" step="0.1"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>说明</h2>
+        <div class="note" style="margin-top:0;">
+          坐标系：原点位于前墙底前缘中点（前墙底边中点，同剖面图），x=纵桥向（指向台后，前墙前缘竖直面 x=0，帽梁前缘 x=−ec）、y=横桥向（桥台宽度方向）、z=竖向；标高以前墙底=0.000 计，绝对标高=相对标高+原点绝对标高。
+          汇总计算：台身（前墙）、侧墙（两道）、帽梁、背墙、基础、回填。
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 右侧：3D + 工程量 ===== -->
+    <div>
+      <div id="view3d"></div>
+      <div class="toolbar no-print">
+        <label><input type="checkbox" id="showLabels"> 显示尺寸标注</label>
+        <label><input type="checkbox" id="showAxes"> 显示坐标轴</label>
+        <label><input type="checkbox" id="showEL"> 显示相对标高</label>
+        <label><input type="checkbox" id="showELa"> 显示绝对标高</label>
+        <label><input type="checkbox" id="wireOnly"> 仅显示轮廓</label>
+        <label><input type="checkbox" id="pFw" checked> 前墙</label>
+        <label><input type="checkbox" id="pSw" checked> 侧墙</label>
+        <label><input type="checkbox" id="pCap" checked> 帽梁</label>
+        <label><input type="checkbox" id="pBw" checked> 背墙</label>
+        <label><input type="checkbox" id="pFd" checked> 基础</label>
+        <label><input type="checkbox" id="pFill"> 回填</label>
+        <label><input type="checkbox" id="exGround"> 现状地平面</label>
+        <label><input type="checkbox" id="exSoil"> 土方开挖</label>
+        <label><input type="checkbox" id="exRock"> 石方开挖</label>
+      </div>
+      <div class="toolbar no-print">
+        <button class="btn" onclick="setViewPreset('long')">纵桥向</button>
+        <button class="btn" onclick="setViewPreset('trans')">横桥向1</button>
+        <button class="btn" onclick="setViewPreset('trans2')">横桥向2</button>
+        <button class="btn" onclick="setViewPreset('top')">俯视平面</button>
+        <button class="btn" onclick="setViewPreset('iso')">45°视角</button>
+        <span style="color:var(--sub); font-size:11.5px;">左键旋转 · 右键/中键平移 · 滚轮缩放</span>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:#c8a27c"></i>前墙(台身)</span>
+        <span><i class="sw" style="background:#9db8d2"></i>侧墙</span>
+        <span><i class="sw" style="background:#86c28b"></i>帽梁</span>
+        <span><i class="sw" style="background:#e08e8e"></i>背墙</span>
+        <span><i class="sw" style="background:#c9d4de"></i>基础</span>
+        <span><i class="sw" style="background:#f0dc9a"></i>回填</span>
+        <span><i class="sw" style="background:#cfe0c3"></i>现状地面</span>
+        <span><i class="sw" style="background:#e3c98f"></i>土方开挖</span>
+        <span><i class="sw" style="background:#aab4bd"></i>石方开挖</span>
+      </div>
+      <div class="card">
+        <h2>工程量计算表</h2>
+        <table>
+          <thead><tr><th style="width:20%">项目</th><th>计算式</th><th style="width:12%;">材料</th><th style="width:13%; text-align:right;">数量</th><th style="width:6%;">单位</th></tr></thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+        <div class="note" id="assumpNote"></div>
+      </div>
+    </div>
+  </div>
+  <footer>三维模型按参数联动生成 · 坡比约定 竖:横=m:1（0=竖直） · 使用前请复核参数</footer>
+</div>
+
+<script>/*__THREE__*/</script>
+<script>
+/* ================= 工具 ================= */
+const $ = id => document.getElementById(id);
+const f = (x, n=2) => (isFinite(x) ? x : 0).toFixed(n);
+const ft = (x, n=2) => {          // 三维标注用：去掉小数末尾的 0
+  let s = f(x, n);
+  if(s.indexOf('.') >= 0) s = s.replace(/0+$/,'').replace(/\.$/,'');
+  return s;
+};
+window.addEventListener("error", e => {
+  try{ const el=$("assumpNote"); if(el) el.innerHTML += '<br><span class="neg">脚本错误：'+e.message+'</span>'; }catch(_){}
+});
+/* 数值积分（梯形法，足够精确） */
+function integrate(fn, a, b, n){
+  n = n || 800;
+  if(b - a < 1e-9) return 0;
+  const h = (b-a)/n;
+  let s = (fn(a) + fn(b))/2;
+  for(let i=1;i<n;i++) s += fn(a+i*h);
+  return s*h;
+}
+
+function readP(){
+  $("Wf").value = $("W").value; /* 前墙横桥向宽度自动 = 桥台总宽 W（只读显示） */
+  const g0 = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
+  $("t1").value = (g0("capWid") - g0("capCant")).toFixed(2); /* 前墙顶宽自动 = 帽梁宽度−帽梁悬出长度 */
+  $("Hs").value = (g0("bwH") + g0("capH") + g0("H1")).toFixed(2); /* 侧墙总高自动 = 背墙高+帽梁高+前墙高 H1 */
+  const g = id => { const v = parseFloat($(id).value); return isFinite(v) && v>0 ? v : 0; };
+  return {
+    Wf:g("Wf"), H1:g("H1"), t1:g("t1"), m1:g("m1"),
+    W:g("W"), Hs:g("Hs"), t2:g("t2"), L2:g("L2"), m2:g("m2"), m3:g("m3"), elAbs:g("elAbs"),
+    excMs:g("excMs"), excMr:g("excMr"), excW:g("excW"), excH:g("excH"), excHs:g("excHs"),
+    excHst:g("excHst"), excB:g("excB"),
+    capH:g("capH"), capCant:g("capCant"), capWid:g("capWid"), bwT:g("bwT"), bwH:g("bwH"),
+    fd1H:g("fd1H"), fd1X:g("fd1X"), fd1Zf:g("fd1Zf"), fd1Zb:g("fd1Zb"),
+    useFd2:$("useFd2").checked, fd2H:g("fd2H"), fd2X:g("fd2X"), fd2Zf:g("fd2Zf"), fd2Zb:g("fd2Zb")
+  };
+}
+
+/* ================= 工程量计算 =================
+   坐标系：x横桥向(±W/2为侧墙外缘), y竖向(墙底=0), z顺桥向(前墙前缘=0, 指向台后为正, 帽梁前缘=−ec)
+   内面放坡：前墙背坡面 zbw(y)=ec+t1+max(H1-y,0)/m1；侧墙内缘半距 xi(y)=W/2-t2-max(Hs-y,0)/m2 */
+function calcQ(p){
+  const q = {};
+  const slope = (m, dh) => m>0 ? dh/m : 0;
+  q.t1b  = p.t1 + slope(p.m1, p.H1);          // 前墙底宽（背坡 m1 放坡后）
+  q.capL = p.W + 2*p.capCant;                 // 帽梁总长度（横桥向）= 桥台总宽 W + 2×悬出
+  q.fdT  = p.fd1H + (p.useFd2 ? p.fd2H : 0);  // 基础总厚
+  /* 侧墙厚度：上段（标高 Hs−h2 以上）按内坡 m2、下段按内坡 m3，分段点处连续（t2b=上段底厚=下段顶厚） */
+  const zS  = Math.max(p.Hs - (p.capH + p.bwH), 0);              // 上段底标高
+  const t2b = p.t2 + slope(p.m2, p.Hs - zS);                     // 上段底厚（m2=0 时 t2b=t2，上段矩形）
+  const tx  = y => y >= zS ? p.t2 + slope(p.m2, Math.max(p.Hs-y,0))
+                           : t2b + slope(p.m3, zS-y);            // 侧墙厚度(随高度，分段内坡)
+  const xF  = z => p.capCant + p.t1 + slope(p.m1, Math.max(p.H1-z,0)); // 前墙背坡面 x（基准=帽梁前缘 x=0，前墙前缘=ec）
+  const xi  = y => p.W/2 - tx(y);                                // 侧墙内缘半距(腔半宽)
+  const open = y => p.W - 2*tx(y);                               // 两侧墙内缘净距
+  /* 帽梁为全宽立方体（总长 W+2×悬出，顺桥宽=帽梁宽度参数）；
+     背墙总长度=帽梁总长度，立于帽梁后端顶部 */
+  q.capWid = p.capWid;
+  q.bwL  = q.capL;
+  q.swUpH = p.capH + p.bwH;                   // 上段侧墙高 = 帽梁高 + 背墙高
+  q.swTopW = p.L2 - p.t1;                     // 上段侧墙顶宽（顺桥向）= 桥台顺桥向总长 B − 前墙顶宽 t1
+  q.swBotW = p.t2 + slope(p.m2, q.swUpH);     // 上段侧墙底厚（横桥向）= 上段顶厚 t2 + 上段高/m2（内坡 m2:1）
+  q.swLowTopW = q.swTopW;                     // 下段侧墙顶宽（顺桥向）= 上段侧墙顶宽/底宽
+  q.swLowTopT = q.swBotW;                     // 下段侧墙顶厚（横桥向）= 上段侧墙底厚
+  q.swLowH = p.Hs - q.swUpH;                  // 下段侧墙高度 = 侧墙总高 Hs − 上段侧墙高
+  q.swBotT = q.swLowTopT + slope(p.m3, q.swLowH); // 下段侧墙底厚 = 下段顶厚 + 下段高/m3（内坡 m3:1）
+  q.swLowBotW = q.swLowTopW - slope(p.m3, q.swLowH); // 下段侧墙底宽（顺桥向）= 下段顶宽 − 下段高/m3（内坡 m3:1）
+
+  /* 台身（前墙）：横桥向宽 Wf，梯形断面（背坡 m1） */
+  q.V_fw = p.Wf * p.H1 * (p.t1 + q.t1b)/2;
+  /* 侧墙（两道）：分段拟棱台公式 V=Σh/6(A下+4A中+A上)。
+     每段内厚度 tx(z) 与前端缘 xF(z) 均随高度线性变化 → 断面积 A(z)=tx×len 为二次函数，公式解析精确；
+     分段点 = 上/下段分界 zS、前墙顶 H1（背坡→竖直折点）、断面归零标高 zc（极端参数防护） */
+  const Az  = z => tx(z) * Math.max(p.L2 + p.capCant - xF(z), 0);
+  const zc  = p.m1>0 ? p.H1 - p.m1*(p.L2 - p.t1) : Infinity;   // len(z)=0 的标高
+  const pts = [0, p.Hs];
+  for(const zz of [zS, p.H1, zc])
+    if(zz>1e-9 && zz<p.Hs-1e-9 && !pts.some(v=>Math.abs(v-zz)<1e-9)) pts.push(zz);
+  pts.sort((a,b)=>a-b);
+  q.swSegs = []; let swEach = 0;
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i], b=pts[i+1], h=b-a; if(h<1e-9) continue;
+    const A1=Az(a), Am=Az((a+b)/2), A2=Az(b), V=h/6*(A1+4*Am+A2);
+    q.swSegs.push({h, S1:A1, Sm:Am, S2:A2, V});
+    swEach += V;
+  }
+  q.V_swEach = swEach;
+  q.V_sw = 2 * swEach;
+  /* 帽梁：总长度×梁高×宽度（立方体） */
+  q.V_cap = q.capL * p.capH * q.capWid;
+  /* 背墙：总长度×厚×高（立方体） */
+  q.V_bw = q.bwL * p.bwT * p.bwH;
+  /* 基础：平面=前墙+侧墙整体轮廓+襟边（顺桥向前缘自 -fdZf 至侧墙尾端+fdZb） */
+  q.fdW1 = Math.max(p.W, p.Wf) + 2*p.fd1X;
+  q.fdL1 = p.L2 + p.fd1Zf + p.fd1Zb;
+  q.V_fd1 = q.fdW1 * q.fdL1 * p.fd1H;
+  q.fdW2 = q.fdW1 + 2*p.fd2X;
+  q.fdL2 = q.fdL1 + p.fd2Zf + p.fd2Zb;
+  q.V_fd2 = p.useFd2 ? q.fdW2 * q.fdL2 * p.fd2H : 0;
+  q.V_fd = q.V_fd1 + q.V_fd2;
+  /* 开挖：坑底平面=最底层基础轮廓+每侧工作宽度，坑底=基础底面。
+     分层放坡（下层石方 h石 坡比 m石、上层土方 h土 坡比 m土，层间连续，竖:横=m:1，0=竖直）；
+     分级放坡：自坑底每累计一个分级高度 h分 设一级平台（宽 b平），平台处开挖线每侧水平外移 b平 再继续放坡。
+     断面每侧外放 off(z)=b平×已设平台数 + min(z,h石)/m石 + max(z−h石,0)/m土（z 自坑底）；
+     体积=∑分段 ∫(Wb+2off)(Lb+2off)dz（分段点=各级平台与石土界面，段内 off 线性，Simpson 精确） */
+  const hsE = Math.min(p.excHs, p.excH);              // 土方层高（不超过开挖总高）
+  q.excHr = Math.max(p.excH - hsE, 0);                // 石方高度 = 开挖总高度 − 土方高度
+  q.excWb = (p.useFd2 ? q.fdW2 : q.fdW1) + 2*p.excW;  // 坑底横桥向宽
+  q.excLb = (p.useFd2 ? q.fdL2 : q.fdL1) + 2*p.excW;  // 坑底顺桥向长
+  const hSt = p.excHst > 1e-6 ? p.excHst : 1e9;
+  const bSt = Math.max(p.excB, 0);
+  const rR = p.excMr > 0 ? 1/p.excMr : 0, rS = p.excMs > 0 ? 1/p.excMs : 0;
+  const nSt = z => Math.floor(z/hSt + 1e-9);          // z 处（含该标高）已设平台数
+  const off = z => bSt*nSt(z) + Math.min(z, q.excHr)*rR + Math.max(z-q.excHr, 0)*rS;
+  const bps = [0, p.excH];
+  for(let k=1; k*hSt < p.excH - 1e-9; k++) bps.push(k*hSt);
+  if(q.excHr > 1e-6 && q.excHr < p.excH - 1e-9) bps.push(q.excHr);
+  bps.sort((a,b)=>a-b);
+  q.V_exRock = 0; q.V_exSoil = 0; q.exSegs = [];
+  const nBw = z => Math.floor((z - 1e-9)/hSt);        // 略低于 z：不含该标高处平台
+  const Aat = (z, n) => { const o = bSt*n + Math.min(z,q.excHr)*rR + Math.max(z-q.excHr,0)*rS;
+                          return (q.excWb + 2*o) * (q.excLb + 2*o); };
+  for(let i=0; i<bps.length-1; i++){
+    const a = bps[i], b = bps[i+1]; if(b - a < 1e-9) continue;
+    const S1 = Aat(a, nSt(a)), Sm = Aat((a+b)/2, nSt((a+b)/2)), S2 = Aat(b, nBw(b));
+    const V = (b-a)/6 * (S1 + 4*Sm + S2);
+    const rock = (a+b)/2 <= q.excHr;
+    q.exSegs.push({h:b-a, S1, Sm, S2, V, rock});
+    if(rock) q.V_exRock += V; else q.V_exSoil += V;
+  }
+  q.V_ex = q.V_exRock + q.V_exSoil;
+  q.excHsE = hsE; q.excOffR = off(q.excHr); q.excOffTop = off(p.excH);
+  /* 回填：台腔内分段拟棱台 V=Σh/6(A下+4A中+A上)。
+     断面积 A(y)=2·xi(y)×[尾端−zf(y)]：xi 随侧墙内坡线性（折点 zS=上/下段分界）、
+     zf 在前墙顶 H1 处由背坡面转为帽梁/背墙背缘（折点）→ 每段内 A(y) 为二次函数，公式解析精确 */
+  const zf = y => y < p.H1 ? xF(y) : p.capWid;
+  const Ay = y => 2*xi(y) * (p.L2 + p.capCant - zf(y));
+  const ptsF = [0, p.Hs];
+  for(const yy of [zS, p.H1])
+    if(yy>1e-9 && yy<p.Hs-1e-9 && !ptsF.some(v=>Math.abs(v-yy)<1e-9)) ptsF.push(yy);
+  ptsF.sort((a,b)=>a-b);
+  q.fillSegs = []; let fillV = 0;
+  for(let i=0;i<ptsF.length-1;i++){
+    const a=ptsF[i], b=ptsF[i+1], h=b-a; if(h<1e-9) continue;
+    const A1=Ay(a), Am=Ay((a+b)/2), A2=Ay(b), V=h/6*(A1+4*Am+A2);
+    q.fillSegs.push({h, S1:A1, Sm:Am, S2:A2, V});
+    fillV += V;
+  }
+  q.V_fill = fillV;
+  /* 圬工合计 */
+  q.total = q.V_fw + q.V_sw + q.V_cap + q.V_bw + q.V_fd;
+  return q;
+}
+
+/* ================= three.js 场景 ================= */
+let scene, camera, renderer, group, labelGroup, sph, tgt;
+let slopeSpr = null, slopeAng = 0; /* 内坡(m2上段)标注精灵与坡角（文字随坡角旋转，视角翻转时同步转向） */
+let labelSprites = [];             /* 全部文字标注精灵（渲染循环按相机距离自适应缩放，屏幕大小恒定） */
+let datumX = 0;                    /* 坐标基准平移：原点=前墙前缘（帽梁前缘=−ec），场景x=顺桥坐标−ec */
+let hlGroup = null, hlActive = null, hlClock = 0;   /* 参数高亮：聚焦输入框时对应部位闪烁 */
+let slopeSpr3 = null, slopeAng3 = 0; /* 内坡(m3下段)标注 */
+let slopeFwSpr = null, slopeFwAng = 0, slopeFwBase = null, slopeFwHh = 0; /* 背坡标注：旋转+底边贴坡线 */
+let modelCenter = null, needFocus = false;
+let TH = THREE;
+
+function init3D(){
+  const box = $("view3d");
+  try{
+    scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, box.clientWidth/box.clientHeight, 0.1, 2000);
+  camera.up.set(0,0,1);   // z 竖向为上
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(box.clientWidth, box.clientHeight);
+  renderer.setClearColor(0xeef2f6);
+  box.appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x99a3b3, 0.95));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.55);
+  dl.position.set(30, 60, 40); scene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0xffffff, 0.25);
+  dl2.position.set(-40, 20, -30); scene.add(dl2);
+  tgt = new THREE.Vector3(0, 0, 4);
+  sph = {r:36, th:2.55, ph:1.12};
+  needFocus = true;
+  resetView();
+  // 交互
+  let drag=null;
+  const el = renderer.domElement;
+  el.addEventListener("contextmenu", e=>e.preventDefault());
+  el.addEventListener("pointerdown", e=>{ drag={x:e.clientX, y:e.clientY, b:e.button}; el.setPointerCapture(e.pointerId); });
+  el.addEventListener("pointerup", e=>{ drag=null; });
+  el.addEventListener("pointermove", e=>{
+    if(!drag) return;
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY;
+    if(drag.b===0){ camera.up.set(0,0,1); sph.th -= dx*0.005; sph.ph = Math.min(Math.max(sph.ph - dy*0.005, 0.08), Math.PI-0.08); }
+    else {
+      const right=new THREE.Vector3(), up=new THREE.Vector3(0,0,1), fwd=new THREE.Vector3();
+      camera.getWorldDirection(fwd);
+      right.crossVectors(fwd, up).normalize();
+      tgt.addScaledVector(right, -dx*sph.r*0.0011);
+      tgt.addScaledVector(up, dy*sph.r*0.0011);
+    }
+    updateCam();
+  });
+  el.addEventListener("wheel", e=>{ e.preventDefault(); sph.r=Math.min(Math.max(sph.r*(1+e.deltaY*0.001), 2), 300); updateCam(); }, {passive:false});
+  window.addEventListener("resize", ()=>{
+    camera.aspect = box.clientWidth/box.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(box.clientWidth, box.clientHeight);
+  });
+  (function loop(){
+    requestAnimationFrame(loop);
+    /* 标注文字大小自适应：按精灵与相机距离缩放（参考距离36），屏幕显示大小恒定，
+       避免视角拉近时标注文字巨大；限幅防极端 */
+    for(const sp of labelSprites){
+      if(!sp.userData.wh) continue;
+      const f = Math.min(Math.max(camera.position.distanceTo(sp.position)/36, 0.3), 10);
+      sp.scale.set(sp.userData.wh.w*f, sp.userData.wh.h*f, 1);
+    }
+    /* 坡比标注（内坡上段/下段、背坡）：文字沿坡线书写（读向坡顶→坡脚），底边贴坡线；
+       镜像视角下旋转取反、贴线偏移同步翻转（世界偏移随视角符号变化） */
+    const s1 = camera.position.x < 0 ? 1 : -1;
+    if(slopeSpr){
+      const f = Math.min(Math.max(camera.position.distanceTo(slopeSpr.position)/36, 0.3), 10);
+      const off = f*slopeSpr.userData.wh.h/2 + 0.12;
+      slopeSpr.material.rotation = -Math.PI/2 + slopeAng*s1;
+      slopeSpr.position.set(slopeSpr.userData.x,
+        slopeSpr.userData.y0 - s1*Math.cos(slopeAng)*off,
+        slopeSpr.userData.z + s1*Math.sin(slopeAng)*off);
+    }
+    if(slopeSpr3){
+      const f = Math.min(Math.max(camera.position.distanceTo(slopeSpr3.position)/36, 0.3), 10);
+      const off = f*slopeSpr3.userData.wh.h/2 + 0.12;
+      slopeSpr3.material.rotation = -Math.PI/2 + slopeAng3*s1;
+      slopeSpr3.position.set(slopeSpr3.userData.x,
+        slopeSpr3.userData.y0 - s1*Math.cos(slopeAng3)*off,
+        slopeSpr3.userData.z + s1*Math.sin(slopeAng3)*off);
+    }
+    const s2 = camera.position.y < 0 ? 1 : -1;
+    if(slopeFwSpr){
+      const f = Math.min(Math.max(camera.position.distanceTo(slopeFwSpr.position)/36, 0.3), 10);
+      const hh = f*slopeFwHh;
+      slopeFwSpr.material.rotation = -Math.PI/2 + slopeFwAng*s2;
+      slopeFwSpr.position.set(slopeFwBase.x + s2*Math.cos(slopeFwAng)*hh, 0,
+        slopeFwBase.z + s2*Math.sin(slopeFwAng)*hh);
+    }
+    renderer.render(scene, camera);
+    /* 参数高亮闪烁（透明度脉冲） */
+    hlClock += 0.05;
+    const hlOp = 0.25 + 0.75*Math.abs(Math.sin(hlClock*4));
+    if(hlGroup) hlGroup.traverse(o=>{ if(o.material) o.material.opacity = hlOp; });
+  })();
+  }catch(err){
+    box.innerHTML = '<div style="padding:24px;color:#b45309;font-size:13px;line-height:1.8;">'+
+      '三维视图初始化失败（当前环境可能不支持 WebGL）：<br>'+ (err && err.message ? err.message : err) +
+      '<br><br>工程量计算不受影响，仍正常显示；将文件下载后用 Chrome/Edge 打开即可看到三维模型。</div>';
+  }
+}
+function updateCam(){
+  if(!camera || !tgt) return;
+  /* 球坐标以 z 为极轴（z=竖向）：th 绕竖轴方位角, ph 自天顶起算 */
+  camera.position.set(
+    tgt.x + sph.r*Math.sin(sph.ph)*Math.cos(sph.th),
+    tgt.y + sph.r*Math.sin(sph.ph)*Math.sin(sph.th),
+    tgt.z + sph.r*Math.cos(sph.ph));
+  camera.lookAt(tgt);
+}
+function resetView(){
+  sph = {r:36, th:2.55, ph:1.12};
+  if(camera) camera.up.set(0,0,1);
+  if(!modelCenter) modelCenter = new THREE.Vector3(0, 0, 4);
+  tgt = modelCenter.clone();
+  updateCam();
+}
+/* 固定视角预设（严格垂直于坐标平面：纵桥向⊥XZ、横桥向⊥YZ、俯视⊥XY） */
+function setViewPreset(kind){
+  if(!camera) return;
+  if(!modelCenter) modelCenter = new THREE.Vector3(0, 0, 4);
+  tgt = modelCenter.clone();
+  const r = (sph && sph.r) ? sph.r : 36;
+  if(kind==='trans'){      // 横桥向1：视线沿 x 轴（⊥YZ面），自桥跨侧(−x)看前墙立面
+    sph = {r, th:Math.PI, ph:Math.PI/2};
+  }else if(kind==='trans2'){ // 横桥向2：视线沿 x 轴（⊥YZ面），自台后(+x)看
+    sph = {r, th:0, ph:Math.PI/2};
+  }else if(kind==='long'){ // 纵桥向：视线沿 y 轴（⊥XZ面），自 −y 侧看侧墙侧面
+    sph = {r, th:-Math.PI/2, ph:Math.PI/2};
+  }else if(kind==='top'){  // 俯视平面：视线沿 −z 轴（⊥XY面），自正上方
+    sph = {r, th:-Math.PI/2, ph:0};
+  }else if(kind==='iso'){  // 45° 轴测：−x 与 +y 之间 45°，俯角约20°（前墙立面居左、侧墙面居右）
+    sph = {r, th:3*Math.PI/4, ph:1.22};
+  }
+  /* 俯视时视线与 z 轴平行，up 改用 y 轴避免退化；其余视角 up=竖向 */
+  camera.up.set(0, kind==='top' ? 1 : 0, kind==='top' ? 0 : 1);
+  updateCam();
+}
+
+/* ---- 几何工具 ---- */
+const MAT = {
+  fw  : ()=> new THREE.MeshLambertMaterial({color:0xc8a27c, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  sw  : ()=> new THREE.MeshLambertMaterial({color:0x9db8d2, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  cap : ()=> new THREE.MeshLambertMaterial({color:0x86c28b, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  bw  : ()=> new THREE.MeshLambertMaterial({color:0xe08e8e, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  fd  : ()=> new THREE.MeshLambertMaterial({color:0xc9d4de, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  fill: ()=> new THREE.MeshLambertMaterial({color:0xf0dc9a, side:THREE.DoubleSide, transparent:true, opacity:0.35,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  ground: ()=> new THREE.MeshLambertMaterial({color:0xcfe0c3, side:THREE.DoubleSide, transparent:true, opacity:0.38,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}),
+  exS : ()=> new THREE.MeshLambertMaterial({color:0xe3c98f, side:THREE.DoubleSide, transparent:true, opacity:0.45,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  exR : ()=> new THREE.MeshLambertMaterial({color:0xaab4bd, side:THREE.DoubleSide, transparent:true, opacity:0.55,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  edge: ()=> new THREE.LineBasicMaterial({color:0x3f4a5a}),
+  dash: ()=> new THREE.LineDashedMaterial({color:0x8a94a6, dashSize:0.3, gapSize:0.18,
+           depthFunc:THREE.GreaterDepth, depthWrite:false, transparent:true, opacity:0.95})
+};
+function hexaMesh(v8, mat){
+  const idx=[0,1,2,3, 5,4,7,6, 0,1,5,4, 1,2,6,5, 2,3,7,6, 3,0,4,7];
+  const pos=[];
+  for(let i=0;i<idx.length;i+=4){
+    const a=idx[i], b=idx[i+1], c=idx[i+2], d=idx[i+3];
+    pos.push(...v8[a].toArray(),...v8[b].toArray(),...v8[c].toArray());
+    pos.push(...v8[a].toArray(),...v8[c].toArray(),...v8[d].toArray());
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, mat);
+  addDualEdges(mesh, g, 12);
+  return mesh;
+}
+/* 棱线双份：实线=可见轮廓，虚线=被遮挡的隐藏棱线（深度测试 GreaterDepth） */
+function addDualEdges(mesh, g, threshold){
+  const eg = new TH.EdgesGeometry(g, threshold);
+  mesh.add(new THREE.LineSegments(eg, MAT.edge()));
+  const dg = new THREE.LineSegments(eg, MAT.dash());
+  dg.computeLineDistances();
+  dg.renderOrder = 5;
+  dg.visible = $("wireOnly").checked;   /* 仅"显示轮廓"模式下绘制隐藏虚线 */
+  mesh.add(dg);
+}
+/* 建模内部坐标约定（x纵桥向长度,y横桥向,z高度）→ 场景坐标(x纵桥向,y横桥向,z竖向) */
+function makeLabel(text, x, y, z, color, scale, part){
+  return makeLabelRaw(text, z - datumX, x, y, color, scale, part);  /* z=顺桥坐标，减基准平移 */
+}
+function makeLabelRaw(text, x, y, z, color, scale, part){
+  color = color || "#1f2937"; scale = scale || 1; part = part || null;
+  const fs=30, pad=12;
+  const cv=document.createElement("canvas"), ctx=cv.getContext("2d");
+  ctx.font = fs+'px "Microsoft YaHei",sans-serif';
+  cv.width = Math.ceil(ctx.measureText(text).width)+pad*2;
+  cv.height = fs+pad*2;
+  const c2 = cv.getContext("2d");
+  c2.font = fs+'px "Microsoft YaHei",sans-serif';
+  c2.fillStyle = "rgba(255,255,255,0.88)";
+  c2.strokeStyle = "#64748b"; c2.lineWidth = 2;
+  c2.beginPath();
+  const r=8, W=cv.width, Hh=cv.height;
+  c2.moveTo(r,0); c2.lineTo(W-r,0); c2.quadraticCurveTo(W,0,W,r); c2.lineTo(W,Hh-r);
+  c2.quadraticCurveTo(W,Hh,W-r,Hh); c2.lineTo(r,Hh); c2.quadraticCurveTo(0,Hh,0,Hh-r);
+  c2.lineTo(0,r); c2.quadraticCurveTo(0,0,r,0); c2.fill(); c2.stroke();
+  c2.fillStyle = color; c2.textBaseline = "middle";
+  c2.fillText(text, pad, Hh/2);
+  const tex = new TH.CanvasTexture(cv); tex.minFilter = TH.LinearFilter;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false, transparent:true}));
+  const kk = 0.024*scale;
+  sp.userData.wh = {w: cv.width*kk, h: cv.height*kk};   /* 世界尺寸（渲染循环按相机距离缩放，屏幕大小恒定） */
+  sp.scale.set(sp.userData.wh.w, sp.userData.wh.h, 1);
+  labelSprites.push(sp);
+  sp.position.set(x,y,z);
+  sp.userData.part = part;
+  return sp;
+}
+/* CAD 风格尺寸标注（场景坐标直写）：p1/p2=被测点，off=尺寸线偏移矢量，text=测量文字，part=所属构件（随构件显隐） */
+function makeDimRaw(p1, p2, off, text, color, part){
+  color = color || "#1e40af";
+  const c = new THREE.Color(color);
+  const mat = new THREE.LineBasicMaterial({color:c, depthTest:false, transparent:true});
+  const A = p1.clone().add(off), B = p2.clone().add(off);
+  const g = new THREE.Group();
+  const seg = (a,b)=>{ g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]), mat)); };
+  const dir = p2.clone().sub(p1); const L = dir.length(); dir.normalize();
+  const u = off.clone().normalize();
+  /* 延长线：自被测点留小间隙，超出尺寸线少许 */
+  seg(p1.clone().addScaledVector(u,0.12), A.clone().addScaledVector(u,0.35));
+  seg(p2.clone().addScaledVector(u,0.12), B.clone().addScaledVector(u,0.35));
+  /* 尺寸线 */
+  seg(A, B);
+  /* 实心箭头：尖端指在延长线上，尾部朝尺寸线内侧 */
+  const aL = Math.min(0.7, L*0.12);
+  const coneG = new THREE.ConeGeometry(aL*0.22, aL, 12);
+  const coneM = new THREE.MeshBasicMaterial({color:c, depthTest:false, transparent:true});
+  [[A, dir.clone().negate()], [B, dir.clone()]].forEach(([pt,d])=>{
+    const cone = new THREE.Mesh(coneG, coneM);
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), d);
+    cone.position.copy(pt).addScaledVector(d, -aL/2);
+    g.add(cone);
+  });
+  /* 测量文字：位于尺寸线中部外侧；竖向尺寸文字旋转90°（沿尺寸线阅读，同CAD） */
+  const mid = A.clone().add(B).multiplyScalar(0.5).addScaledVector(u, 0.8);
+  const sp = makeLabelRaw(text, mid.x, mid.y, mid.z, color, 0.65);
+  if(Math.abs(dir.z) > 0.9) sp.material.rotation = Math.PI/2;
+  g.add(sp);
+  g.traverse(o=>{ o.renderOrder = 10; });
+  if(part) g.userData.part = part;
+  return g;
+}
+
+/* ---- 建模（内部坐标：x顺桥向长度(前墙前缘=0,向台后为正,帽梁前缘=−ec), y横桥向, z竖向(墙底=0)
+        场景轴：x=纵桥向, y=横桥向, z=竖向；场景x统一减 ec（原点=前墙前缘）） ---- */
+/* ================= 参数高亮：输入框聚焦时对应部位/边长闪烁（实体粗管，避免线宽限制） =================
+   工程坐标(a=横桥向, b=竖向, c=顺桥向) → 场景坐标(c−datumX, a, b)，与 V3 映射一致 */
+const HL_C = 0xef4444;
+let lastP = null, lastQ = null;
+function hlR(p, q){
+  const span = Math.max(p.W || 0, p.L2 || 0, p.Hs || 0, (p.excH || 0) + Math.abs(q.fdT || 0), 1);
+  return Math.min(Math.max(span*0.0065, 0.025), 0.085);   /* 管半径：约模型尺度0.65%，限幅2.5~8.5cm */
+}
+function hlTube(g, pts, r){
+  const up = new THREE.Vector3(0,1,0), a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+  for(let i=0; i+5 < pts.length; i+=6){
+    a.set(pts[i], pts[i+1], pts[i+2]); b.set(pts[i+3], pts[i+4], pts[i+5]);
+    d.subVectors(b, a); const L = d.length(); if(L < 1e-9) continue;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, 8, 1),
+      new THREE.MeshBasicMaterial({color:HL_C, depthTest:false, transparent:true}));
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(up, d.normalize());
+    m.renderOrder = 18; g.add(m);
+  }
+}
+function hlTorus(g, cx, cy, cz, R, r){
+  const m = new THREE.Mesh(new THREE.TorusGeometry(R, r, 10, 72),
+    new THREE.MeshBasicMaterial({color:HL_C, depthTest:false, transparent:true}));
+  m.position.set(cx, cy, cz); m.renderOrder = 18; g.add(m);
+}
+/* 矩形环（水平面）：场景 x=纵桥向、y=横桥向、z=竖向 */
+function hlRect(x0, x1, y0, y1, z){
+  return [x0,y0,z, x1,y0,z,  x1,y0,z, x1,y1,z,  x1,y1,z, x0,y1,z,  x0,y1,z, x0,y0,z];
+}
+/* 竖向量高（带端部刻度，沿 ±x 方向出刻度） */
+function hlVert(x, y, z0, z1, tick){
+  tick = tick || 0.45;
+  return [x,y,z0, x,y,z1,  x,y,z0, x+tick,y,z0,  x,y,z1, x+tick,y,z1];
+}
+function hlParts(g, tags, r){
+  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  group.traverse(o=>{
+    if(!o.isMesh || !o.userData.part || tags.indexOf(o.userData.part) < 0) return;
+    const eg = new THREE.EdgesGeometry(o.geometry, 30), pos = eg.getAttribute("position");
+    o.updateMatrix();
+    const pts = [];
+    for(let i=0; i+1 < pos.count; i+=2){
+      a.fromBufferAttribute(pos, i).applyMatrix4(o.matrix);
+      b.fromBufferAttribute(pos, i+1).applyMatrix4(o.matrix);
+      pts.push(a.x,a.y,a.z, b.x,b.y,b.z);
+    }
+    hlTube(g, pts, r);
+  });
+}
+function excProfile(p, q){
+  const hSt = p.excHst > 1e-6 ? p.excHst : 1e9;
+  const bSt = Math.max(p.excB, 0);
+  const rR = p.excMr > 0 ? 1/p.excMr : 0, rS = p.excMs > 0 ? 1/p.excMs : 0;
+  const nA = z => Math.floor(z/hSt + 1e-9), nB = z => Math.floor((z - 1e-9)/hSt);
+  const off = (z, n) => bSt*n + Math.min(z, q.excHr)*rR + Math.max(z - q.excHr, 0)*rS;
+  const bps = [0, p.excH];
+  for(let k=1; k*hSt < p.excH - 1e-9; k++) bps.push(k*hSt);
+  if(q.excHr > 1e-6 && q.excHr < p.excH - 1e-9) bps.push(q.excHr);
+  bps.sort((x,y)=>x-y);
+  return {bps, off, nA, nB, hSt, bSt};
+}
+/* 参数 → 部位/边长映射：{pts:场景坐标粗线段} / {parts:部件标签}，null=不适用 */
+const PARAM_HL = {
+  /* ---- 总体 ---- */
+  W:     (p,q)=>{ const xF = p.capCant - datumX;                 /* 前墙前缘立面（场景 x） */
+            return {pts:[ xF,-p.W/2,0, xF,p.W/2,0 ]}; },        /* 前墙底边横向量线（W 的实际量取位置） */
+  L2:    (p,q)=>{ const xF = p.capCant - datumX, zr = p.L2 + p.capCant - datumX;
+            return {pts:[ xF,-p.W/2,0, zr,-p.W/2,0,           /* 侧墙外缘底边（顺桥向）：前墙前缘→台尾（仅底边，不加竖直刻度） */
+                         xF, p.W/2,0, zr, p.W/2,0 ]}; },
+  elAbs: (p,q)=>{ const xF = p.capCant - datumX;                /* 原点=前墙底边中点 */
+            return {pts:[ xF-0.6,0,0, xF+0.6,0,0,  0, -0.6,0, 0,0.6,0,  xF,0,-0.6, xF,0,0.6 ]}; },
+  /* ---- 台帽 ---- */
+  capH:  (p,q)=>{ const dx = -datumX, yE = q.capL/2;
+            return {pts:[ dx,yE,p.H1, dx,yE,p.H1+p.capH]}; },
+  capCant:(p,q)=>{ const yE = q.capL/2, z = p.H1;          /* 帽梁底面=前墙顶面 */
+            return {pts:[ 0-datumX,yE,z, p.capCant-datumX,yE,z,        /* 顺桥向：帽梁前缘→前墙前缘（即帽梁超出前墙的长度 ec） */
+                          0-datumX,-yE,z, p.capCant-datumX,-yE,z ]}; },
+  capWid:(p,q)=>{ const dx = -datumX, yE = q.capL/2, z = p.H1 + p.capH;
+            return {pts:[ dx,yE,z, p.capWid - datumX, yE,z]}; },
+  bwT:   (p,q)=>{ const yE = q.capL/2, z = p.H1 + p.capH + p.bwH;
+            return {pts:[ (p.capWid-p.bwT)-datumX,yE,z, p.capWid-datumX,yE,z]}; },
+  bwH:   (p,q)=>{ const yE = q.capL/2, z0 = p.H1 + p.capH;
+            return {pts:[ p.capWid-datumX,yE,z0, p.capWid-datumX,yE,z0+p.bwH]}; },
+  /* ---- 前墙 ---- */
+  H1:    (p,q)=>{ const xF = p.capCant - datumX;                /* 前墙前缘立面 */
+            return {pts:[ xF,-p.W/2,0, xF,-p.W/2,p.H1 ]}; },     /* 竖向量线：基础顶(墙底)→前墙顶(帽梁底) */
+  t1:    (p,q)=>{ const xF = p.capCant - datumX;
+            return {pts:[ xF,-p.W/2,p.H1, xF+p.t1,-p.W/2,p.H1]}; },
+  m1:    (p,q)=>{ const xF = p.capCant - datumX, t1b = p.t1 + (p.m1>0 ? p.H1/p.m1 : 0);
+            return {pts:[ xF+p.t1,0,p.H1, xF+t1b,0,0]}; },
+  /* ---- 侧墙 ---- */
+  Hs:    (p,q)=>{ const zr = p.L2 + p.capCant - datumX;
+            return {pts:[ zr,-p.W/2,0, zr,-p.W/2,p.Hs ]}; },
+  t2:    (p,q)=>{ const zr = p.L2 + p.capCant - datumX;
+            return {pts:[ zr,p.W/2-p.t2,p.Hs, zr,p.W/2,p.Hs ]}; },
+  m2:    (p,q)=>{ const zr = p.L2 + p.capCant - datumX, h2 = p.capH + p.bwH;
+            const t2b = p.t2 + (p.m2>0 ? h2/p.m2 : 0);
+            return {pts:[ zr,p.W/2-p.t2,p.Hs, zr,p.W/2-t2b,p.Hs-h2]}; },
+  m3:    (p,q)=>{ const zr = p.L2 + p.capCant - datumX, h2 = p.capH + p.bwH;
+            const t2b = p.t2 + (p.m2>0 ? h2/p.m2 : 0);
+            const h3 = Math.max(p.Hs - h2, 0), t3b = t2b + (p.m3>0 ? h3/p.m3 : 0);
+            return {pts:[ zr,p.W/2-t2b,p.Hs-h2, zr,p.W/2-t3b,0]}; },
+  /* ---- 基础 ---- */
+  fd1H:  (p,q)=>{ const zF = p.capCant - p.fd1Zf, zB = p.capCant + p.L2 + p.fd1Zb, y = q.fdW1/2;   /* 一层基础四角竖棱（底→顶） */
+            return {pts:[ (zF-datumX),-y,-p.fd1H, (zF-datumX),-y,0,   (zF-datumX), y,-p.fd1H, (zF-datumX), y,0,
+                          (zB-datumX),-y,-p.fd1H, (zB-datumX),-y,0,   (zB-datumX), y,-p.fd1H, (zB-datumX), y,0 ]}; },
+  fd1X:  (p,q)=>{ const zB = p.capCant + p.L2 + p.fd1Zb;
+            return {pts:[ zB-datumX,p.W/2,0, zB-datumX,q.fdW1/2,0]}; },
+  fd1Zf: (p,q)=>{ const xF = p.capCant - datumX, zF = p.capCant - p.fd1Zf;
+            return {pts:[ zF-datumX,0,0, xF,0,0]}; },
+  fd1Zb: (p,q)=>{ const zB = p.capCant + p.L2 + p.fd1Zb, z0 = p.capCant + p.L2;
+            return {pts:[ z0-datumX,0,0, zB-datumX,0,0]}; },
+  fd2H:  (p,q)=>{ if(!p.useFd2) return null;                       /* 二层基础四角竖棱（底→一层顶） */
+            const zF = p.capCant - p.fd1Zf - p.fd2Zf, zB = p.capCant + p.L2 + p.fd1Zb + p.fd2Zb, y = q.fdW2/2;
+            return {pts:[ (zF-datumX),-y,-q.fdT, (zF-datumX),-y,-p.fd1H,   (zF-datumX), y,-q.fdT, (zF-datumX), y,-p.fd1H,
+                          (zB-datumX),-y,-q.fdT, (zB-datumX),-y,-p.fd1H,   (zB-datumX), y,-q.fdT, (zB-datumX), y,-p.fd1H ]}; },
+  fd2X:  (p,q)=>{ if(!p.useFd2) return null; const zB = p.capCant + p.L2 + p.fd1Zb + p.fd2Zb;
+            return {pts:[ zB-datumX,q.fdW1/2,-p.fd1H, zB-datumX,q.fdW2/2,-p.fd1H]}; },
+  fd2Zf: (p,q)=>{ if(!p.useFd2) return null; const zF = p.capCant - p.fd1Zf;
+            return {pts:[ (zF-p.fd2Zf)-datumX,0,-p.fd1H, zF-datumX,0,-p.fd1H]}; },
+  fd2Zb: (p,q)=>{ if(!p.useFd2) return null; const zB = p.capCant + p.L2 + p.fd1Zb;
+            return {pts:[ zB-datumX,0,-p.fd1H, (zB+p.fd2Zb)-datumX,0,-p.fd1H]}; },
+  /* ---- 开挖土石方 ---- */
+  excW:  (p,q)=>{ const zFb = p.useFd2 ? p.capCant - p.fd1Zf - p.fd2Zf : p.capCant - p.fd1Zf;
+                  const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+                  const yB = -q.fdT, c = p.excW, wb = (p.useFd2 ? q.fdW2 : q.fdW1)/2, y0 = q.excWb/2;
+            return {pts:[ ...hlRect(zFb-datumX, zBb-datumX, -wb, wb, yB),          /* 基础底轮廓 */
+                         ...hlRect((zFb-c)-datumX, (zBb+c)-datumX, -y0, y0, yB) ]}; },  /* 坑底轮廓 */
+  excH:  (p,q)=>{ if(!(p.excH > 1e-6)) return null;                 /* 坑口后缘一条竖向量线：坑底→现状地面 */
+            const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+            const x = zBb + p.excW + q.excOffTop - datumX;
+            return {pts:[x,0,-q.fdT, x,0,-q.fdT + p.excH]}; },
+  excHs: (p,q)=>{ if(!(q.excHsE > 1e-6)) return null;               /* 土方层：一条竖向量线（土石分界→地面） */
+            const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+            const x = zBb + p.excW + q.excOffTop - datumX;
+            return {pts:[x,0,-q.fdT + p.excH - q.excHsE, x,0,-q.fdT + p.excH]}; },
+  excHr: (p,q)=>{ if(!(q.excHr > 1e-6)) return null;                 /* 石方层：一条竖向量线（坑底→土石分界） */
+            const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+            const x = zBb + p.excW + q.excOffTop - datumX;
+            return {pts:[x,0,-q.fdT, x,0,-q.fdT + q.excHr]}; },
+  excMs: (p,q)=>{ if(!(q.excHsE > 1e-6)) return null;
+            const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+            const {bps, off, nA, nB} = excProfile(p,q), pts = [];
+            for(let i=0;i<bps.length-1;i++){ const a = bps[i], b = bps[i+1];
+              if(a < q.excHr - 1e-9 || b - a < 1e-9) continue;
+              pts.push(zBb+p.excW+off(a,nA(a))-datumX, 0, -q.fdT+a,  zBb+p.excW+off(b,nB(b))-datumX, 0, -q.fdT+b); }
+            return {parts:["exS"], pts}; },
+  excMr: (p,q)=>{ if(!(q.excHr > 1e-6)) return null;
+            const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+            const {bps, off, nA, nB} = excProfile(p,q), pts = [];
+            for(let i=0;i<bps.length-1;i++){ const a = bps[i], b = bps[i+1];
+              if(b > q.excHr + 1e-9 || b - a < 1e-9) continue;
+              pts.push(zBb+p.excW+off(a,nA(a))-datumX, 0, -q.fdT+a,  zBb+p.excW+off(b,nB(b))-datumX, 0, -q.fdT+b); }
+            return {parts:["exR"], pts}; },
+  excHst:(p,q)=>{ if(!(p.excHst > 1e-6)) return null;               /* 分级高度：一条竖向量线（坑底起量一级） */
+            const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+            const x = zBb + p.excW + q.excOffTop - datumX;
+            return {pts:[x,0,-q.fdT, x,0,-q.fdT + p.excHst]}; },
+  excB:  (p,q)=>{ if(!(p.excB > 1e-6) || !(p.excHst > 1e-6)) return null;
+            const zFb = p.useFd2 ? p.capCant - p.fd1Zf - p.fd2Zf : p.capCant - p.fd1Zf;
+            const zBb = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+            const {off, nA, nB, hSt} = excProfile(p,q), y0 = q.excWb/2, pts = [];
+            for(let k=1; k*hSt < p.excH - 1e-9; k++){ const z = k*hSt, zA = -q.fdT + z;
+              const oB = off(z, nB(z)), oA = off(z, nA(z)), L = oA - oB;
+              if(L < 1e-9) continue;
+              const xR = zBb + p.excW, xL = zFb - p.excW;
+              pts.push(xR+oB-datumX, y0+oB, zA, xR+oA-datumX, y0+oB, zA);
+              pts.push(xL-oB-datumX, y0+oB, zA, xL-oA-datumX, y0+oB, zA);
+              pts.push(xR+oB-datumX, -(y0+oB), zA, xR+oA-datumX, -(y0+oB), zA);
+              pts.push(xL-oB-datumX, -(y0+oB), zA, xL-oA-datumX, -(y0+oB), zA);
+              pts.push(xR+oB-datumX, y0+oB, zA, xR+oB-datumX, y0+oA, zA);
+              pts.push(xR+oB-datumX, -(y0+oB), zA, xR+oB-datumX, -(y0+oA), zA);
+              pts.push(xL-oB-datumX, y0+oB, zA, xL-oB-datumX, y0+oA, zA);
+              pts.push(xL-oB-datumX, -(y0+oB), zA, xL-oB-datumX, -(y0+oA), zA);
+            }
+            if(!pts.length){ const zA = -q.fdT + p.excH;
+              pts.push(zBb+p.excW+q.excOffTop-datumX, y0+q.excOffTop, zA, zBb+p.excW+q.excOffTop+p.excB-datumX, y0+q.excOffTop, zA); }
+            return {pts}; },
+  /* ---- 材料 ---- */
+  matCap:(p,q)=>({parts:["cap"]}),
+  matFw: (p,q)=>({parts:["fw"]}),
+  matSw: (p,q)=>({parts:["sw"]}),
+  matFd: (p,q)=>({parts:["fd"]}),
+  matFill:(p,q)=>({parts:["fill"]})
+};
+function showHl(id){
+  if(hlGroup && hlGroup.parent) hlGroup.parent.remove(hlGroup);
+  hlGroup = null;
+  if(!id || !lastP || !PARAM_HL[id]) return;
+  const p = lastP, q = lastQ, r = hlR(p, q);
+  let def = null; try{ def = PARAM_HL[id](p, q); }catch(e){}
+  if(!def) return;
+  const g = new THREE.Group();
+  if(def.pts && def.pts.length) hlTube(g, def.pts, r);
+  if(def.parts) hlParts(g, def.parts, r);
+  hlGroup = g;
+  if(scene) scene.add(g);
+}
+
+function buildModel(p, q){
+  group = new THREE.Group(); labelGroup = new THREE.Group(); labelSprites = [];
+  datumX = p.capCant;
+  const V3 = (x,y,z)=>new THREE.Vector3(z - datumX, x, y);   // 映射到场景轴（x减基准）
+  const W2 = p.W/2;
+  const slope = (m, dh) => m>0 ? dh/m : 0;
+  /* 侧墙厚度：上段 m2 / 下段 m3 分段放坡（与 calcQ 同规则） */
+  const zS = Math.max(p.Hs - q.swUpH, 0);
+  const t2b = q.swBotW;
+  const tx  = y => y >= zS ? p.t2 + slope(p.m2, Math.max(p.Hs-y,0))
+                           : t2b + slope(p.m3, zS-y);            // 侧墙厚度
+  const xi  = y => W2 - tx(y);                               // 侧墙内缘半距
+  const open = y => p.W - 2*tx(y);
+  /* 侧墙前端缘：贴合前墙背坡面（前墙顶以上竖直 x=ec+t1）；显示外偏 0.002 避免与前墙背共面
+     （基准=帽梁前缘 x=0，帽梁前缘悬出前墙前缘 ec） */
+  const xF  = z => p.capCant + p.t1 + slope(p.m1, Math.max(p.H1-z,0));
+  const xFd = z => xF(z) + 0.002;
+
+  /* 基础：平面=前墙+侧墙整体轮廓+襟边（顺桥向前缘自 ec−fdZf 至侧墙尾端 ec+B+fdZb） */
+  const zF1 = p.capCant - p.fd1Zf, zB1 = p.capCant + p.L2 + p.fd1Zb;
+  const fd1 = hexaMesh([
+    V3(-q.fdW1/2,-p.fd1H,zF1), V3(q.fdW1/2,-p.fd1H,zF1), V3(q.fdW1/2,-p.fd1H,zB1), V3(-q.fdW1/2,-p.fd1H,zB1),
+    V3(-q.fdW1/2,0,zF1),       V3(q.fdW1/2,0,zF1),       V3(q.fdW1/2,0,zB1),       V3(-q.fdW1/2,0,zB1)
+  ], MAT.fd());
+  fd1.userData.part = "fd"; group.add(fd1);
+  if(p.useFd2){
+    const fd2 = hexaMesh([
+      V3(-q.fdW2/2,-q.fdT,zF1-p.fd2Zf), V3(q.fdW2/2,-q.fdT,zF1-p.fd2Zf),
+      V3(q.fdW2/2,-q.fdT,zB1+p.fd2Zb),  V3(-q.fdW2/2,-q.fdT,zB1+p.fd2Zb),
+      V3(-q.fdW2/2,-p.fd1H,zF1-p.fd2Zf), V3(q.fdW2/2,-p.fd1H,zF1-p.fd2Zf),
+      V3(q.fdW2/2,-p.fd1H,zB1+p.fd2Zb),  V3(-q.fdW2/2,-p.fd1H,zB1+p.fd2Zb)
+    ], MAT.fd());
+    fd2.userData.part = "fd"; group.add(fd2);
+  }
+
+  /* 前墙：梯形断面（顶宽 t1、背坡 m1 放坡至底宽 t1b），横桥向宽 Wf；前缘=帽梁前缘+ec
+     （V3 参数序：横桥向, 竖向, 顺桥向 → 场景 x=纵桥向, y=横桥向, z=竖向） */
+  const fw = hexaMesh([
+    V3(-p.Wf/2,0,p.capCant), V3(p.Wf/2,0,p.capCant), V3(p.Wf/2,0,p.capCant+q.t1b), V3(-p.Wf/2,0,p.capCant+q.t1b),
+    V3(-p.Wf/2,p.H1,p.capCant), V3(p.Wf/2,p.H1,p.capCant), V3(p.Wf/2,p.H1,p.capCant+p.t1), V3(-p.Wf/2,p.H1,p.capCant+p.t1)
+  ], MAT.fw());
+  fw.userData.part = "fw"; group.add(fw);
+
+  /* 侧墙×2：外面竖直，内面放坡（上段顶厚 t2、内坡 m2，竖:横）；前端缘贴合前墙背坡面
+     （前墙顶以上竖直，显示外偏 0.002）；按 上段底(=Hs−上段高) 与 前墙顶 分段建模，
+     上段高=帽梁高+背墙高 */
+  const swUpBot = Math.min(Math.max(p.Hs - q.swUpH, 0), p.Hs);   // 上段底标高
+  const swBrk = [...new Set([0, Math.min(p.H1, p.Hs), swUpBot, p.Hs])]
+    .filter(v => v >= 0 && v <= p.Hs).sort((a,b)=>a-b)
+    .filter((v,i,arr) => i===0 || v-arr[i-1] > 1e-6);
+  for(const s of [-1, 1]){
+    for(let i=0;i<swBrk.length-1;i++){
+      const ya = swBrk[i], yb = swBrk[i+1];
+      if(yb - ya < 1e-6) continue;
+      const seg = hexaMesh([
+        V3(s*xi(ya),ya,xFd(ya)), V3(s*W2,ya,xFd(ya)), V3(s*W2,ya,p.L2+p.capCant), V3(s*xi(ya),ya,p.L2+p.capCant),
+        V3(s*xi(yb),yb,xFd(yb)), V3(s*W2,yb,xFd(yb)), V3(s*W2,yb,p.L2+p.capCant), V3(s*xi(yb),yb,p.L2+p.capCant)
+      ], MAT.sw());
+      seg.userData.part = "sw"; group.add(seg);
+    }
+  }
+
+  /* 帽梁：全宽立方体，立于前墙顶，横桥向总长 W+2×悬出（两端超出台身/前墙外缘），
+     前缘与前墙前缘齐平，顺桥向宽=帽梁宽度 */
+  if(p.capH > 1e-6){
+    const cap = hexaMesh([
+      V3(-q.capL/2,p.H1,0), V3(q.capL/2,p.H1,0), V3(q.capL/2,p.H1,q.capWid), V3(-q.capL/2,p.H1,q.capWid),
+      V3(-q.capL/2,p.H1+p.capH,0), V3(q.capL/2,p.H1+p.capH,0),
+      V3(q.capL/2,p.H1+p.capH,q.capWid), V3(-q.capL/2,p.H1+p.capH,q.capWid)
+    ], MAT.cap());
+    cap.userData.part = "cap"; group.add(cap);
+  }
+  /* 背墙：全宽立方体（总长=帽梁总长度），立于帽梁顶部后端（后缘与帽梁后缘齐平 x=capWid），组成 L 形台帽 */
+  if(p.bwH > 1e-6){
+    const yb0 = p.H1 + p.capH, yb1 = yb0 + p.bwH;
+    const bw = hexaMesh([
+      V3(-q.bwL/2,yb0,q.capWid-p.bwT), V3(q.bwL/2,yb0,q.capWid-p.bwT), V3(q.bwL/2,yb0,q.capWid), V3(-q.bwL/2,yb0,q.capWid),
+      V3(-q.bwL/2,yb1,q.capWid-p.bwT), V3(q.bwL/2,yb1,q.capWid-p.bwT), V3(q.bwL/2,yb1,q.capWid), V3(-q.bwL/2,yb1,q.capWid)
+    ], MAT.bw());
+    bw.userData.part = "bw"; group.add(bw);
+  }
+
+  /* 回填（半透明）：台腔内填土，前缘为前墙背坡面/帽梁背缘/背墙背缘，顶面填至侧墙顶 */
+  const zf = y => y < p.H1 ? xF(y) : p.capWid;
+  const y1 = Math.min(p.H1, p.Hs), y2 = Math.min(p.H1+p.capH, p.Hs);
+  [[0,y1],[y1,y2],[y2,p.Hs]].forEach(([ya,yb])=>{
+    if(yb - ya < 1e-6) return;
+    const fl = hexaMesh([
+      V3(-xi(ya),ya,p.L2+p.capCant), V3(xi(ya),ya,p.L2+p.capCant), V3(xi(ya),ya,zf(ya)), V3(-xi(ya),ya,zf(ya)),
+      V3(-xi(yb),yb,p.L2+p.capCant), V3(xi(yb),yb,p.L2+p.capCant), V3(xi(yb),yb,zf(yb)), V3(-xi(yb),yb,zf(yb))
+    ], MAT.fill());
+    fl.userData.part = "fill"; group.add(fl);
+  });
+
+  /* ---- 开挖显示：现状地平面 + 分级放坡棱台带（半透明，显隐由工具栏开关控制） ----
+     坑底=基础底面（标高 −(d1+d2)），地面=yBot+H挖=H挖−d1−d2；
+     分层放坡（下石上土、层间连续）+分级平台（每 h分 一级、宽 b平，平台处断面外移 b平 形成台阶） */
+  if(p.excH > 1e-6){
+    const zF1b = p.useFd2 ? p.capCant - p.fd1Zf - p.fd2Zf : p.capCant - p.fd1Zf;
+    const zB1b = p.useFd2 ? p.capCant + p.L2 + p.fd1Zb + p.fd2Zb : p.capCant + p.L2 + p.fd1Zb;
+    const c = p.excW, w0 = q.excWb/2, zL = zF1b - c, zR = zB1b + c;
+    const yBot = -q.fdT, yGnd = yBot + p.excH;
+    const hSt = p.excHst > 1e-6 ? p.excHst : 1e9;
+    const bSt = Math.max(p.excB, 0);
+    const rR = p.excMr > 0 ? 1/p.excMr : 0, rS = p.excMs > 0 ? 1/p.excMs : 0;
+    const nAbove = z => Math.floor(z/hSt + 1e-9);       /* 标高 z 略上方：含该处平台 */
+    const nBelow = z => Math.floor((z - 1e-9)/hSt);     /* 标高 z 略下方：不含该处平台 */
+    const offAB = (z, n) => bSt*n + Math.min(z, q.excHr)*rR + Math.max(z-q.excHr, 0)*rS;
+    const bps = [0, p.excH];
+    for(let k=1; k*hSt < p.excH - 1e-9; k++) bps.push(k*hSt);
+    if(q.excHr > 1e-6 && q.excHr < p.excH - 1e-9) bps.push(q.excHr);
+    bps.sort((a,b)=>a-b);
+    for(let i=0; i<bps.length-1; i++){
+      const a = bps[i], b = bps[i+1]; if(b - a < 1e-9) continue;
+      const wLo = w0 + offAB(a, nAbove(a)), wHi = w0 + offAB(b, nBelow(b));
+      const zlLo = zL - offAB(a, nAbove(a)), zrLo = zR + offAB(a, nAbove(a));
+      const zlHi = zL - offAB(b, nBelow(b)), zrHi = zR + offAB(b, nBelow(b));
+      const band = hexaMesh([
+        V3(-wLo,yBot+a,zlLo), V3(wLo,yBot+a,zlLo), V3(wLo,yBot+a,zrLo), V3(-wLo,yBot+a,zrLo),
+        V3(-wHi,yBot+b,zlHi), V3(wHi,yBot+b,zlHi), V3(wHi,yBot+b,zrHi), V3(-wHi,yBot+b,zrHi)
+      ], (a+b)/2 <= q.excHr ? MAT.exR() : MAT.exS());
+      band.userData.part = (a+b)/2 <= q.excHr ? "exR" : "exS";
+      group.add(band);
+    }
+    if($("exGround").checked){
+      const mg = 6, wG = w0 + q.excOffTop + mg;
+      const zLg = zL - q.excOffTop - mg, zRg = zR + q.excOffTop + mg;
+      const gnd = hexaMesh([
+        V3(-wG,yGnd-0.12,zLg), V3(wG,yGnd-0.12,zLg), V3(wG,yGnd-0.12,zRg), V3(-wG,yGnd-0.12,zRg),
+        V3(-wG,yGnd,zLg), V3(wG,yGnd,zLg), V3(wG,yGnd,zRg), V3(-wG,yGnd,zRg)
+      ], MAT.ground());
+      gnd.userData.part = "ground"; group.add(gnd);
+    }
+    /* ---- 开挖尺寸标注（CAD 风格，受"显示尺寸标注"+土/石方开关控制） ---- */
+    if($("showLabels").checked){
+      const L = labelGroup, ER = "#475569", ES = "#b45309";
+      const V = (x,y,z)=>new THREE.Vector3(x,y,z);
+      const exPart = q.excHr > 1e-6 ? "exR" : "exS";
+      const yMid = yBot + q.excHr;
+      /* 坑底平面尺寸 */
+      L.add(makeDimRaw(V(zF1b-c,-w0,yBot), V(zF1b-c,w0,yBot), V(-1.8,0,0), `坑底宽=${ft(q.excWb)}`, ER, exPart));
+      L.add(makeDimRaw(V(zF1b-c,w0,yBot), V(zB1b+c,w0,yBot), V(0,2.4,0), `坑底长=${ft(q.excLb)}`, ER, exPart));
+      /* 高度链：石方 h石 / 土方 h土 / 总高 H挖（坑底→地面，右侧外移竖向标注） */
+      const xR = zR + q.excOffTop + 1.2;
+      if(q.excHr > 1e-6) L.add(makeDimRaw(V(xR,0,yBot), V(xR,0,yMid), V(0,1.6,0), `h石=${ft(q.excHr)}`, ER, "exR"));
+      if(q.excHsE > 1e-6) L.add(makeDimRaw(V(xR,0,yMid), V(xR,0,yGnd), V(0,1.6,0), `h土=${ft(q.excHsE)}`, ES, "exS"));
+      L.add(makeDimRaw(V(xR+2.0,0,yBot), V(xR+2.0,0,yGnd), V(0,1.6,0), `H挖=${ft(p.excH)}`, ER, exPart));
+      /* 分级平台宽度（每级一级，标在平台右侧台阶处） */
+      for(let k=1; k*hSt < p.excH - 1e-9; k++){
+        const z = k*hSt, xb = zR + offAB(z, nBelow(z)), xa = zR + offAB(z, nAbove(z));
+        L.add(makeDimRaw(V(xb,0,yBot+z), V(xa,0,yBot+z), V(0,0,0.45), `b平=${ft(bSt)}`, ES, z <= q.excHr+1e-9 ? "exR" : "exS"));
+      }
+      /* 坡比文字（贴外坡面中点） */
+      if(q.excHr > 1e-6){
+        const zr = q.excHr/2, offr = offAB(zr, nBelow(zr));
+        L.add(makeLabel(`石方坡比${p.excMr>0?ft(p.excMr,1)+":1":"竖直"}`, 0, yBot+zr, zR+offr+0.4, "#334155", 0.9, "exR"));
+      }
+      if(q.excHsE > 1e-6){
+        const zs = q.excHr + q.excHsE/2, offs = offAB(zs, nBelow(zs));
+        L.add(makeLabel(`土方坡比${p.excMs>0?ft(p.excMs,1)+":1":"竖直"}`, 0, yBot+zs, zR+offs+0.4, "#92400e", 0.9, "exS"));
+      }
+    }
+  }
+
+  /* ---- 三维坐标轴（原点=前墙底前缘中点：x纵桥向指向台后, y横桥向, z竖向；长度2，端点带箭头，
+          depthTest=false 保证不被构件面遮挡） ---- */
+  if($("showAxes").checked){
+    const axLen = 2;
+    const ax = new THREE.AxesHelper(axLen);
+    ax.material.depthTest = false; ax.material.transparent = true; ax.renderOrder = 20;
+    group.add(ax);
+    const axG = new THREE.Group();
+    [[axLen,0,0,0xdc2626,[1,0,0]], [0,axLen,0,0x16a34a,[0,1,0]], [0,0,axLen,0x2563eb,[0,0,1]]]
+    .forEach(([ex,ey,ez,col,dir])=>{
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.3, 12),
+        new THREE.MeshBasicMaterial({color:col, depthTest:false, transparent:true}));
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(dir[0],dir[1],dir[2]));
+      cone.position.set(ex,ey,ez); cone.renderOrder = 20; axG.add(cone);
+    });
+    group.add(axG);
+    labelGroup.add(makeLabelRaw("x(纵桥向)", axLen+0.55, 0, 0, "#dc2626", 0.9));
+    labelGroup.add(makeLabelRaw("y(横桥向)", 0, axLen+0.55, 0, "#16a34a", 0.9));
+    labelGroup.add(makeLabelRaw("z(竖向)", 0, 0, axLen+0.55, "#2563eb", 0.9));
+  }
+
+  /* ---- 尺寸标注（CAD 风格：延长线+尺寸线+箭头+测量文字，场景坐标 x纵桥/y横桥/z竖向） ---- */
+  if($("showLabels").checked){
+    const L = labelGroup, DC = "#1e40af";
+    const V = (x,y,z)=>new THREE.Vector3(x - datumX, y, z);  /* x=顺桥坐标，减基准平移 */
+    /* 横桥向：桥台总宽 W、帽梁总长、基础总宽 */
+    L.add(makeDimRaw(V(p.capCant,-W2,0), V(p.capCant,W2,0), V(-2.6,0,0), `W=${ft(p.W)}`, DC, "sw"));
+    if(p.capH>0) L.add(makeDimRaw(V(0,-q.capL/2,p.H1+p.capH), V(0,q.capL/2,p.H1+p.capH), V(0,0,1.3), `${ft(q.capL)}`, DC, "cap"));
+    L.add(makeDimRaw(V(p.capCant-p.fd1Zf,-q.fdW1/2,-q.fdT), V(p.capCant-p.fd1Zf,q.fdW1/2,-q.fdT), V(-5.0,0,0), `${ft(q.fdW1)}`, DC, "fd"));
+    /* 纵桥向：桥台顺桥向总长 B、基础总长、帽梁宽度、前墙顶宽 t1（前墙顶 x∈[ec, ec+t1]） */
+    L.add(makeDimRaw(V(p.capCant,W2,0), V(p.capCant+p.L2,W2,0), V(0,2.6,0), `B=${ft(p.L2)}`, DC, "sw"));
+    L.add(makeDimRaw(V(p.capCant-p.fd1Zf,q.fdW1/2,-q.fdT), V(p.capCant+p.L2+p.fd1Zb,q.fdW1/2,-q.fdT), V(0,5.0,0), `${ft(q.fdL1)}`, DC, "fd"));
+    if(p.capH>0) L.add(makeDimRaw(V(0,q.capL/2,p.H1+p.capH), V(q.capWid,q.capL/2,p.H1+p.capH), V(0,1.8,0), `${ft(q.capWid)}`, DC, "cap"));
+    L.add(makeDimRaw(V(p.capCant,0,p.H1), V(p.capCant+p.t1,0,p.H1), V(0,0,1.7), `t1=${ft(p.t1)}`, DC, "fw"));
+    /* 竖向：前墙高 H1、侧墙总高 Hs、基础层厚 */
+    L.add(makeDimRaw(V(p.capCant,-W2,0), V(p.capCant,-W2,p.H1), V(0,-2.6,0), `H1=${ft(p.H1)}`, DC, "fw"));
+    L.add(makeDimRaw(V(p.capCant+p.L2,W2,0), V(p.capCant+p.L2,W2,p.Hs), V(0,2.6,0), `Hs=${ft(p.Hs)}`, DC, "sw"));
+    L.add(makeDimRaw(V(p.capCant-p.fd1Zf,-q.fdW1/2,-q.fdT), V(p.capCant-p.fd1Zf,-q.fdW1/2,0), V(-2.0,0,0), `${ft(p.fd1H)}`, DC, "fd"));
+    /* 补充参数标注：帽梁高/背墙高厚/悬出、前墙底宽、分段厚度、上段高、分段顶/底宽 */
+    const xT = p.capCant + p.L2*0.8;
+    if(p.capH>0){
+      L.add(makeDimRaw(V(q.capWid*0.4,q.capL/2,p.H1), V(q.capWid*0.4,q.capL/2,p.H1+p.capH), V(0,1.5,0), `hc=${ft(p.capH)}`, DC, "cap"));
+      L.add(makeDimRaw(V(0,q.capL/2,p.H1+p.capH), V(p.capCant,q.capL/2,p.H1+p.capH), V(0,2.4,0), `ec=${ft(p.capCant)}`, DC, "cap"));
+      if(p.bwH>0) L.add(makeDimRaw(V(q.capWid-p.bwT/2,q.capL/2,p.H1+p.capH), V(q.capWid-p.bwT/2,q.capL/2,p.H1+p.capH+p.bwH), V(0,1.5,0), `hb=${ft(p.bwH)}`, DC, "bw"));
+      if(p.bwT>0) L.add(makeDimRaw(V(q.capWid-p.bwT,q.capL/2,p.H1+p.capH), V(q.capWid,q.capL/2,p.H1+p.capH), V(0,1.1,0), `tb=${ft(p.bwT)}`, DC, "bw"));
+    }
+    L.add(makeDimRaw(V(p.capCant,-p.Wf/2,0), V(p.capCant+q.t1b,-p.Wf/2,0), V(0,-1.8,0), `b1=${ft(q.t1b)}`, DC, "fw"));
+    L.add(makeDimRaw(V(xT,W2,p.Hs), V(xT,W2-p.t2,p.Hs), V(0,0,1.0), `t2=${ft(p.t2)}`, DC, "sw"));
+    L.add(makeDimRaw(V(xT,W2,zS), V(xT,W2-t2b,zS), V(0,0,0.8), `t2b=${ft(t2b)}`, DC, "sw"));
+    L.add(makeDimRaw(V(xT,W2,0), V(xT,W2-q.swBotT,0), V(0,0,0.8), `t3b=${ft(q.swBotT)}`, DC, "sw"));
+    if(p.Hs > zS+1e-6) L.add(makeDimRaw(V(p.capCant+p.L2*0.9,W2,zS), V(p.capCant+p.L2*0.9,W2,p.Hs), V(0,1.8,0), `h2=${ft(p.Hs-zS)}`, DC, "sw"));
+    if(p.Hs > p.H1+1e-6) L.add(makeDimRaw(V(p.capCant+p.t1,W2,zS+(p.Hs-zS)/2), V(p.capCant+p.L2,W2,zS+(p.Hs-zS)/2), V(0,2.0,0), `b2=${ft(p.L2-p.t1)}`, DC, "sw"));
+    if(zS > 1e-6) L.add(makeDimRaw(V(p.capCant+q.t1b,W2,0), V(p.capCant+p.L2,W2,0), V(0,2.0,0), `b3b=${ft(q.swLowBotW)}`, DC, "sw"));
+    /* 坡比文字 */
+    slopeFwSpr = makeLabel(`背坡${p.m1>0?ft(p.m1,1)+":1":"竖直"}`, 0, p.H1/2, p.capCant+(p.t1+q.t1b)/2, "#1f2937", 0.95, "fw");
+    slopeFwAng = p.m1>0 ? Math.atan(1/p.m1) : 0;    /* 坡面与竖直方向夹角（纵桥向视图内） */
+    slopeFwBase = new THREE.Vector3(p.capCant+(p.t1+q.t1b)/2 - datumX, 0, p.H1/2); /* 场景坐标：坡线中点 */
+    slopeFwHh = slopeFwSpr.userData.wh.h/2;
+    L.add(slopeFwSpr);
+    /* 内坡 m2（上段）/ m3（下段）：文字沿坡线书写、底边贴坡线（旋转与贴位在渲染循环按视角更新） */
+    const zU = zS + (p.Hs - zS)/2, txU = p.t2 + slope(p.m2, p.Hs - zU);
+    slopeSpr = makeLabel(`内坡${p.m2>0?ft(p.m2,1)+":1":"竖直"}`, W2-txU, zU, p.capCant+p.L2*0.55, "#1f2937", 0.95, "sw");
+    slopeAng = p.m2>0 ? Math.atan(1/p.m2) : 0;
+    slopeSpr.userData.x = p.capCant+p.L2*0.55 - datumX; slopeSpr.userData.y0 = W2-txU; slopeSpr.userData.z = zU;
+    L.add(slopeSpr);
+    const zL = zS/2, txL = tx(zL);
+    slopeSpr3 = makeLabel(`内坡${p.m3>0?ft(p.m3,1)+":1":"竖直"}`, W2-txL, zL, p.capCant+p.L2*0.55, "#1f2937", 0.95, "sw");
+    slopeAng3 = p.m3>0 ? Math.atan(1/p.m3) : 0;
+    slopeSpr3.userData.x = p.capCant+p.L2*0.55 - datumX; slopeSpr3.userData.y0 = W2-txL; slopeSpr3.userData.z = zL;
+    L.add(slopeSpr3);
+  }
+  /* ---- 部件标高：相对标高（前墙底=0.000）/ 绝对标高（=相对+原点绝对标高），
+          分别受"显示相对标高/显示绝对标高"及分构件开关控制；两者同开时绝对标高外移一列避免重叠 ---- */
+  if($("showEL").checked || $("showELa").checked){
+    const L = labelGroup, eC = "#0f766e", eA = "#0e7490", ea = isFinite(+p.elAbs) ? +p.elAbs : 0;
+    const items = [
+      ["基础底", -q.fdT,             -q.fdW1/2-2.8, -q.fdT+0.3,            p.capCant+p.L2/2,    "fd"],
+      ["前墙底",  0,                 -W2-2.8,        0.35,                 p.capCant+0.5,       "fw"],
+      ["前墙顶",  p.H1,              -W2-2.8,        p.H1+0.4,             p.capCant+p.t1*0.5,  "fw"],
+      ["帽梁顶",  p.H1+p.capH,       -W2-2.8,        p.H1+p.capH+0.4,      q.capWid/2,          "cap"],
+      ["背墙顶",  p.H1+p.capH+p.bwH, -W2-2.8,        p.H1+p.capH+p.bwH+0.4,q.capWid-p.bwT/2,    "bw"],
+      ["侧墙顶",  p.Hs,               W2+2.8,        p.Hs+0.4,             p.capCant+p.L2*0.75, "sw"]
+    ];
+    for(const [nm, z, x, y, zs, part] of items){
+      if(part==="cap" && !(p.capH>0)) continue;
+      if(part==="bw" && !(p.bwH>0)) continue;
+      if($("showEL").checked)  L.add(makeLabel(`${nm} ▽${ft(z,3)}`, x, y, zs, eC, 0.95, part));
+      if($("showELa").checked) L.add(makeLabel(`${nm} ▽${ft(z+ea,3)}`, x, y+($("showEL").checked?2.4:0), zs, eA, 0.95, part));
+    }
+  }
+
+  /* 视角对准模型（场景轴：x纵桥向, y横桥向, z竖向） */
+  const topY = Math.max(p.Hs, p.H1+p.capH+p.bwH), botY = -q.fdT;
+  if(!modelCenter) modelCenter = new THREE.Vector3();
+  modelCenter.set((p.L2+p.capCant)*0.42 - datumX, 0, (topY+botY)/2);
+  if(needFocus && camera){
+    if(!tgt) tgt = new THREE.Vector3();
+    tgt.copy(modelCenter);
+    needFocus = false;
+    updateCam();
+  }
+  scene.add(group);
+  scene.add(labelGroup);
+  lastP = p; lastQ = q; if(hlActive) showHl(hlActive);
+  applyPartVisibility();
+}
+
+/* 分构件显示开关（同时控制对应标注） */
+function applyPartVisibility(){
+  if(!group) return;
+  const show = {
+    fw:$("pFw").checked, sw:$("pSw").checked, cap:$("pCap").checked,
+    bw:$("pBw").checked, fd:$("pFd").checked, fill:$("pFill").checked,
+    ground:$("exGround").checked, exS:$("exSoil").checked, exR:$("exRock").checked
+  };
+  [group, labelGroup].forEach(G=>{
+    if(!G) return;
+    G.traverse(o=>{ if(o.userData && o.userData.part) o.visible = !!show[o.userData.part]; });
+  });
+}
+
+/* ================= 表格 / 主流程 ================= */
+function renderTable(p, q){
+  const rows = [];
+  const mat = id => { try{ return $(id).value || "—"; }catch(_){ return "—"; } };
+  const add = (name, fx, val, unit, mt, cls) => rows.push(
+    `<tr${cls?` class="${cls}"`:""}><td>${name}</td><td class="fx">${fx}</td>`+
+    `<td>${mt||"—"}</td><td class="num">${f(Math.abs(val),3)}</td><td>${unit}</td></tr>`);
+  const sl = m => m>0 ? `${Number(f(m,2))}:1` : "竖直";
+  add("台身（前墙）", `Wf(=桥台总宽W)×H1×(t1+b1)/2 = ${f(p.Wf)}×${f(p.H1)}×(${f(p.t1)}+${f(q.t1b)})/2，背坡${sl(p.m1)}`, q.V_fw, "m³", mat("matFw"));
+  const swTerms = q.swSegs.map(s=>`${f(s.h,2)}×(${f(s.S1,2)}＋4×${f(s.Sm,2)}＋${f(s.S2,2)})/6`).join("＋") || "0";
+  add("侧墙（两道）", `V=Σh/6(A下＋4A中＋A上)×2道＝2×[${swTerms}]（每道，分段点=上/下段分界与前墙顶，段内厚与前端缘随高度线性）`, q.V_sw, "m³", mat("matSw"));
+  add("帽梁", `横桥向长(W+2×ec，两端各悬出ec)×高×宽 = ${f(q.capL)}×${f(p.capH)}×${f(q.capWid)}（立方体）`, q.V_cap, "m³", mat("matCap"));
+  add("背墙", `长(=帽梁总长)×厚×高 = ${f(q.bwL)}×${f(p.bwT)}×${f(p.bwH)}（立方体）`, q.V_bw, "m³", mat("matCap"));
+  add("基础", `${f(q.fdW1)}×${f(q.fdL1)}×${f(p.fd1H)}` + (q.V_fd2>0 ? ` + ${f(q.fdW2)}×${f(q.fdL2)}×${f(p.fd2H)}` : "") +
+      `（整体轮廓+襟边）`, q.V_fd, "m³", mat("matFd"));
+  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">台身+侧墙+帽梁+背墙+基础</td><td>—</td>`+
+    `<td class="num">${f(q.total,3)}</td><td>m³</td></tr>`);
+  rows.push(`<tr class="sep"><td colspan="5">开挖（不计入圬工）</td></tr>`);
+  const segTerms = rock => q.exSegs.filter(s=>s.rock===rock)
+    .map(s=>`${f(s.h,2)}×(${f(s.S1,2)}＋4×${f(s.Sm,2)}＋${f(s.S2,2)})/6`).join("＋") || "0";
+  add("土方开挖", `V=Σh/6(A下＋4A中＋A上)＝${segTerms(false)}（坑底${f(q.excWb)}×${f(q.excLb)}，含工作宽度每侧${f(p.excW)}；坡比(竖:横)${sl(p.excMs)}，分级高度${f(p.excHst,2)}、平台宽${f(p.excB,2)}）`, q.V_exSoil, "m³", "—");
+  add("石方开挖", `V=Σh/6(A下＋4A中＋A上)＝${segTerms(true)}（坑底同上，坡比(竖:横)${sl(p.excMr)}）`, q.V_exRock, "m³", "—");
+  rows.push(`<tr class="sep"><td colspan="5">回填（台腔填土，不计入圬工）</td></tr>`);
+  const fillTerms = q.fillSegs.map(s=>`${f(s.h,2)}×(${f(s.S1,2)}＋4×${f(s.Sm,2)}＋${f(s.S2,2)})/6`).join("＋") || "0";
+  add("回填", `V=Σh/6(A下＋4A中＋A上)＝${fillTerms}（台腔内，前缘为背坡面/帽梁/背墙，顶填至侧墙顶）`, q.V_fill, "m³", mat("matFill"));
+  $("resultBody").innerHTML = rows.join("");
+  $("assumpNote").innerHTML = `<b>模型与计算约定</b>` + [
+    `① 坐标系：原点=前墙底前缘中点（前墙底边中点，剖面图惯例），x 轴=纵桥向（指向台后，前墙前缘竖直面 x=0，帽梁前缘 x=−ec）、y 轴=横桥向（桥台宽度方向）、z 轴=竖向（高度），标高以前墙底=0.000 计，绝对标高=相对标高+原点绝对标高；`,
+    `② U形结构：前墙外面竖直、背坡按 m1:1 放坡（竖:横，0=竖直）；侧墙外面竖直、内面放坡（上段顶厚 t2＝横桥向自外缘向内的墙厚，内坡 m2:1，0=竖直），腔体向下收窄，并按上段（高=帽梁高+背墙高）与下段分段建模；`,
+    `③ 侧墙前端缘贴合前墙背坡面（前墙顶以上竖直 x=t1）——即纵桥向视图所示形状；`,
+    `④ 帽梁为全宽立方体：总长度=桥台总宽 W+2×悬出长度（两端超出台身/前墙外缘各 ec），前缘自前墙前缘向前悬出 ec（前墙顶面 x∈[0, t1]，帽梁前缘 x=−ec，帽梁后缘与前墙顶后缘齐平），顺桥向宽度=帽梁宽度参数，背墙立于帽梁后端顶部（竖肢，组成 L 形台帽）；`,
+    `⑤ 帽梁/背墙均为矩形断面的立方体（无斜边），背墙总长度=帽梁总长度、立于帽梁后端顶部；`,
+    `⑥ 基础按前墙+侧墙整体平面轮廓外扩襟边（横向±、前缘、后缘），可选第二层；`,
+    `⑦ 回填为台腔内填土：前缘为前墙背坡面/帽梁后缘/背墙后缘，顶面填至侧墙顶，背墙顶以上按竖直面向上近似；`,
+    `⑧ 开挖：坑底平面=最底层基础轮廓+每侧工作宽度 c，坑底=基础底面（标高 −(d1+d2)）；现状地面标高=开挖总高度 H挖−d1−d2（地面在坑底以上 H挖）；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
+    `侧墙（两道）、回填及土/石方量均采用**分段拟棱台体积公式** V=∑hᵢ/6·(A下+4A中+A上)（分段点：侧墙/回填为上、下段分界与前墙顶，开挖为每级平台与石土界面；各段内断面面积随高度线性变化、为高度的二次函数，故该公式解析精确）。经典棱台公式 V=h/3·(S₁+S₂+√S₁S₂) 仅当顶底面相似时精确，本模型坑底及侧墙断面顶底不相似，套用会产生系统性偏小（约0.01%~0.07%，随放坡段高度增大而增大），故本表不用经典公式；三维网格体积独立测量与拟棱台公式结果一致，已相互印证。`
+  ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
+}
+
+function rebuild(){
+  const p = readP(), q = calcQ(p);
+  try{
+    $("capLshow").value = f(q.capL);
+    $("bwLshow").value = f(q.bwL);
+    $("t1bshow").value = f(q.t1b);
+    $("swUpHshow").value = f(q.swUpH);
+    $("swTopWshow").value = f(q.swTopW);
+    $("swBotWshow").value = f(q.swBotW);
+    $("swLowTopWshow").value = f(q.swLowTopW);
+    $("swLowTopTshow").value = f(q.swLowTopT);
+    $("swLowHshow").value = f(q.swLowH);
+    $("swBotTshow").value = f(q.swBotT);
+    $("swLowBotWshow").value = f(q.swLowBotW);
+    $("excHr").value = f(q.excHr);
+  }catch(_){}
+  try{
+    renderTable(p, q);
+  }catch(err){
+    $("resultBody").innerHTML = '<tr><td colspan="5" class="neg">计算表渲染出错：'+(err && err.message ? err.message : err)+'</td></tr>';
+  }
+  if(scene){
+    try{
+      if(group){ scene.remove(group); scene.remove(labelGroup);
+        group.traverse(o=>{ if(o.geometry) o.geometry.dispose();
+          if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(mm=>{ if(mm.map) mm.map.dispose(); mm.dispose(); }); } });
+      }
+      buildModel(p, q);
+    }catch(err){
+      console.error(err);
+      try{ $("assumpNote").innerHTML += '<br><span class="neg">三维建模出错：'+(err && err.message ? err.message : err)+'</span>'; }catch(e2){}
+    }
+  }
+}
+
+function exportCSV(){
+  const p = readP(), q = calcQ(p);
+  const lines = [];
+  lines.push(`${$("projName").value || "U型桥台"} - U型桥台工程量计算表`);
+  lines.push(`坡比约定:竖直:水平=m:1,0为竖直面;标高以前墙底=0.000;单位m`);
+  lines.push(`项目,计算式,材料,数量,单位`);
+  const qq = s => `"${String(s).replace(/"/g,'""')}"`;
+  const row = (n2,fx,v,u,mt) => lines.push([qq(n2),qq(fx),qq(mt||""),f(Math.abs(v),3),qq(u)].join(","));
+  const mt = id => { try{ return $(id).value || ""; }catch(_){ return ""; } };
+  const segTerms = rock => (q.exSegs||[]).filter(s=>s.rock===rock)
+    .map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+") || "0";
+  row("台身(前墙)", `${f(p.Wf)}×${f(p.H1)}×(${f(p.t1)}+${f(q.t1b)})/2, 背坡${sl0(p.m1)}`, q.V_fw, "m3", mt("matFw"));  row("侧墙(两道)", `分段拟棱台 V=Σh/6(A下+4A中+A上)×2道=2×[${q.swSegs.map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+")}]`, q.V_sw, "m3", mt("matSw"));
+  row("帽梁", `${f(q.capL)}×${f(p.capH)}×${f(q.capWid,3)}`, q.V_cap, "m3", mt("matCap"));
+  row("背墙", `${f(q.bwL)}×${f(p.bwT)}×${f(p.bwH)}`, q.V_bw, "m3", mt("matCap"));
+  row("基础", `${f(q.fdW1)}×${f(q.fdL1)}×${f(p.fd1H)}` + (q.V_fd2>0 ? `+${f(q.fdW2)}×${f(q.fdL2)}×${f(p.fd2H)}` : ""), q.V_fd, "m3", mt("matFd"));
+  row("土方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(false)}, 坑底${f(q.excWb)}×${f(q.excLb)}(含工作宽度每侧${f(p.excW)}), 坡比(竖:横)${sl0(p.excMs)}, 分级高度${f(p.excHst,2)}/平台宽${f(p.excB,2)}`, q.V_exSoil, "m3");
+  row("石方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(true)}, 坑底同上, 坡比(竖:横)${sl0(p.excMr)}`, q.V_exRock, "m3");
+  row("圬工合计", "台身+侧墙+帽梁+背墙+基础", q.total, "m3");
+  row("回填", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${q.fillSegs.map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+")}, 台腔内填土, 顶填至侧墙顶`, q.V_fill, "m3", mt("matFill"));
+  lines.push("说明:三维参数化估算,最终以施工图工程数量表为准");
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${$("projName").value || "U型桥台"}工程量.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  function sl0(m){ return m>0 ? Number(f(m,2))+":1" : "竖直"; }
+}
+
+document.querySelectorAll("input").forEach(el => el.addEventListener("input", rebuild));
+document.querySelectorAll("select").forEach(el => el.addEventListener("change", rebuild));
+document.querySelectorAll(".toolbar input[type=checkbox]").forEach(el => el.addEventListener("change", rebuild));
+/* 参数输入框聚焦 → 三维对应部位闪烁高亮，失焦取消 */
+Object.keys(PARAM_HL).forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el || !el.addEventListener) return;
+  el.addEventListener("focus", ()=>{ hlActive = id; showHl(id); });
+  el.addEventListener("blur",  ()=>{ if(hlActive === id){ hlActive = null; showHl(null); } });
+});
+/* 信息卡折叠：点击标题折叠/展开（折叠不改变参数值） */
+(function initCardFold(){
+  document.querySelectorAll(".side .card").forEach(card=>{
+    const h = card.querySelector("h2");
+    if(!h || h.querySelector(".tg")) return;
+    const t = document.createElement("span"); t.className = "tg"; t.textContent = "▼";
+    h.appendChild(t);
+    h.addEventListener("click", ()=> card.classList.toggle("collapsed"));
+  });
+})();
+init3D();
+rebuild();
+</script>
+</body>
+</html>

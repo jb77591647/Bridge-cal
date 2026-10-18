@@ -1,0 +1,15 @@
+# 工具/编辑器
+.workbuddy/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 构建与调试中间产物
+.tmp/backup_before_rebuild.html
+.tmp/three.min.js
+.tmp/hl_*.txt
+.tmp/probe*.js
+.tmp/ref_text.txt
+.tmp/uabutment_ref.html

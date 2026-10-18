@@ -1,0 +1,5 @@
+# 统一按 LF 存放与检出（构建产物按字节比对，避免换行被改写）
+* text=auto eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.md text eol=lf

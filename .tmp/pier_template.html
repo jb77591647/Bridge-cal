@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>桥墩三维参数化模型与工程量计算</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff; --line:#e3e8ee; --ink:#1f2937; --sub:#64748b;
+    --accent:#1d4ed8; --accent-soft:#eff4ff; --warn:#b45309;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.55;
+    padding:16px;
+  }
+  .wrap{max-width:1500px; margin:0 auto;}
+  header{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px;}
+  header h1{font-size:19px; font-weight:700; letter-spacing:1px;}
+  header .proj{margin-left:auto; display:flex; align-items:center; gap:8px;}
+  header input[type=text]{width:170px;}
+  .btn{
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;
+    text-decoration:none; display:inline-block;
+  }
+  .btn:hover{border-color:var(--accent); color:var(--accent);}
+  .layout{display:grid; grid-template-columns:370px 1fr; gap:14px; align-items:start;}
+  /* 左侧参数栏：完整展开，不产生内部滚动条/不被裁剪 */
+  /* 左侧参数栏：贴顶固定 + 独立滚动（输入下方参数时仍能看到模型） */
+  .side{position:sticky; top:16px; align-self:start; max-height:calc(100vh - 32px);
+        overflow-y:auto; overflow-x:hidden; padding-right:8px; overscroll-behavior:contain;
+        scrollbar-width:thin; scrollbar-color:#cbd5e1 transparent;}
+  .side::-webkit-scrollbar{width:9px;}
+  .side::-webkit-scrollbar-thumb{background:#cbd5e1; border-radius:5px;}
+  .side::-webkit-scrollbar-thumb:hover{background:#94a3b8;}
+  .side::-webkit-scrollbar-track{background:transparent;}
+  /* 信息卡折叠：点标题栏折叠/展开 */
+  .card h2{display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;}
+  .card h2 .tg{margin-left:auto; color:var(--sub); font-size:10px; transition:transform .15s;}
+  .card.collapsed h2 .tg{transform:rotate(-90deg);}
+  .card.collapsed .fields, .card.collapsed .note, .card.collapsed .chk,
+  .card.collapsed .tblnote, .card.collapsed .sub{display:none !important;}
+  .card.collapsed{padding-bottom:10px;}
+  @media(max-width:1000px){.layout{grid-template-columns:1fr;}}
+  @media(max-width:1000px){.side{position:static; max-height:none; overflow:visible;}}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; margin-bottom:12px;
+  }
+  .card h2{
+    font-size:13px; font-weight:700; margin-bottom:8px; padding-left:8px;
+    border-left:3px solid var(--accent); line-height:1.4;
+  }
+  .fields{display:grid; grid-template-columns:1fr; gap:0;}
+  .field{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0;}
+  .field + .field{border-top:1px dashed #cbd5e1;}
+  .field label{color:#334155; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .field small{color:var(--sub); font-size:10.5px;}
+  input[type=number]{
+    width:78px; padding:3px 6px; border:1px solid #96d3ab; border-radius:5px;
+    font-size:12.5px; text-align:right; background:#d6f2e0;
+  }
+  input[type=number]:focus{outline:none; border-color:#2e9e5b; background:#c2ecd2;}
+  input[type=number]:disabled{background:#eef2f6; border-color:var(--line);}
+  input[type=text]{padding:4px 8px; border:1px solid #96d3ab; border-radius:5px; font-size:13px; background:#d6f2e0;}
+  select{padding:3px 4px; border:1px solid #96d3ab; border-radius:5px; font-size:12.5px; background:#d6f2e0; width:118px; color:var(--ink);}
+  #view3d{
+    width:100%; height:560px; border:1px solid var(--line); border-radius:10px;
+    background:#eef2f6; position:relative; overflow:hidden; cursor:grab;
+  }
+  #view3d:active{cursor:grabbing;}
+  .toolbar{display:flex; gap:12px; align-items:center; margin:8px 2px; flex-wrap:wrap; font-size:12.5px; color:#334155;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{border:1px solid var(--line); padding:5px 7px; text-align:left;}
+  th{background:#f1f5f9; font-weight:600; white-space:nowrap;}
+  td.num{text-align:right; font-variant-numeric:tabular-nums;}
+  td.fx{color:var(--sub); font-size:11.5px;}
+  tr.total td{background:var(--accent-soft); font-weight:700;}
+  tr.sep td{background:#f8fafc; font-weight:600; color:var(--sub); font-size:11.5px;}
+  .neg{color:var(--warn);}
+  .note{
+    font-size:11.5px; color:var(--sub); background:#fffbeb; border:1px solid #fde68a;
+    border-radius:6px; padding:7px 9px; margin-top:8px;
+  }
+  .legend{display:flex; flex-wrap:wrap; gap:10px; font-size:11.5px; color:#334155; margin:6px 2px;}
+  .legend span{display:inline-flex; align-items:center; gap:4px;}
+  .sw{width:14px; height:14px; border-radius:3px; border:1px solid #475569; display:inline-block;}
+  footer{color:var(--sub); font-size:11.5px; text-align:center; margin-top:6px;}
+  @media print{
+    body{background:#fff; padding:0;}
+    .btn,.no-print{display:none;}
+    .card{border:none; page-break-inside:avoid;}
+    .layout{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>桥墩三维参数化模型与工程量计算</h1>
+    <div class="proj no-print">
+      <a class="btn" href="U型桥台三维参数化模型.html">U型桥台计算页</a>
+      <label>项目名称</label>
+      <input type="text" id="projName" value="桥墩">
+      <button class="btn" onclick="exportCSV()">导出CSV</button>
+      <button class="btn" onclick="window.print()">打印</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ===== 左侧参数 ===== -->
+    <div class="no-print side">
+      <div class="card">
+        <h2>总体参数</h2>
+        <div class="fields">
+          <div class="field"><label>桥墩类型</label><select id="pierType">
+            <option selected>实体矩形桥墩</option><option>圆柱式桥墩</option></select></div>
+          <div class="field"><label>墩身高 H <small>墩底(基础顶)→墩顶</small></label><input type="number" id="Hp" value="6" step="0.01"></div>
+          <div class="field"><label>原点绝对标高 <small>墩底(0.000)对应高程</small></label><input type="number" id="elAbs" value="146" step="0.01"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>墩身</h2>
+        <div class="fields" id="fldRect">
+          <div class="field"><label>墩身长 Lp <small>纵桥向</small></label><input type="number" id="Lp" value="2.5" step="0.01"></div>
+          <div class="field"><label>墩身宽 Wp <small>横桥向</small></label><input type="number" id="Wp" value="6" step="0.01"></div>
+        </div>
+        <div class="fields" id="fldCyl" style="display:none;">
+          <div class="field"><label>圆柱直径 d</label><input type="number" id="d" value="1.6" step="0.01"></div>
+          <div class="field"><label>圆柱根数 n <small>单排布置（横桥向）</small></label><input type="number" id="n" value="2" step="1" min="1"></div>
+          <div class="field"><label>柱中心距 s <small>相邻圆柱中心间距</small></label><input type="number" id="s" value="4.5" step="0.01"></div>
+          <div class="field"><label>最外侧圆柱外缘距 Wd <small>=(n−1)×s+d，自动</small></label><input type="number" id="Wdshow" value="" disabled style="background:#eef2f6;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>扩大基础（1～2层）</h2>
+        <div class="fields">
+          <div class="field"><label>一层高度 fh1</label><input type="number" id="fh1" value="1.00" step="0.01"></div>
+          <div class="field"><label>一层襟边 c1 <small>每侧：边长=墩身尺寸+2×c1</small></label><input type="number" id="c1" value="1" step="0.01"></div>
+          <div class="field"><label>一层边长(纵×横) <small>自动</small></label><input type="text" id="f1ABshow" value="" disabled style="background:#eef2f6; width:78px; text-align:right;"></div>
+        </div>
+        <div class="chk" style="margin:6px 0 4px;"><input type="checkbox" id="useFd2">
+          <label for="useFd2">设置第二层基础</label></div>
+        <div class="fields">
+          <div class="field"><label>二层高度 fh2</label><input type="number" id="fh2" value="1.00" step="0.01"></div>
+          <div class="field"><label>二层襟边 c2 <small>每侧：在一层边长上再加</small></label><input type="number" id="c2" value="1" step="0.01"></div>
+          <div class="field"><label>二层边长(纵×横) <small>自动</small></label><input type="text" id="f2ABshow" value="" disabled style="background:#eef2f6; width:78px; text-align:right;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>材料</h2>
+        <div class="fields">
+          <div class="field"><label>墩身</label><select id="matPier">
+            <option>C15砼</option><option>C20砼</option><option>C25砼</option><option selected>C30砼</option><option>C35砼</option>
+            <option>C15片石砼</option><option>C20片石砼</option><option>C25片石砼</option><option>C30片石砼</option><option>C35片石砼</option>
+            <option>M10浆砌块石</option></select></div>
+          <div class="field"><label>基础</label><select id="matFd">
+            <option>C15砼</option><option>C20砼</option><option selected>C25砼</option><option>C30砼</option><option>C35砼</option>
+            <option>C15片石砼</option><option>C20片石砼</option><option>C25片石砼</option><option>C30片石砼</option><option>C35片石砼</option>
+            <option>M10浆砌块石</option></select></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>开挖土石方</h2>
+        <div class="fields">
+          <div class="field"><label>土方开挖坡比 m土 <small>竖:横=m土:1，0=竖直</small></label><input type="number" id="excMs" value="1" step="0.5" min="0"></div>
+          <div class="field"><label>石方开挖坡比 m石 <small>竖:横=m石:1，0=竖直</small></label><input type="number" id="excMr" value="1" step="0.5" min="0"></div>
+          <div class="field"><label>工作宽度 c <small>坑底每侧加宽</small></label><input type="number" id="excW" value="0.5" step="0.01"></div>
+          <div class="field"><label>开挖总高度 H挖 <small>地面至坑底</small></label><input type="number" id="excH" value="3" step="0.01"></div>
+          <div class="field"><label>土方高度 h土 <small>上层土层厚度</small></label><input type="number" id="excHs" value="1" step="0.01"></div>
+          <div class="field"><label>石方高度 h石 <small>=开挖总高度−土方高度，自动</small></label><input type="number" id="excHr" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>开挖分级高度 h分 <small>每级放坡高度</small></label><input type="number" id="excHst" value="5" step="0.1"></div>
+          <div class="field"><label>分级平台宽度 b平 <small>每级平台宽度</small></label><input type="number" id="excB" value="1" step="0.1"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>说明</h2>
+        <div class="note" style="margin-top:0;">
+          坐标系：原点=墩身底面中心（基础顶面中心），x=纵桥向、y=横桥向、z=竖向；标高以墩底=0.000 计，绝对标高=相对标高+原点绝对标高。<br>
+          基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 右侧：3D + 工程量 ===== -->
+    <div>
+      <div id="view3d"></div>
+      <div class="toolbar no-print">
+        <label><input type="checkbox" id="showLabels"> 显示尺寸标注</label>
+        <label><input type="checkbox" id="showEL"> 显示相对标高</label>
+        <label><input type="checkbox" id="showELa"> 显示绝对标高</label>
+        <label><input type="checkbox" id="showAxes"> 显示坐标轴</label>
+        <label><input type="checkbox" id="wireOnly"> 仅显示轮廓</label>
+        <label><input type="checkbox" id="pPier" checked> 墩身</label>
+        <label><input type="checkbox" id="pFd" checked> 基础</label>
+        <label><input type="checkbox" id="exGround"> 现状地平面</label>
+        <label><input type="checkbox" id="exSoil"> 土方开挖</label>
+        <label><input type="checkbox" id="exRock"> 石方开挖</label>
+      </div>
+      <div class="toolbar no-print">
+        <button class="btn" onclick="setViewPreset('long')">纵桥向</button>
+        <button class="btn" onclick="setViewPreset('trans')">横桥向1</button>
+        <button class="btn" onclick="setViewPreset('trans2')">横桥向2</button>
+        <button class="btn" onclick="setViewPreset('top')">俯视平面</button>
+        <button class="btn" onclick="setViewPreset('iso')">45°视角</button>
+        <span style="color:var(--sub); font-size:11.5px;">左键旋转 · 右键/中键平移 · 滚轮缩放</span>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:#c8a27c"></i>墩身</span>
+        <span><i class="sw" style="background:#c9d4de"></i>基础一层</span>
+        <span><i class="sw" style="background:#aab8c9"></i>基础二层</span>
+        <span><i class="sw" style="background:#cfe0c3"></i>现状地面</span>
+        <span><i class="sw" style="background:#e3c98f"></i>土方开挖</span>
+        <span><i class="sw" style="background:#aab4bd"></i>石方开挖</span>
+      </div>
+      <div class="card">
+        <h2>工程量计算表</h2>
+        <table>
+          <thead><tr><th style="width:20%">项目</th><th>计算式</th><th style="width:12%;">材料</th><th style="width:13%; text-align:right;">数量</th><th style="width:6%;">单位</th></tr></thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+        <div class="note" id="assumpNote"></div>
+      </div>
+    </div>
+  </div>
+  <footer>三维模型按参数联动生成 · 基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边 · 使用前请复核参数</footer>
+</div>
+
+<script>/*__THREE__*/</script>
+<script>
+/* ================= 工具 ================= */
+const $ = id => document.getElementById(id);
+const f = (x, n=2) => (isFinite(x) ? x : 0).toFixed(n);
+const ft = (x, n=2) => {          // 三维标注用：去掉小数末尾的 0
+  let s = f(x, n);
+  if(s.indexOf('.') >= 0) s = s.replace(/0+$/,'').replace(/\.$/,'');
+  return s;
+};
+window.addEventListener("error", e => {
+  try{ const el=$("assumpNote"); if(el) el.innerHTML += '<br><span class="neg">脚本错误：'+e.message+'</span>'; }catch(_){}
+});
+
+function readP(){
+  const g0 = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
+  const type = $("pierType").value;
+  $("fldRect").style.display = type==="实体矩形桥墩" ? "" : "none";
+  $("fldCyl").style.display  = type==="圆柱式桥墩"  ? "" : "none";
+  const g = id => { const v = parseFloat($(id).value); return isFinite(v) && v>0 ? v : 0; };
+  const n = Math.max(1, Math.round(g("n")));
+  return {
+    type, H:g("Hp"), elAbs:g0("elAbs"),
+    Lp:g("Lp"), Wp:g("Wp"),
+    d:g("d"), n, s:Math.max(g("d"), g("s")),  // 中心距小于直径时按直径取值，避免柱体重叠
+    useFd2:$("useFd2").checked, fh1:g("fh1"), c1:g("c1"), fh2:g("fh2"), c2:g("c2"),
+    excMs:g("excMs"), excMr:g("excMr"), excW:g("excW"), excH:g("excH"), excHs:g("excHs"),
+    excHst:g("excHst"), excB:g("excB")
+  };
+}
+
+/* ================= 工程量计算 =================
+   坐标系：原点=墩身底面中心，x纵桥向, y横桥向, z竖向(墩底=0, 基础在 z<0)
+   基础边长：一层=墩身尺寸(矩形长宽 或 最外侧圆柱外缘距)+每侧襟边 c1；
+             二层=一层边长+每侧襟边 c2（自上而下分层） */
+function calcQ(p){
+  const q = {};
+  const isRect = p.type==="实体矩形桥墩";
+  const baseA = isRect ? p.Lp : p.d;             // 纵桥向基准尺寸
+  const baseB = isRect ? p.Wp : (p.n-1)*p.s + p.d; // 横桥向基准尺寸（最外侧圆柱外缘距）
+  q.Wd  = (p.n-1)*p.s + p.d;
+  q.a1  = baseA + 2*p.c1;  q.b1 = baseB + 2*p.c1;
+  q.a2  = q.a1 + 2*p.c2;   q.b2 = q.b1 + 2*p.c2;
+  q.fdT = p.fh1 + (p.useFd2 ? p.fh2 : 0);        // 基础总厚
+  q.V_pier = isRect ? p.Lp*p.Wp*p.H : p.n*Math.PI*p.d*p.d/4*p.H;
+  q.V_fd1  = q.a1*q.b1*p.fh1;
+  q.V_fd2  = p.useFd2 ? q.a2*q.b2*p.fh2 : 0;
+  q.V_fd   = q.V_fd1 + q.V_fd2;
+  q.total  = q.V_pier + q.V_fd;
+  /* 开挖：坑底平面=最底层基础轮廓（矩形 边长×边长）+每侧工作宽度，坑底=基础底面（z=−fdT）。
+     分层放坡（下层石方 h石 坡比 m石、上层土方 h土 坡比 m土，层间连续，竖:横=m:1，0=竖直）；
+     分级放坡：自坑底每累计一个分级高度 h分 设一级平台（宽 b平），平台处开挖线每侧水平外移 b平 再继续放坡。
+     断面每侧外放 off(z)=b平×已设平台数 + min(z,h石)/m石 + max(z−h石,0)/m土（z 自坑底）；
+     体积=分段拟棱台 ∑h/6(A下+4A中+A上)（分段点=各级平台与石土界面，段内 off 线性→A 为二次函数，解析精确） */
+  const hsE = Math.min(p.excHs, p.excH);              // 土方层高（不超过开挖总高）
+  q.excHr = Math.max(p.excH - hsE, 0);                // 石方高度 = 开挖总高度 − 土方高度
+  q.excLa = (p.useFd2 ? q.a2 : q.a1) + 2*p.excW;      // 坑底纵桥向长
+  q.excWb = (p.useFd2 ? q.b2 : q.b1) + 2*p.excW;      // 坑底横桥向宽
+  const hSt = p.excHst > 1e-6 ? p.excHst : 1e9;
+  const bSt = Math.max(p.excB, 0);
+  const rR = p.excMr > 0 ? 1/p.excMr : 0, rS = p.excMs > 0 ? 1/p.excMs : 0;
+  const nSt = z => Math.floor(z/hSt + 1e-9);          // z 处（含该标高）已设平台数
+  const off = z => bSt*nSt(z) + Math.min(z, q.excHr)*rR + Math.max(z-q.excHr, 0)*rS;
+  const bps = [0, p.excH];
+  for(let k=1; k*hSt < p.excH - 1e-9; k++) bps.push(k*hSt);
+  if(q.excHr > 1e-6 && q.excHr < p.excH - 1e-9) bps.push(q.excHr);
+  bps.sort((a,b)=>a-b);
+  q.V_exRock = 0; q.V_exSoil = 0; q.exSegs = [];
+  const nBw = z => Math.floor((z - 1e-9)/hSt);        // 略低于 z：不含该标高处平台
+  const Aat = (z, n) => { const o = bSt*n + Math.min(z,q.excHr)*rR + Math.max(z-q.excHr,0)*rS;
+                          return (q.excLa + 2*o) * (q.excWb + 2*o); };
+  for(let i=0; i<bps.length-1; i++){
+    const a = bps[i], b = bps[i+1]; if(b - a < 1e-9) continue;
+    const S1 = Aat(a, nSt(a)), Sm = Aat((a+b)/2, nSt((a+b)/2)), S2 = Aat(b, nBw(b));
+    const V = (b-a)/6 * (S1 + 4*Sm + S2);
+    const rock = (a+b)/2 <= q.excHr;
+    q.exSegs.push({h:b-a, S1, Sm, S2, V, rock});
+    if(rock) q.V_exRock += V; else q.V_exSoil += V;
+  }
+  q.V_ex = q.V_exRock + q.V_exSoil;
+  q.excHsE = hsE; q.excOffR = off(q.excHr); q.excOffTop = off(p.excH);
+  return q;
+}
+
+/* ================= three.js 场景 ================= */
+let scene, camera, renderer, group, labelGroup, sph, tgt;
+let labelSprites = [];             /* 全部文字标注精灵（渲染循环按相机距离自适应缩放，屏幕大小恒定） */
+let hlGroup = null, hlActive = null, hlClock = 0;   /* 参数高亮：聚焦输入框时对应部位闪烁 */
+let modelCenter = null, needFocus = false;
+let TH = THREE;
+
+function init3D(){
+  const box = $("view3d");
+  try{
+    scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, box.clientWidth/box.clientHeight, 0.1, 2000);
+  camera.up.set(0,0,1);   // z 竖向为上
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(box.clientWidth, box.clientHeight);
+  renderer.setClearColor(0xeef2f6);
+  box.appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x99a3b3, 0.95));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.55);
+  dl.position.set(30, 60, 40); scene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0xffffff, 0.25);
+  dl2.position.set(-40, 20, -30); scene.add(dl2);
+  tgt = new THREE.Vector3(0, 0, 3);
+  sph = {r:36, th:2.55, ph:1.12};
+  needFocus = true;
+  resetView();
+  // 交互
+  let drag=null;
+  const el = renderer.domElement;
+  el.addEventListener("contextmenu", e=>e.preventDefault());
+  el.addEventListener("pointerdown", e=>{ drag={x:e.clientX, y:e.clientY, b:e.button}; el.setPointerCapture(e.pointerId); });
+  el.addEventListener("pointerup", e=>{ drag=null; });
+  el.addEventListener("pointermove", e=>{
+    if(!drag) return;
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y; drag.x=e.clientX; drag.y=e.clientY;
+    if(drag.b===0){ camera.up.set(0,0,1); sph.th -= dx*0.005; sph.ph = Math.min(Math.max(sph.ph - dy*0.005, 0.08), Math.PI-0.08); }
+    else {
+      const right=new THREE.Vector3(), up=new THREE.Vector3(0,0,1), fwd=new THREE.Vector3();
+      camera.getWorldDirection(fwd);
+      right.crossVectors(fwd, up).normalize();
+      tgt.addScaledVector(right, -dx*sph.r*0.0011);
+      tgt.addScaledVector(up, dy*sph.r*0.0011);
+    }
+    updateCam();
+  });
+  el.addEventListener("wheel", e=>{ e.preventDefault(); sph.r=Math.min(Math.max(sph.r*(1+e.deltaY*0.001), 2), 300); updateCam(); }, {passive:false});
+  window.addEventListener("resize", ()=>{
+    camera.aspect = box.clientWidth/box.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(box.clientWidth, box.clientHeight);
+  });
+  (function loop(){
+    requestAnimationFrame(loop);
+    /* 标注文字大小自适应：按精灵与相机距离缩放（参考距离36），屏幕显示大小恒定 */
+    for(const sp of labelSprites){
+      if(!sp.userData.wh) continue;
+      const f = Math.min(Math.max(camera.position.distanceTo(sp.position)/36, 0.3), 10);
+      sp.scale.set(sp.userData.wh.w*f, sp.userData.wh.h*f, 1);
+    }
+    renderer.render(scene, camera);
+    /* 参数高亮闪烁（透明度脉冲） */
+    hlClock += 0.05;
+    const hlOp = 0.25 + 0.75*Math.abs(Math.sin(hlClock*4));
+    if(hlGroup) hlGroup.traverse(o=>{ if(o.material) o.material.opacity = hlOp; });
+  })();
+  }catch(err){
+    box.innerHTML = '<div style="padding:24px;color:#b45309;font-size:13px;line-height:1.8;">'+
+      '三维视图初始化失败（当前环境可能不支持 WebGL）：<br>'+ (err && err.message ? err.message : err) +
+      '<br><br>工程量计算不受影响，仍正常显示；将文件下载后用 Chrome/Edge 打开即可看到三维模型。</div>';
+  }
+}
+function updateCam(){
+  if(!camera || !tgt) return;
+  camera.position.set(
+    tgt.x + sph.r*Math.sin(sph.ph)*Math.cos(sph.th),
+    tgt.y + sph.r*Math.sin(sph.ph)*Math.sin(sph.th),
+    tgt.z + sph.r*Math.cos(sph.ph));
+  camera.lookAt(tgt);
+}
+function resetView(){
+  sph = {r:36, th:2.55, ph:1.12};
+  if(camera) camera.up.set(0,0,1);
+  if(!modelCenter) modelCenter = new THREE.Vector3(0, 0, 3);
+  tgt = modelCenter.clone();
+  updateCam();
+}
+/* 固定视角预设（严格垂直于坐标平面：纵桥向⊥XZ、横桥向⊥YZ、俯视⊥XY） */
+function setViewPreset(kind){
+  if(!camera) return;
+  if(!modelCenter) modelCenter = new THREE.Vector3(0, 0, 3);
+  tgt = modelCenter.clone();
+  const r = (sph && sph.r) ? sph.r : 36;
+  if(kind==='trans'){       sph = {r, th:Math.PI, ph:Math.PI/2}; }
+  else if(kind==='trans2'){ sph = {r, th:0, ph:Math.PI/2}; }
+  else if(kind==='long'){   sph = {r, th:-Math.PI/2, ph:Math.PI/2}; }
+  else if(kind==='top'){    sph = {r, th:-Math.PI/2, ph:0}; }
+  else if(kind==='iso'){    sph = {r, th:3*Math.PI/4, ph:1.22}; }
+  camera.up.set(0, kind==='top' ? 1 : 0, kind==='top' ? 0 : 1);
+  updateCam();
+}
+
+/* ---- 几何工具 ---- */
+const MAT = {
+  pier: ()=> new THREE.MeshLambertMaterial({color:0xc8a27c, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  fd1 : ()=> new THREE.MeshLambertMaterial({color:0xc9d4de, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  fd2 : ()=> new THREE.MeshLambertMaterial({color:0xaab8c9, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  ground: ()=> new THREE.MeshLambertMaterial({color:0xcfe0c3, side:THREE.DoubleSide, transparent:true, opacity:0.38,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1}),
+  exS : ()=> new THREE.MeshLambertMaterial({color:0xe3c98f, side:THREE.DoubleSide, transparent:true, opacity:0.45,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  exR : ()=> new THREE.MeshLambertMaterial({color:0xaab4bd, side:THREE.DoubleSide, transparent:true, opacity:0.55,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
+  edge: ()=> new THREE.LineBasicMaterial({color:0x3f4a5a}),
+  dash: ()=> new THREE.LineDashedMaterial({color:0x8a94a6, dashSize:0.3, gapSize:0.18,
+           depthFunc:THREE.GreaterDepth, depthWrite:false, transparent:true, opacity:0.95})
+};
+function hexaMesh(v8, mat){
+  const idx=[0,1,2,3, 5,4,7,6, 0,1,5,4, 1,2,6,5, 2,3,7,6, 3,0,4,7];
+  const pos=[];
+  for(let i=0;i<idx.length;i+=4){
+    const a=idx[i], b=idx[i+1], c=idx[i+2], d=idx[i+3];
+    pos.push(...v8[a].toArray(),...v8[b].toArray(),...v8[c].toArray());
+    pos.push(...v8[a].toArray(),...v8[c].toArray(),...v8[d].toArray());
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, mat);
+  addDualEdges(mesh, g, 12);
+  return mesh;
+}
+/* 棱线双份：实线=可见轮廓，虚线=被遮挡的隐藏棱线（深度测试 GreaterDepth） */
+function addDualEdges(mesh, g, threshold){
+  const eg = new TH.EdgesGeometry(g, threshold);
+  mesh.add(new THREE.LineSegments(eg, MAT.edge()));
+  const dg = new THREE.LineSegments(eg, MAT.dash());
+  dg.computeLineDistances();
+  dg.renderOrder = 5;
+  dg.visible = $("wireOnly").checked;
+  mesh.add(dg);
+}
+/* 文字标注（场景坐标 x纵桥/y横桥/z竖向） */
+function makeLabelRaw(text, x, y, z, color, scale, part){
+  color = color || "#1f2937"; scale = scale || 1; part = part || null;
+  const fs=30, pad=12;
+  const cv=document.createElement("canvas"), ctx=cv.getContext("2d");
+  ctx.font = fs+'px "Microsoft YaHei",sans-serif';
+  cv.width = Math.ceil(ctx.measureText(text).width)+pad*2;
+  cv.height = fs+pad*2;
+  const c2 = cv.getContext("2d");
+  c2.font = fs+'px "Microsoft YaHei",sans-serif';
+  c2.fillStyle = "rgba(255,255,255,0.88)";
+  c2.strokeStyle = "#64748b"; c2.lineWidth = 2;
+  c2.beginPath();
+  const r=8, W=cv.width, Hh=cv.height;
+  c2.moveTo(r,0); c2.lineTo(W-r,0); c2.quadraticCurveTo(W,0,W,r); c2.lineTo(W,Hh-r);
+  c2.quadraticCurveTo(W,Hh,W-r,Hh); c2.lineTo(r,Hh); c2.quadraticCurveTo(0,Hh,0,Hh-r);
+  c2.lineTo(0,r); c2.quadraticCurveTo(0,0,r,0); c2.fill(); c2.stroke();
+  c2.fillStyle = color; c2.textBaseline = "middle";
+  c2.fillText(text, pad, Hh/2);
+  const tex = new TH.CanvasTexture(cv); tex.minFilter = TH.LinearFilter;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false, transparent:true}));
+  const kk = 0.024*scale;
+  sp.userData.wh = {w: cv.width*kk, h: cv.height*kk};
+  sp.scale.set(sp.userData.wh.w, sp.userData.wh.h, 1);
+  labelSprites.push(sp);
+  sp.position.set(x,y,z);
+  sp.userData.part = part;
+  return sp;
+}
+/* CAD 风格尺寸标注：p1/p2=被测点，off=尺寸线偏移矢量，text=测量文字，part=所属构件（随构件显隐） */
+function makeDimRaw(p1, p2, off, text, color, part){
+  color = color || "#1e40af";
+  const c = new THREE.Color(color);
+  const mat = new THREE.LineBasicMaterial({color:c, depthTest:false, transparent:true});
+  const A = p1.clone().add(off), B = p2.clone().add(off);
+  const g = new THREE.Group();
+  const seg = (a,b)=>{ g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]), mat)); };
+  const dir = p2.clone().sub(p1); const L = dir.length(); dir.normalize();
+  const u = off.clone().normalize();
+  seg(p1.clone().addScaledVector(u,0.12), A.clone().addScaledVector(u,0.35));
+  seg(p2.clone().addScaledVector(u,0.12), B.clone().addScaledVector(u,0.35));
+  seg(A, B);
+  const aL = Math.min(0.7, L*0.12);
+  const coneG = new THREE.ConeGeometry(aL*0.22, aL, 12);
+  const coneM = new THREE.MeshBasicMaterial({color:c, depthTest:false, transparent:true});
+  [[A, dir.clone().negate()], [B, dir.clone()]].forEach(([pt,d])=>{
+    const cone = new THREE.Mesh(coneG, coneM);
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), d);
+    cone.position.copy(pt).addScaledVector(d, -aL/2);
+    g.add(cone);
+  });
+  const mid = A.clone().add(B).multiplyScalar(0.5).addScaledVector(u, 0.8);
+  const sp = makeLabelRaw(text, mid.x, mid.y, mid.z, color, 0.65);
+  if(Math.abs(dir.z) > 0.9) sp.material.rotation = Math.PI/2;
+  g.add(sp);
+  g.traverse(o=>{ o.renderOrder = 10; });
+  if(part) g.userData.part = part;
+  return g;
+}
+
+/* ---- 建模（场景坐标：x纵桥向, y横桥向, z竖向；墩底=0，基础在 z<0） ---- */
+/* ================= 参数高亮：输入框聚焦时对应部位/边长闪烁（实体粗管，避免线宽限制） =================
+   约定：几何点均用场景坐标 (x=纵桥向, y=横桥向, z=竖向)，原点=墩底中心 */
+const HL_C = 0xef4444;
+let lastP = null, lastQ = null;
+function hlR(p, q){
+  const span = Math.max(p.H || 0, q.a1 || 0, q.b1 || 0, (p.excH || 0) + Math.abs(q.fdT || 0), 1);
+  return Math.min(Math.max(span*0.0065, 0.025), 0.085);   /* 管半径：约模型尺度0.65%，限幅2.5~8.5cm */
+}
+function hlTube(g, pts, r){
+  const up = new THREE.Vector3(0,1,0), a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+  for(let i=0; i+5 < pts.length; i+=6){
+    a.set(pts[i], pts[i+1], pts[i+2]); b.set(pts[i+3], pts[i+4], pts[i+5]);
+    d.subVectors(b, a); const L = d.length(); if(L < 1e-9) continue;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, 8, 1),
+      new THREE.MeshBasicMaterial({color:HL_C, depthTest:false, transparent:true}));
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(up, d.normalize());
+    m.renderOrder = 18; g.add(m);
+  }
+}
+function hlTorus(g, cx, cy, cz, R, r){
+  const m = new THREE.Mesh(new THREE.TorusGeometry(R, r, 10, 72),
+    new THREE.MeshBasicMaterial({color:HL_C, depthTest:false, transparent:true}));
+  m.position.set(cx, cy, cz); m.renderOrder = 18; g.add(m);   /* Torus 默认在 XY 平面，法向 z，正对竖向圆柱 */
+}
+/* 矩形环（水平面），返回线段端点数组 */
+function hlRect(x0, x1, y0, y1, z){
+  return [x0,y0,z, x1,y0,z,  x1,y0,z, x1,y1,z,  x1,y1,z, x0,y1,z,  x0,y1,z, x0,y0,z];
+}
+/* 竖向量高（带上下端刻度） */
+function hlVert(x, y, z0, z1, tick){
+  tick = tick || 0.45;
+  return [x,y,z0, x,y,z1,  x,y,z0, x+(x>=0?tick:-tick),y,z0,  x,y,z1, x+(x>=0?tick:-tick),y,z1];
+}
+function hlParts(g, tags, r){
+  const a = new THREE.Vector3(), b = new THREE.Vector3();
+  group.traverse(o=>{
+    if(!o.isMesh || !o.userData.part || tags.indexOf(o.userData.part) < 0) return;
+    const eg = new THREE.EdgesGeometry(o.geometry, 30), pos = eg.getAttribute("position");
+    o.updateMatrix();
+    const pts = [];
+    for(let i=0; i+1 < pos.count; i+=2){
+      a.fromBufferAttribute(pos, i).applyMatrix4(o.matrix);
+      b.fromBufferAttribute(pos, i+1).applyMatrix4(o.matrix);
+      pts.push(a.x,a.y,a.z, b.x,b.y,b.z);
+    }
+    hlTube(g, pts, r);
+  });
+}
+/* 开挖断面：与建模同式（bps 分段 + 每侧外放 off(z)） */
+function excProfile(p, q){
+  const hSt = p.excHst > 1e-6 ? p.excHst : 1e9;
+  const bSt = Math.max(p.excB, 0);
+  const rR = p.excMr > 0 ? 1/p.excMr : 0, rS = p.excMs > 0 ? 1/p.excMs : 0;
+  const nA = z => Math.floor(z/hSt + 1e-9), nB = z => Math.floor((z - 1e-9)/hSt);
+  const off = (z, n) => bSt*n + Math.min(z, q.excHr)*rR + Math.max(z - q.excHr, 0)*rS;
+  const bps = [0, p.excH];
+  for(let k=1; k*hSt < p.excH - 1e-9; k++) bps.push(k*hSt);
+  if(q.excHr > 1e-6 && q.excHr < p.excH - 1e-9) bps.push(q.excHr);
+  bps.sort((x,y)=>x-y);
+  return {bps, off, nA, nB, hSt, bSt};
+}
+/* 参数 → 部位/边长映射：{pts:粗线段} / {circles:[x,y,z,R]} / {parts:[部件标签]}，null=不适用 */
+const PARAM_HL = {
+  Hp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
+            -p.Lp/2,-p.Wp/2,0, -p.Lp/2,-p.Wp/2,p.H,     /* 四条竖直棱（墩底→墩顶） */
+             p.Lp/2,-p.Wp/2,0,  p.Lp/2,-p.Wp/2,p.H,
+            -p.Lp/2, p.Wp/2,0, -p.Lp/2, p.Wp/2,p.H,
+             p.Lp/2, p.Wp/2,0,  p.Lp/2, p.Wp/2,p.H ]} : {parts:["pier"]},
+  Lp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
+            -p.Lp/2,-p.Wp/2,0,  p.Lp/2,-p.Wp/2,0,     /* 底边（纵桥向） */
+            -p.Lp/2, p.Wp/2,0,  p.Lp/2, p.Wp/2,0,
+            -p.Lp/2,-p.Wp/2,p.H, p.Lp/2,-p.Wp/2,p.H,  /* 顶边 */
+            -p.Lp/2, p.Wp/2,p.H, p.Lp/2, p.Wp/2,p.H ]} : {parts:["pier"]},
+  Wp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
+            -p.Lp/2,-p.Wp/2,0, -p.Lp/2, p.Wp/2,0,     /* 底边（横桥向） */
+             p.Lp/2,-p.Wp/2,0,  p.Lp/2, p.Wp/2,0,
+            -p.Lp/2,-p.Wp/2,p.H, -p.Lp/2, p.Wp/2,p.H,
+             p.Lp/2,-p.Wp/2,p.H,  p.Lp/2, p.Wp/2,p.H ]} : {parts:["pier"]},
+  d:     (p,q)=>{ const y0 = -(p.n-1)/2*p.s, y1 = (p.n-1)/2*p.s;
+            const C = [[0,y0,0,p.d/2], [0,y0,p.H,p.d/2]];
+            if(Math.abs(y1-y0) > 1e-9){ C.push([0,y1,0,p.d/2], [0,y1,p.H,p.d/2]); }
+            return {circles:C, pts:[0,y0-p.d/2,p.H, 0,y0+p.d/2,p.H]}; },   /* 圆环 + 顶面直径线 */
+  n:     (p,q)=>{ const C = [];
+            for(let i=0;i<p.n;i++){ const y = (i-(p.n-1)/2)*p.s;
+              C.push([0,y,0,p.d/2], [0,y,p.H,p.d/2]); }
+            return {circles:C}; },
+  s:     (p,q)=>{ const y0 = -(p.n-1)/2*p.s, y1 = (p.n-1)/2*p.s, z = p.H + 0.35;
+            const pts = [0,y0,z, 0,y1,z,  0,y0,z-0.25, 0,y0,z+0.25,  0,y1,z-0.25, 0,y1,z+0.25];
+            return {pts}; },                                              /* 柱中心距（柱顶上方量线） */
+  fh1:   (p,q)=>{ const a=q.a1, b=q.b1;              /* 一层基础：四个角点竖直棱（基础底→基础顶） */
+            return {pts:[ -a/2,-b/2,-p.fh1, -a/2,-b/2,0,   a/2,-b/2,-p.fh1,  a/2,-b/2,0,
+                          -a/2, b/2,-p.fh1, -a/2, b/2,0,   a/2, b/2,-p.fh1,  a/2, b/2,0 ]}; },
+  fh2:   (p,q)=>{ if(!p.useFd2) return null; const a=q.a2, b=q.b2;   /* 二层基础：四个角点竖直棱 */
+            return {pts:[ -a/2,-b/2,-q.fdT, -a/2,-b/2,-p.fh1,  a/2,-b/2,-q.fdT,  a/2,-b/2,-p.fh1,
+                          -a/2, b/2,-q.fdT, -a/2, b/2,-p.fh1,  a/2, b/2,-q.fdT,  a/2, b/2,-p.fh1 ]}; },
+  c1:    (p,q)=>{ const a0 = p.type==="实体矩形桥墩" ? p.Lp : p.d,
+                      b0 = p.type==="实体矩形桥墩" ? p.Wp : q.Wd;
+            return {pts:[...hlRect(-a0/2,a0/2,-b0/2,b0/2,0),        /* 墩身底轮廓 */
+                         ...hlRect(-q.a1/2,q.a1/2,-q.b1/2,q.b1/2,0)]}; },  /* 一层顶轮廓（襟边环带） */
+  c2:    (p,q)=> p.useFd2 ? {pts:[...hlRect(-q.a1/2,q.a1/2,-q.b1/2,q.b1/2,-p.fh1),
+                                    ...hlRect(-q.a2/2,q.a2/2,-q.b2/2,q.b2/2,-p.fh1)]} : null,
+  excW:  (p,q)=>{ const aL = p.useFd2 ? q.a2 : q.a1, bL = p.useFd2 ? q.b2 : q.b1, z = -q.fdT;
+            return {pts:[...hlRect(-aL/2,aL/2,-bL/2,bL/2,z),                        /* 基础底轮廓 */
+                         ...hlRect(-(aL/2+p.excW),aL/2+p.excW,-(bL/2+p.excW),bL/2+p.excW,z)]}; }, /* 坑底轮廓 */
+  excH:  (p,q)=>{ if(!(p.excH > 1e-6)) return null; const w0y = q.excWb/2;   /* 坑口前缘一条竖向量线：坑底→现状地面 */
+            return {pts:[0, w0y + q.excOffTop, -q.fdT, 0, w0y + q.excOffTop, -q.fdT + p.excH]}; },
+  excHs: (p,q)=>{ if(!(q.excHsE > 1e-6)) return null; const w0y = q.excWb/2;   /* 土方层：一条竖向量线（土石分界→地面） */
+            return {pts:[0, w0y + q.excOffTop, -q.fdT + p.excH - q.excHsE, 0, w0y + q.excOffTop, -q.fdT + p.excH]}; },
+  excHr: (p,q)=>{ if(!(q.excHr > 1e-6)) return null; const w0y = q.excWb/2;     /* 石方层：一条竖向量线（坑底→土石分界） */
+            return {pts:[0, w0y + q.excOffTop, -q.fdT, 0, w0y + q.excOffTop, -q.fdT + q.excHr]}; },
+  excMs: (p,q)=>{ if(!(q.excHsE > 1e-6)) return null;
+            const w0y = q.excWb/2, {bps, off, nA, nB} = excProfile(p,q), pts = [];
+            for(let i=0;i<bps.length-1;i++){ const a = bps[i], b = bps[i+1];
+              if(a < q.excHr - 1e-9 || b - a < 1e-9) continue;
+              pts.push(0, w0y + off(a, nA(a)), -q.fdT + a,  0, w0y + off(b, nB(b)), -q.fdT + b); }
+            return {parts:["exS"], pts}; },                                  /* 土方坡面斜线 */
+  excMr: (p,q)=>{ if(!(q.excHr > 1e-6)) return null;
+            const w0y = q.excWb/2, {bps, off, nA, nB} = excProfile(p,q), pts = [];
+            for(let i=0;i<bps.length-1;i++){ const a = bps[i], b = bps[i+1];
+              if(b > q.excHr + 1e-9 || b - a < 1e-9) continue;
+              pts.push(0, w0y + off(a, nA(a)), -q.fdT + a,  0, w0y + off(b, nB(b)), -q.fdT + b); }
+            return {parts:["exR"], pts}; },                                  /* 石方坡面斜线 */
+  excHst:(p,q)=>{ if(!(p.excHst > 1e-6)) return null; const w0y = q.excWb/2;   /* 分级高度：一条竖向量线（坑底起量一级） */
+            return {pts:[0, w0y + q.excOffTop, -q.fdT, 0, w0y + q.excOffTop, -q.fdT + p.excHst]}; },
+  excB:  (p,q)=>{ if(!(p.excB > 1e-6) || !(p.excHst > 1e-6)) return null;
+            const {off, nA, nB, hSt} = excProfile(p,q), w0x = q.excLa/2, w0y = q.excWb/2, pts = [];
+            for(let k=1; k*hSt < p.excH - 1e-9; k++){ const z = k*hSt, zA = -q.fdT + z;
+              const oB = off(z, nB(z)), oA = off(z, nA(z)), L = oA - oB;
+              if(L < 1e-9) continue;
+              pts.push(w0x+oB, w0y+oB, zA, w0x+oA, w0y+oB, zA);   /* 四角台阶宽 */
+              pts.push(-(w0x+oB), w0y+oB, zA, -(w0x+oA), w0y+oB, zA);
+              pts.push(w0x+oB, -(w0y+oB), zA, w0x+oA, -(w0y+oB), zA);
+              pts.push(-(w0x+oB), -(w0y+oB), zA, -(w0x+oA), -(w0y+oB), zA);
+              pts.push(w0x+oB, w0y+oB, zA, w0x+oB, w0y+oA, zA);
+              pts.push(-(w0x+oB), w0y+oB, zA, -(w0x+oB), w0y+oA, zA);
+              pts.push(w0x+oB, -(w0y+oB), zA, w0x+oB, -(w0y+oA), zA);
+              pts.push(-(w0x+oB), -(w0y+oB), zA, -(w0x+oB), -(w0y+oA), zA);
+            }
+            if(!pts.length){ const zA = -q.fdT + p.excH;   /* 无平台：在坑口后角示意台阶宽 */
+              pts.push(w0x + q.excOffTop, w0y + q.excOffTop, zA, w0x + q.excOffTop + p.excB, w0y + q.excOffTop, zA); }
+            return {pts}; },                                                /* 平台台阶宽度 */
+  elAbs: ()=>({pts:[-0.6,0,0, 0.6,0,0,  0,-0.6,0, 0,0.6,0,  0,0,-0.6, 0,0,0.6]}),  /* 原点十字 */
+  matPier:(p,q)=>({parts:["pier"]}),
+  matFd: (p,q)=>({parts:["fd1","fd2"]})
+};
+function showHl(id){
+  if(hlGroup && hlGroup.parent) hlGroup.parent.remove(hlGroup);
+  hlGroup = null;
+  if(!id || !lastP || !PARAM_HL[id]) return;
+  const p = lastP, q = lastQ, r = hlR(p, q);
+  let def = null; try{ def = PARAM_HL[id](p, q); }catch(e){}
+  if(!def) return;
+  const g = new THREE.Group();
+  if(def.pts && def.pts.length) hlTube(g, def.pts, r);
+  if(def.circles) def.circles.forEach(c=>hlTorus(g, c[0], c[1], c[2], c[3], r*1.15));
+  if(def.parts) hlParts(g, def.parts, r);
+  hlGroup = g;
+  if(scene) scene.add(g);
+}
+
+function buildModel(p, q){
+  group = new THREE.Group(); labelGroup = new THREE.Group(); labelSprites = [];
+  const V = (x,y,z)=>new THREE.Vector3(x,y,z);
+  const box = (x0,x1,y0,y1,z0,z1, mat) => hexaMesh([
+    V(x0,y0,z0), V(x1,y0,z0), V(x1,y1,z0), V(x0,y1,z0),
+    V(x0,y0,z1), V(x1,y0,z1), V(x1,y1,z1), V(x0,y1,z1)
+  ], mat);
+  const isRect = p.type==="实体矩形桥墩";
+
+  /* 基础（自上而下：一层 z∈[−fh1,0]，二层 z∈[−fdT,−fh1]） */
+  group.add(Object.assign(box(-q.a1/2,q.a1/2,-q.b1/2,q.b1/2,-p.fh1,0, MAT.fd1()), {userData:{part:"fd1"}}));
+  if(p.useFd2)
+    group.add(Object.assign(box(-q.a2/2,q.a2/2,-q.b2/2,q.b2/2,-q.fdT,-p.fh1, MAT.fd2()), {userData:{part:"fd2"}}));
+
+  /* 墩身 */
+  if(isRect){
+    group.add(Object.assign(box(-p.Lp/2,p.Lp/2,-p.Wp/2,p.Wp/2,0,p.H, MAT.pier()), {userData:{part:"pier"}}));
+  }else{
+    for(let i=0;i<p.n;i++){
+      const y = (i-(p.n-1)/2)*p.s;
+      const g = new THREE.CylinderGeometry(p.d/2, p.d/2, p.H, 32, 1, false);
+      g.rotateX(Math.PI/2);                      /* 圆柱轴转为竖向 z */
+      const mesh = new THREE.Mesh(g, MAT.pier());
+      mesh.position.set(0, y, p.H/2);
+      addDualEdges(mesh, g, 12);
+      mesh.userData.part = "pier";
+      group.add(mesh);
+    }
+  }
+
+  /* ---- 开挖显示：分级放坡棱台带 + 现状地平面（半透明，显隐由工具栏开关控制） ----
+     坑底=最底层基础轮廓+每侧工作宽度（坑底标高 z=−fdT），地面=zBot+H挖；
+     分层放坡（下石上土、层间连续）+分级平台（每 h分 一级、宽 b平，平台处断面外移 b平 形成台阶） */
+  if(p.excH > 1e-6){
+    const w0x = q.excLa/2, w0y = q.excWb/2;
+    const zBot = -q.fdT, zGnd = zBot + p.excH;
+    const hSt = p.excHst > 1e-6 ? p.excHst : 1e9;
+    const bSt = Math.max(p.excB, 0);
+    const rR = p.excMr > 0 ? 1/p.excMr : 0, rS = p.excMs > 0 ? 1/p.excMs : 0;
+    const nAbove = z => Math.floor(z/hSt + 1e-9);       /* 标高 z 略上方：含该处平台 */
+    const nBelow = z => Math.floor((z - 1e-9)/hSt);     /* 标高 z 略下方：不含该处平台 */
+    const offAB = (z, n) => bSt*n + Math.min(z, q.excHr)*rR + Math.max(z-q.excHr, 0)*rS;
+    const bps = [0, p.excH];
+    for(let k=1; k*hSt < p.excH - 1e-9; k++) bps.push(k*hSt);
+    if(q.excHr > 1e-6 && q.excHr < p.excH - 1e-9) bps.push(q.excHr);
+    bps.sort((a,b)=>a-b);
+    for(let i=0; i<bps.length-1; i++){
+      const a = bps[i], b = bps[i+1]; if(b - a < 1e-9) continue;
+      const oLo = offAB(a, nAbove(a)), oHi = offAB(b, nBelow(b));
+      const band = hexaMesh([
+        V(-w0x-oLo,-w0y-oLo,zBot+a), V(w0x+oLo,-w0y-oLo,zBot+a), V(w0x+oLo,w0y+oLo,zBot+a), V(-w0x-oLo,w0y+oLo,zBot+a),
+        V(-w0x-oHi,-w0y-oHi,zBot+b), V(w0x+oHi,-w0y-oHi,zBot+b), V(w0x+oHi,w0y+oHi,zBot+b), V(-w0x-oHi,w0y+oHi,zBot+b)
+      ], (a+b)/2 <= q.excHr ? MAT.exR() : MAT.exS());
+      band.userData.part = (a+b)/2 <= q.excHr ? "exR" : "exS";
+      group.add(band);
+    }
+    if($("exGround").checked){
+      const mg = 6, wGx = w0x + q.excOffTop + mg, wGy = w0y + q.excOffTop + mg;
+      const gnd = hexaMesh([
+        V(-wGx,-wGy,zGnd-0.12), V(wGx,-wGy,zGnd-0.12), V(wGx,wGy,zGnd-0.12), V(-wGx,wGy,zGnd-0.12),
+        V(-wGx,-wGy,zGnd), V(wGx,-wGy,zGnd), V(wGx,wGy,zGnd), V(-wGx,wGy,zGnd)
+      ], MAT.ground());
+      gnd.userData.part = "ground"; group.add(gnd);
+    }
+    /* ---- 开挖尺寸标注（CAD 风格，受"显示尺寸标注"+土/石方开关控制） ---- */
+    if($("showLabels").checked){
+      const L = labelGroup, ER = "#475569", ES = "#b45309";
+      const exPart = q.excHr > 1e-6 ? "exR" : "exS";
+      const zMid = zBot + q.excHr;
+      /* 坑底平面尺寸：坑底长（纵桥向）/ 坑底宽（横桥向） */
+      L.add(makeDimRaw(V(-w0x,-w0y,zBot), V(w0x,-w0y,zBot), V(0,-1.8,0), `坑底长=${ft(q.excLa)}`, ER, exPart));
+      L.add(makeDimRaw(V(-w0x,-w0y,zBot), V(-w0x,w0y,zBot), V(-1.8,0,0), `坑底宽=${ft(q.excWb)}`, ER, exPart));
+      /* 高度链：石方 h石 / 土方 h土 / 总高 H挖（坑底→地面，纵桥向外移竖向标注） */
+      const xR = w0x + q.excOffTop + 1.2;
+      if(q.excHr > 1e-6) L.add(makeDimRaw(V(xR,0,zBot), V(xR,0,zMid), V(0,0,1.6), `h石=${ft(q.excHr)}`, ER, "exR"));
+      if(q.excHsE > 1e-6) L.add(makeDimRaw(V(xR,0,zMid), V(xR,0,zGnd), V(0,0,1.6), `h土=${ft(q.excHsE)}`, ES, "exS"));
+      L.add(makeDimRaw(V(xR+2.0,0,zBot), V(xR+2.0,0,zGnd), V(0,0,1.6), `H挖=${ft(p.excH)}`, ER, exPart));
+      /* 分级平台宽度（每级一级，标在平台台阶处，横桥向） */
+      for(let k=1; k*hSt < p.excH - 1e-9; k++){
+        const z = k*hSt, yb = w0y + offAB(z, nBelow(z)), ya = w0y + offAB(z, nAbove(z));
+        L.add(makeDimRaw(V(0,yb,zBot+z), V(0,ya,zBot+z), V(0,0,0.45), `b平=${ft(bSt)}`, ES, z <= q.excHr+1e-9 ? "exR" : "exS"));
+      }
+      /* 坡比文字（贴外坡面中点） */
+      if(q.excHr > 1e-6){
+        const zr = q.excHr/2, offr = offAB(zr, nBelow(zr));
+        L.add(makeLabelRaw(`石方坡比${p.excMr>0?ft(p.excMr,1)+":1":"竖直"}`, w0x+offr+0.4, 0, zBot+zr, "#334155", 0.9, "exR"));
+      }
+      if(q.excHsE > 1e-6){
+        const zs = q.excHr + q.excHsE/2, offs = offAB(zs, nBelow(zs));
+        L.add(makeLabelRaw(`土方坡比${p.excMs>0?ft(p.excMs,1)+":1":"竖直"}`, w0x+offs+0.4, 0, zBot+zs, "#92400e", 0.9, "exS"));
+      }
+    }
+  }
+
+  /* ---- 三维坐标轴（原点=墩底中心：x纵桥向, y横桥向, z竖向；长度2，端点带箭头，
+          depthTest=false 保证不被构件面遮挡） ---- */
+  if($("showAxes").checked){
+    const axLen = 2;
+    const ax = new THREE.AxesHelper(axLen);
+    ax.material.depthTest = false; ax.material.transparent = true; ax.renderOrder = 20;
+    group.add(ax);
+    const axG = new THREE.Group();
+    [[axLen,0,0,0xdc2626,[1,0,0]], [0,axLen,0,0x16a34a,[0,1,0]], [0,0,axLen,0x2563eb,[0,0,1]]]
+    .forEach(([ex,ey,ez,col,dir])=>{
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.3, 12),
+        new THREE.MeshBasicMaterial({color:col, depthTest:false, transparent:true}));
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), new THREE.Vector3(dir[0],dir[1],dir[2]));
+      cone.position.set(ex,ey,ez); cone.renderOrder = 20; axG.add(cone);
+    });
+    group.add(axG);
+    labelGroup.add(makeLabelRaw("x(纵桥向)", axLen+0.55, 0, 0, "#dc2626", 0.9));
+    labelGroup.add(makeLabelRaw("y(横桥向)", 0, axLen+0.55, 0, "#16a34a", 0.9));
+    labelGroup.add(makeLabelRaw("z(竖向)", 0, 0, axLen+0.55, "#2563eb", 0.9));
+  }
+
+  /* ---- 尺寸标注（CAD 风格，受"显示尺寸标注"与构件开关控制） ---- */
+  if($("showLabels").checked){
+    const L = labelGroup, DC = "#1e40af", DC2 = "#0f766e";
+    const xP = isRect ? p.Lp/2 : p.d/2;          /* 墩身纵桥向边缘 */
+    /* 竖向：墩身高 H、一层/二层厚度 */
+    L.add(makeDimRaw(V(-xP,-q.b1/2,0), V(-xP,-q.b1/2,p.H), V(0,-1.6,0), `H=${ft(p.H)}`, DC, "pier"));
+    L.add(makeDimRaw(V(-q.a1/2,-q.b1/2,0), V(-q.a1/2,-q.b1/2,-p.fh1), V(0,-1.6,0), `fh1=${ft(p.fh1)}`, DC, "fd1"));
+    if(p.useFd2) L.add(makeDimRaw(V(-q.a2/2,-q.b2/2,-p.fh1), V(-q.a2/2,-q.b2/2,-q.fdT), V(0,-1.6,0), `fh2=${ft(p.fh2)}`, DC, "fd2"));
+    /* 基础平面：一层纵桥向/横桥向边长，二层纵桥向边长 */
+    L.add(makeDimRaw(V(-q.a1/2,-q.b1/2,-p.fh1), V(q.a1/2,-q.b1/2,-p.fh1), V(0,-1.8,0), `${ft(q.a1)}`, DC, "fd1"));
+    L.add(makeDimRaw(V(-q.a1/2,-q.b1/2,-p.fh1), V(-q.a1/2,q.b1/2,-p.fh1), V(-1.8,0,0), `${ft(q.b1)}`, DC, "fd1"));
+    if(p.useFd2) L.add(makeDimRaw(V(-q.a2/2,-q.b2/2,-q.fdT), V(q.a2/2,-q.b2/2,-q.fdT), V(0,-1.8,0), `${ft(q.a2)}`, DC, "fd2"));
+    /* 襟边 c1：墩身边缘→基础一层边缘（纵桥向，墩底平面） */
+    L.add(makeDimRaw(V(xP,-q.b1/2,0), V(q.a1/2,-q.b1/2,0), V(0,-1.2,0), `c1=${ft(p.c1)}`, DC2, "fd1"));
+    if(isRect){
+      /* 墩身长/宽 */
+      L.add(makeDimRaw(V(-p.Lp/2,p.Wp/2,0), V(p.Lp/2,p.Wp/2,0), V(0,2.0,0), `Lp=${ft(p.Lp)}`, DC, "pier"));
+      L.add(makeDimRaw(V(p.Lp/2,-p.Wp/2,0), V(p.Lp/2,p.Wp/2,0), V(2.2,0,0), `Wp=${ft(p.Wp)}`, DC, "pier"));
+    }else{
+      /* 圆柱：直径 d（最外侧柱）、柱中心距 s、最外侧圆柱外缘距 Wd */
+      const y0 = -(p.n-1)/2*p.s, y1 = (p.n-1)/2*p.s;
+      L.add(makeDimRaw(V(0,y0-p.d/2,0), V(0,y0+p.d/2,0), V(-2.4,0,0), `d=${ft(p.d)}`, DC, "pier"));
+      if(p.n>=2) L.add(makeDimRaw(V(0,y0,0), V(0,y0+p.s,0), V(0,0,1.4), `s=${ft(p.s)}`, DC, "pier"));
+      L.add(makeDimRaw(V(0,-q.Wd/2,0), V(0,q.Wd/2,0), V(2.6,0,0), `Wd=${ft(q.Wd)}`, DC, "pier"));
+    }
+  }
+
+  /* ---- 部件标高：相对标高（墩底=0.000）/ 绝对标高（=相对+原点绝对标高），
+          分别受"显示相对标高/显示绝对标高"及分构件开关控制；两者同开时绝对标高外移一列避免重叠 ---- */
+  if($("showEL").checked || $("showELa").checked){
+    const L = labelGroup, eC = "#0f766e", eA = "#0e7490", ea = isFinite(+p.elAbs) ? +p.elAbs : 0;
+    const items = [
+      ["基础底", -q.fdT,  p.useFd2 ? "fd2" : "fd1"],
+      ["墩底",    0,      "pier"],
+      ["墩顶",    p.H,    "pier"]
+    ];
+    if(p.useFd2) items.splice(1, 0, ["一层顶", -p.fh1, "fd1"]);
+    for(const [nm, z, part] of items){
+      if($("showEL").checked)  L.add(makeLabelRaw(`${nm} ▽${ft(z,3)}`, 0, -q.b1/2-2.8, z+0.3, eC, 0.95, part));
+      if($("showELa").checked) L.add(makeLabelRaw(`${nm} ▽${ft(z+ea,3)}`, 0, -q.b1/2-2.8+($("showEL").checked?2.4:0), z+0.3, eA, 0.95, part));
+    }
+  }
+
+  /* 视角对准模型 */
+  if(!modelCenter) modelCenter = new THREE.Vector3();
+  modelCenter.set(0, 0, (p.H-q.fdT)/2);
+  if(needFocus && camera){
+    if(!tgt) tgt = new THREE.Vector3();
+    tgt.copy(modelCenter);
+    sph.r = Math.min(Math.max(Math.max(p.H, q.b1)*2.1, 10), 300);
+    needFocus = false;
+    updateCam();
+  }
+  scene.add(group);
+  scene.add(labelGroup);
+  lastP = p; lastQ = q; if(hlActive) showHl(hlActive);
+  applyPartVisibility();
+}
+
+/* 分构件显示开关（同时控制对应标注） */
+function applyPartVisibility(){
+  if(!group) return;
+  const show = { pier:$("pPier").checked, fd1:$("pFd").checked, fd2:$("pFd").checked,
+    ground:$("exGround").checked, exS:$("exSoil").checked, exR:$("exRock").checked };
+  [group, labelGroup].forEach(G=>{
+    if(!G) return;
+    G.traverse(o=>{ if(o.userData && o.userData.part) o.visible = !!show[o.userData.part]; });
+  });
+}
+
+/* ================= 表格 / 主流程 ================= */
+function renderTable(p, q){
+  const rows = [];
+  const mat = id => { try{ return $(id).value || "—"; }catch(_){ return "—"; } };
+  const add = (name, fx, val, unit, mt, cls) => rows.push(
+    `<tr${cls?` class="${cls}"`:""}><td>${name}</td><td class="fx">${fx}</td>`+
+    `<td>${mt||"—"}</td><td class="num">${f(Math.abs(val),3)}</td><td>${unit}</td></tr>`);
+  const isRect = p.type==="实体矩形桥墩";
+  if(isRect)
+    add("墩身", `Lp×Wp×H = ${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}（实体矩形，竖直面）`, q.V_pier, "m³", mat("matPier"));
+  else
+    add("墩身", `n×π×d²/4×H = ${p.n}×π×${f(p.d)}²/4×${f(p.H)}（${p.n} 根圆柱，中心距 ${f(p.s)}）`, q.V_pier, "m³", mat("matPier"));
+  add("基础一层", `${f(q.a1)}×${f(q.b1)}×${f(p.fh1)}（墩身尺寸+每侧襟边 ${f(p.c1)}）`, q.V_fd1, "m³", mat("matFd"));
+  if(p.useFd2)
+    add("基础二层", `${f(q.a2)}×${f(q.b2)}×${f(p.fh2)}（一层边长+每侧襟边 ${f(p.c2)}）`, q.V_fd2, "m³", mat("matFd"));
+  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">墩身+基础一层${p.useFd2?"+基础二层":""}</td><td>—</td>`+
+    `<td class="num">${f(q.total,3)}</td><td>m³</td></tr>`);
+  const sl = m => m>0 ? `${Number(f(m,2))}:1` : "竖直";
+  rows.push(`<tr class="sep"><td colspan="5">开挖（不计入圬工）</td></tr>`);
+  const segTerms = rock => (q.exSegs||[]).filter(s=>s.rock===rock)
+    .map(s=>`${f(s.h,2)}×(${f(s.S1,2)}＋4×${f(s.Sm,2)}＋${f(s.S2,2)})/6`).join("＋") || "0";
+  add("土方开挖", `V=Σh/6(A下＋4A中＋A上)＝${segTerms(false)}（坑底${f(q.excLa)}×${f(q.excWb)}=最底层基础轮廓+工作宽度每侧${f(p.excW)}；坡比(竖:横)${sl(p.excMs)}，分级高度${f(p.excHst,2)}、平台宽${f(p.excB,2)}）`, q.V_exSoil, "m³", "—");
+  add("石方开挖", `V=Σh/6(A下＋4A中＋A上)＝${segTerms(true)}（坑底同上，坡比(竖:横)${sl(p.excMr)}）`, q.V_exRock, "m³", "—");
+  $("resultBody").innerHTML = rows.join("");
+  $("assumpNote").innerHTML = `<b>模型与计算约定</b>` + [
+    `① 坐标系：原点=墩身底面中心（基础顶面中心），x 轴=纵桥向、y 轴=横桥向、z 轴=竖向；标高以墩底=0.000 计，绝对标高=相对标高+原点绝对标高；`,
+    `② 实体矩形桥墩：墩身四面的竖直面（无放坡），平面断面=墩身长 Lp（纵桥向）×墩身宽 Wp（横桥向），体积=断面×墩身高 H；`,
+    `③ 圆柱式桥墩：n 根直径 d 的圆柱沿横桥向单排布置，相邻圆柱中心距 s；体积=n×π×d²/4×H；最外侧圆柱外缘距 Wd=(n−1)×s+d；`,
+    `④ 扩大基础边长：一层平面=墩身尺寸（矩形取长宽、圆柱取最外侧圆柱外缘距 Wd）+每侧襟边 c1；设第二层时平面=一层边长+每侧襟边 c2，自上而下分层；`,
+    `⑤ 体积：基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=墩身+基础各层；`,
+    `⑥ 柱中心距小于直径时按直径取值（避免柱体重叠）；根数按整数取值；`,
+    `⑦ 开挖：坑底平面=最底层基础轮廓（矩形墩身取长宽、圆柱取 Wd，含襟边）+每侧工作宽度 c，坑底=基础底面（标高 −基础总厚）；现状地面标高=坑底标高+开挖总高度 H挖；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
+    `土/石方量采用**分段拟棱台体积公式** V=∑hᵢ/6·(A下+4A中+A上)（以每级平台与石土界面为分段点，段内断面面积随高度线性外放、为高度的二次函数，故该公式解析精确）。经典棱台公式 V=h/3·(S₁+S₂+√S₁S₂) 仅当顶底面相似时精确，本坑底为不等边矩形（顶底不相似），套用会产生系统性偏小，故本表不用经典公式；三维网格体积独立测量与拟棱台公式结果一致，已相互印证。`
+  ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
+}
+
+function rebuild(){
+  const p = readP(), q = calcQ(p);
+  try{
+    $("Wdshow").value = f(q.Wd);
+    $("f1ABshow").value = `${f(q.a1)}×${f(q.b1)}`;
+    $("f2ABshow").value = p.useFd2 ? `${f(q.a2)}×${f(q.b2)}` : "—";
+    $("excHr").value = f(q.excHr);
+  }catch(_){}
+  try{
+    renderTable(p, q);
+  }catch(err){
+    $("resultBody").innerHTML = '<tr><td colspan="5" class="neg">计算表渲染出错：'+(err && err.message ? err.message : err)+'</td></tr>';
+  }
+  if(scene){
+    try{
+      if(group){ scene.remove(group); scene.remove(labelGroup);
+        group.traverse(o=>{ if(o.geometry) o.geometry.dispose();
+          if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(mm=>{ if(mm.map) mm.map.dispose(); mm.dispose(); }); } });
+      }
+      buildModel(p, q);
+    }catch(err){
+      console.error(err);
+      try{ $("assumpNote").innerHTML += '<br><span class="neg">三维建模出错：'+(err && err.message ? err.message : err)+'</span>'; }catch(e2){}
+    }
+  }
+}
+
+function exportCSV(){
+  const p = readP(), q = calcQ(p);
+  const lines = [];
+  lines.push(`${$("projName").value || "桥墩"} - 桥墩工程量计算表`);
+  lines.push(`标高以墩底=0.000;绝对标高=相对标高+原点绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;单位m`);
+  lines.push(`项目,计算式,材料,数量,单位`);
+  const qq = s => `"${String(s).replace(/"/g,'""')}"`;
+  const row = (n2,fx,v,u,mt) => lines.push([qq(n2),qq(fx),qq(mt||""),f(Math.abs(v),3),qq(u)].join(","));
+  const mt = id => { try{ return $(id).value || ""; }catch(_){ return ""; } };
+  if(p.type==="实体矩形桥墩")
+    row("墩身", `${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}(实体矩形)`, q.V_pier, "m3", mt("matPier"));
+  else
+    row("墩身", `${p.n}×π×${f(p.d)}^2/4×${f(p.H)}(圆柱式,中心距${f(p.s)})`, q.V_pier, "m3", mt("matPier"));
+  row("基础一层", `${f(q.a1)}×${f(q.b1)}×${f(p.fh1)}(墩身尺寸+每侧襟边${f(p.c1)})`, q.V_fd1, "m3", mt("matFd"));
+  if(p.useFd2) row("基础二层", `${f(q.a2)}×${f(q.b2)}×${f(p.fh2)}(一层边长+每侧襟边${f(p.c2)})`, q.V_fd2, "m3", mt("matFd"));
+  const sl0 = m => m>0 ? Number(f(m,2))+":1" : "竖直";
+  const segTerms = rock => (q.exSegs||[]).filter(s=>s.rock===rock)
+    .map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+") || "0";
+  row("土方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(false)}, 坑底${f(q.excLa)}×${f(q.excWb)}(基础轮廓+工作宽度每侧${f(p.excW)}), 坡比(竖:横)${sl0(p.excMs)}, 分级高度${f(p.excHst,2)}/平台宽${f(p.excB,2)}`, q.V_exSoil, "m3");
+  row("石方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(true)}, 坑底同上, 坡比(竖:横)${sl0(p.excMr)}`, q.V_exRock, "m3");
+  row("圬工合计", "墩身+基础一层"+(p.useFd2?"+基础二层":""), q.total, "m3");
+  lines.push("说明:三维参数化估算,最终以施工图工程数量表为准");
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${$("projName").value || "桥墩"}工程量.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+document.querySelectorAll("input").forEach(el => el.addEventListener("input", rebuild));
+document.querySelectorAll("select").forEach(el => el.addEventListener("change", rebuild));
+document.querySelectorAll(".toolbar input[type=checkbox]").forEach(el => el.addEventListener("change", rebuild));
+/* 参数输入框聚焦 → 三维对应部位闪烁高亮，失焦取消 */
+Object.keys(PARAM_HL).forEach(id=>{
+  const el = document.getElementById(id);
+  if(!el || !el.addEventListener) return;
+  el.addEventListener("focus", ()=>{ hlActive = id; showHl(id); });
+  el.addEventListener("blur",  ()=>{ if(hlActive === id){ hlActive = null; showHl(null); } });
+});
+/* 信息卡折叠：点击标题折叠/展开（折叠不改变参数值） */
+(function initCardFold(){
+  document.querySelectorAll(".side .card").forEach(card=>{
+    const h = card.querySelector("h2");
+    if(!h || h.querySelector(".tg")) return;
+    const t = document.createElement("span"); t.className = "tg"; t.textContent = "▼";
+    h.appendChild(t);
+    h.addEventListener("click", ()=> card.classList.toggle("collapsed"));
+  });
+})();
+init3D();
+rebuild();
+</script>
+</body>
+</html>
