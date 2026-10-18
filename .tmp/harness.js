@@ -15,7 +15,7 @@ const vals = {
   Wf:"24", H1:"5", t1:"1.2", m1:"3",
   W:"12", Hs:"6.5", t2:"0.5", L2:"6", m2:"0", m3:"3", elAbs:"146",
   capH:"0.6", capCant:"0.1", capWid:"1.3", bwT:"0.5", bwH:"0.9",
-  nbL:"7", nbB:"0.3", nbH:"0.3", nbA:"0.3",
+  nbL:"7", nbB:"0.3", nbG:"0.3", nbH:"0.3", nbA:"0.3",
   fd1H:"1", fd1X:"1", fd1Zf:"1", fd1Zb:"1",
   fd2H:"1", fd2X:"1", fd2Zf:"1", fd2Zb:"1",
   capLshow:"", bwLshow:"", t1bshow:"", swUpHshow:"", swTopWshow:"", swBotWshow:"", swLowTopWshow:"", swLowTopTshow:"", swLowHshow:"", swBotTshow:"", swLowBotWshow:"", nbTopShow:"",
@@ -175,13 +175,28 @@ near(vol.bw,   q.V_bw,   0.001, "网格体积:背墙");
 near(vol.nb,   q.V_nb,   0.001, "网格体积:牛腿(直角梯形断面×全长)");
 isTrue((parts.nb||[]).length===1, "牛腿 1 块");
 checkBox("nb", {"min.x":1.2,"max.x":1.5,"min.y":-3.5,"max.y":3.5,"min.z":5.6,"max.z":6.2}, 0.01,
-  "牛腿 bbox(x 背墙背面1.2→外端1.5、y 以帽梁中心±L腿/2=±3.5、z 帽梁顶5.6→顶面6.2)");
-near(q.nbTop, 6.2, 1e-9, "牛腿顶面标高=帽梁顶+h端+h腋=6.2");
+  "牛腿 bbox(x 背墙背面1.2→外端1.5、y 以帽梁中心±L腿/2=±3.5、z 根部底5.6→顶面6.2)");
+near(q.nbTop, 6.2, 1e-9, "牛腿顶面标高=背墙顶−h槽=6.5−0.3=6.2");
 near(q.V_nb, 7*0.3*(0.6+0.3)/2, 1e-9, "牛腿 V=L腿×b腿×(h端+h腋/2)=0.945");
 els.nbL.value = "20";
 const pN = api.readP(), qN = api.calcQ(pN);
 near(qN.nbL, 12.2, 1e-9, "L腿>背墙总长时按背墙总长截断(20→12.2)");
 els.nbL.value = "7";
+/* 槽口高度增大 → 顶面以背墙顶为基准下移，根部底面向下延伸(可低于帽梁顶)，体积不变 */
+els.nbG.value = "0.60";
+const pG = api.readP(), qG = api.calcQ(pG);
+near(qG.nbTop, 5.9, 1e-9, "h槽=0.6 时牛腿顶面=背墙顶−0.6=5.9");
+near(qG.nbBase, 5.3, 1e-9, "h槽增大后根部底向下延伸至5.3（低于帽梁顶5.6）");
+near(qG.V_nb, q.V_nb, 1e-9, "h槽变化不影响牛腿体积（断面与长度不变）");
+api.buildModel(pG, qG);
+let nbG1 = null;
+api.groupRef().traverse(o=>{ if(o.isMesh && o.userData.part === "nb") nbG1 = o; });
+nbG1.geometry.computeBoundingBox();
+const nbGbox = nbG1.geometry.boundingBox.clone();
+near(nbGbox.min.z, 5.3, 0.01, "h槽=0.6 时牛腿网格底面=5.3");
+near(nbGbox.max.z, 5.9, 0.01, "h槽=0.6 时牛腿网格顶面=5.9");
+els.nbG.value = "0.3";
+api.buildModel(p, q);
 near(vol.fd,   q.V_fd,   0.001, "网格体积:基础");
 near(vol.fill, q.V_fill, 0.10,  "网格体积:回填");
 near(vol.exR, q.V_exRock, 0.001, "网格体积:石方开挖棱台");
