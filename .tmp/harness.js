@@ -25,7 +25,7 @@ const vals = {
 };
 const checks = {
   useFd2:false, showLabels:false, showAxes:false, showEL:false, showELa:false, wireOnly:false,
-  pFw:true, pSw:true, pCap:true, pBw:true, pFd:true, pFill:true,
+  pFw:true, pSw:true, pCap:true, pNb:true, pBw:true, pFd:true, pFill:true,
   exGround:false, exSoil:false, exRock:false
 };
 const els = {};
@@ -53,7 +53,7 @@ global.requestAnimationFrame = ()=>{};
 global.Blob = class {};
 
 /* 提取 api 探针 */
-app += "\n;global.__api={readP,calcQ,buildModel,renderTable,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup};";
+app += "\n;global.__api={readP,calcQ,buildModel,renderTable,rebuild,applyPartVisibility,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup};";
 global.THREE = require(LIB);
 
 let pass=0, fail=0;
@@ -206,6 +206,36 @@ near(qA.nbBase, 5.0, 1e-9, "根部底面=顶面−根部总高=6.2−1.2=5.0（�
 near(qA.nbTop - qA.nbH, 5.9, 1e-9, "端部底面=顶面−h腿=5.9（不随加腋变化）");
 near(qA.V_nb, 7*0.3*(0.3+0.45), 1e-9, "加腋0.9时 V=L腿×b腿×(h腿+h腋/2)=1.575");
 els.nbA.value = "0.3";
+/* 竖向限值：h槽+h腿+h腋 ≤ 帽梁高+背墙高（默认 0.6+0.9=1.5） */
+els.nbHt.value = "1.00"; els.nbA.value = "1.00";        /* 0.3+1.0+1.0=2.3 > 1.5 */
+const pL = api.readP(), qL = api.calcQ(pL);
+near(qL.nbHlim, 1.5, 1e-9, "竖向限值=帽梁高+背墙高=0.6+0.9=1.5");
+near(qL.nbH, 1.0, 1e-9, "h槽+h腿=1.3 ≤ 1.5 → 牛腿高度不修正，保持1.0");
+near(qL.nbAx, 0.2, 1e-9, "加腋超限 → 修正为 帽梁+背墙−h槽−h腿=1.5−0.3−1.0=0.2");
+near(qL.nbRoot, 1.2, 1e-9, "根部总高被限值封顶为 帽梁+背墙−h槽=1.2");
+near(qL.nbBase, qL.nbTop - 1.2, 1e-9, "根部底面=顶面−1.2（限值内最深位置，等于帽梁底标高）");
+near(qL.V_nb, 7*0.3*(1.0+0.1), 1e-9, "修正后 V=L腿×b腿×(h腿+h腋/2)=2.31");
+/* 加腋已为0后仍超限 → 修正牛腿高度 */
+els.nbHt.value = "1.60"; els.nbA.value = "0.50";        /* 0.3+1.6=1.9 > 1.5 */
+const pM = api.readP(), qM = api.calcQ(pM);
+near(qM.nbH, 1.2, 1e-9, "h槽+h腿=1.9>1.5 → 牛腿高度修正为 1.5−0.3=1.2");
+near(qM.nbAx, 0, 1e-9, "牛腿高度修正后余量为0 → 加腋高度修正为0");
+near(qM.nbRoot, 1.2, 1e-9, "根部总高=h腿=1.2（断面退化为矩形）");
+/* 修正结果写回输入框 */
+api.rebuild();
+near(parseFloat(els.nbA.value), 0, 1e-9, "rebuild 后加腋高度输入框写回修正值0");
+els.nbHt.value = "0.3"; els.nbA.value = "0.3";
+api.buildModel(p, q);
+/* 牛腿独立显示开关 */
+els.pNb.checked = false; api.applyPartVisibility();
+let nbVis = null, capVis = null;
+api.groupRef().traverse(o=>{ if(o.isMesh && o.userData.part==="nb") nbVis = o.visible;
+                             if(o.isMesh && o.userData.part==="cap") capVis = o.visible; });
+isTrue(nbVis === false && capVis === true, "牛腿独立开关：关闭牛腿时牛腿隐藏、帽梁仍显示");
+els.pNb.checked = true; api.applyPartVisibility();
+let nbVis2 = null;
+api.groupRef().traverse(o=>{ if(o.isMesh && o.userData.part==="nb") nbVis2 = o.visible; });
+isTrue(nbVis2 === true, "重新勾选牛腿后恢复显示");
 api.buildModel(p, q);
 near(vol.fd,   q.V_fd,   0.001, "网格体积:基础");
 near(vol.fill, q.V_fill, 0.10,  "网格体积:回填");

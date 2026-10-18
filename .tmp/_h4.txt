@@ -1,0 +1,13 @@
+THREE.WebGLRenderer: i.addEventListener is not a function
+PASS 应用脚本暴露探针
+PASS 单层基础 仅相对: 标签数=3 实际=3
+PASS 标签均带 part 归属
+PASS part 归属：基础底=fd1，墩底/墩顶=pier
+PASS 单层基础 仅绝对: 标签数=3 实际=3
+PASS 仅绝对时同一列(y无外移)
+PASS 双开: 标签数=6 实际=6
+PASS 双开时绝对列相对列外移2.4（z成对，共3对）
+PASS 标签 z 位置：基础底/墩底/墩顶 各+0.3
+PASS 两层基础 双开: 标签数=8 实际=8
+PASS part 归属：基础底=fd2，一层顶=fd1
+=== 标高验证: 11 PASS, 0 FAIL ===

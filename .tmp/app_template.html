@@ -249,6 +249,7 @@
         <label><input type="checkbox" id="pFw" checked> 前墙</label>
         <label><input type="checkbox" id="pSw" checked> 侧墙</label>
         <label><input type="checkbox" id="pCap" checked> 帽梁</label>
+        <label><input type="checkbox" id="pNb" checked> 牛腿</label>
         <label><input type="checkbox" id="pBw" checked> 背墙</label>
         <label><input type="checkbox" id="pFd" checked> 基础</label>
         <label><input type="checkbox" id="pFill"> 回填</label>
@@ -387,8 +388,11 @@ function calcQ(p){
      断面为直角梯形（竖边为平行边）：根部总高=牛腿高度 h腿、外端竖面高=h腿−h腋、悬出宽度 b腿，
      底面向外斜升形成加腋；A=(h腿+(h腿−h腋))/2×b腿，V=A×牛腿横桥向长度 L腿 */
   q.nbL    = Math.min(Math.max(p.nbL, 0), q.bwL);     // 牛腿横桥向长度（以帽梁中心对称，不超过背墙总长）
-  q.nbH    = Math.max(p.nbHt, 0);                     // 牛腿高度 = 外端竖面高度
-  q.nbAx   = Math.max(p.nbA, 0);                      // 加腋高度 = 根部截面变化(斜升)段的竖向高度
+  q.nbHlim = Math.max(p.capH + p.bwH, 0);             // 竖向限值 = 帽梁高 + 背墙高（牛腿自背墙顶向下量，不得超出）
+  q.nbH    = Math.min(Math.max(p.nbHt, 0), Math.max(q.nbHlim - p.nbG, 0));        // 牛腿高度=外端竖面高；约束：h槽+h腿 ≤ 帽梁+背墙
+  q.nbAx   = Math.min(Math.max(p.nbA, 0), Math.max(q.nbHlim - p.nbG - q.nbH, 0)); // 加腋高度=根部截面变化段高；约束：h槽+h腿+h腋 ≤ 帽梁+背墙
+  q.nbHCut = Math.max(p.nbHt, 0) > q.nbH + 1e-9;      // 牛腿高度按限值被向下修正
+  q.nbACut = Math.max(p.nbA, 0)  > q.nbAx + 1e-9;     // 加腋高度按限值被向下修正
   q.nbRoot = q.nbH + q.nbAx;                          // 根部总高 = 牛腿高度 + 加腋高度
   q.nbTop  = p.H1 + p.capH + p.bwH - p.nbG;          // 牛腿顶面（槽口底面）= 背墙顶 − 槽口高度（≈搭板厚度）
   q.nbBase = q.nbTop - q.nbRoot;                     // 根部底面 = 顶面 − 牛腿高度；加高时向下延伸，可低于帽梁顶
@@ -1228,7 +1232,7 @@ function buildModel(p, q){
 function applyPartVisibility(){
   if(!group) return;
   const show = {
-    fw:$("pFw").checked, sw:$("pSw").checked, cap:$("pCap").checked, nb:$("pCap").checked,
+    fw:$("pFw").checked, sw:$("pSw").checked, cap:$("pCap").checked, nb:$("pNb").checked,
     bw:$("pBw").checked, fd:$("pFd").checked, fill:$("pFill").checked,
     ground:$("exGround").checked, exS:$("exSoil").checked, exR:$("exRock").checked
   };
@@ -1270,7 +1274,7 @@ function renderTable(p, q){
     `② U形结构：前墙外面竖直、背坡按 m1:1 放坡（竖:横，0=竖直）；侧墙外面竖直、内面放坡（上段顶厚 t2＝横桥向自外缘向内的墙厚，内坡 m2:1，0=竖直），腔体向下收窄，并按上段（高=帽梁高+背墙高）与下段分段建模；`,
     `③ 侧墙前端缘贴合前墙背坡面（前墙顶以上竖直 x=t1）——即纵桥向视图所示形状；`,
     `④ 帽梁为全宽立方体：总长度=桥台总宽 W+2×悬出长度（两端超出台身/前墙外缘各 ec），前缘自前墙前缘向前悬出 ec（前墙顶面 x∈[0, t1]，帽梁前缘 x=−ec，帽梁后缘与前墙顶后缘齐平），顺桥向宽度=帽梁宽度参数，背墙立于帽梁后端顶部（竖肢，组成 L 形台帽）；`,
-    `⑤ 帽梁/背墙均为矩形断面的立方体（无斜边），背墙总长度=帽梁总长度、立于帽梁后端顶部；牛腿（搭板牛腿）沿横桥向以帽梁中心左右对称布置、长度 L腿（不超过背墙总长），贴背墙背面沿台后方向悬出 b腿；顶面（槽口底面＝搭板搁置面）以背墙顶为基准向下量取槽口高度 h槽（≈搭板厚度），即牛腿顶面=背墙顶−h槽；断面为直角梯形（外端竖面高＝牛腿高度 h腿，根部下缘按加腋高度 h腋 斜升，h腋 即截面变化那一段的竖向高度，根部总高＝h腿+h腋），端部底面=顶面−h腿、根部底面=顶面−(h腿+h腋)，牛腿加高时自顶面向下延伸、底面可能低于帽梁顶面（此时贴帽梁背面，位于帽梁轮廓之外、体积不与帽梁重复）；`,
+    `⑤ 帽梁/背墙均为矩形断面的立方体（无斜边），背墙总长度=帽梁总长度、立于帽梁后端顶部；牛腿（搭板牛腿）沿横桥向以帽梁中心左右对称布置、长度 L腿（不超过背墙总长），贴背墙背面沿台后方向悬出 b腿；顶面（槽口底面＝搭板搁置面）以背墙顶为基准向下量取槽口高度 h槽（≈搭板厚度），即牛腿顶面=背墙顶−h槽；断面为直角梯形（外端竖面高＝牛腿高度 h腿，根部下缘按加腋高度 h腋 斜升，h腋 即截面变化那一段的竖向高度，根部总高＝h腿+h腋），端部底面=顶面−h腿、根部底面=顶面−(h腿+h腋)，牛腿加高时自顶面向下延伸、底面可能低于帽梁顶面（此时贴帽梁背面，位于帽梁轮廓之外，体积不与帽梁重复）；竖向限值：h槽+h腿+h腋 不得超过帽梁高+背墙高，超出时自动将加腋高度修正为（帽梁高+背墙高−h槽−h腿）；若 h槽+h腿 本身已超出，则先把牛腿高度修正为（帽梁高+背墙高−h槽）、加腋高度取 0，修正结果直接写回参数输入框；`,
     `⑥ 基础按前墙+侧墙整体平面轮廓外扩襟边（横向±、前缘、后缘），可选第二层；`,
     `⑦ 回填为台腔内填土：前缘为前墙背坡面/帽梁后缘/背墙后缘，顶面填至侧墙顶，背墙顶以上按竖直面向上近似（按台腔净空计，未扣除牛腿等局部突出体，占比很小）；`,
     `⑧ 开挖：坑底平面=最底层基础轮廓+每侧工作宽度 c，坑底=基础底面（标高 −(d1+d2)）；现状地面标高=开挖总高度 H挖−d1−d2（地面在坑底以上 H挖）；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
@@ -1283,6 +1287,8 @@ function rebuild(){
   try{
     $("capLshow").value = f(q.capL);
     $("bwLshow").value = f(q.bwL);
+    if(q.nbHCut) $("nbHt").value = ft(q.nbH);   /* 超出 帽梁+背墙 高时把修正结果写回输入框 */
+    if(q.nbACut) $("nbA").value  = ft(q.nbAx);
     $("nbTopShow").value = f(q.nbTop);
     $("t1bshow").value = f(q.t1b);
     $("swUpHshow").value = f(q.swUpH);
