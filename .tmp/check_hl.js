@@ -150,6 +150,9 @@ nearHL(b.max.x - b.min.x, 10, 0.45, "桥台 fd2H 顺桥向跨=二层基础总长
 nearHL(b.min.z, -2, 0.25, "桥台 fd2H 竖棱下沿=二层底");
 els.useFd2.checked = false;
 /* 牛腿：三条量线（顶面顺桥向= b腿、外端竖面= h端、根部竖向= h腋） */
+b = bbOf("nbL");
+nearHL(b.max.y - b.min.y, 7, 0.25, "桥台 nbL 高亮横向跨=L腿(以帽梁中心对称)");
+nearHL(b.max.x - b.min.x, 0, 0.25, "桥台 nbL 位于牛腿顶面一条横向量线");
 b = bbOf("nbB");
 nearHL(b.max.x - b.min.x, 0.3, 0.25, "桥台 nbB 高亮顺桥向跨=b腿");
 nearHL(b.max.z - b.min.z, 0, 0.25, "桥台 nbB 位于牛腿顶面(水平量线)");

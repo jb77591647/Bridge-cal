@@ -15,7 +15,7 @@ const vals = {
   Wf:"24", H1:"5", t1:"1.2", m1:"3",
   W:"12", Hs:"6.5", t2:"0.5", L2:"6", m2:"0", m3:"3", elAbs:"146",
   capH:"0.6", capCant:"0.1", capWid:"1.3", bwT:"0.5", bwH:"0.9",
-  nbB:"0.3", nbH:"0.3", nbA:"0.3",
+  nbL:"7", nbB:"0.3", nbH:"0.3", nbA:"0.3",
   fd1H:"1", fd1X:"1", fd1Zf:"1", fd1Zb:"1",
   fd2H:"1", fd2X:"1", fd2Zf:"1", fd2Zb:"1",
   capLshow:"", bwLshow:"", t1bshow:"", swUpHshow:"", swTopWshow:"", swBotWshow:"", swLowTopWshow:"", swLowTopTshow:"", swLowHshow:"", swBotTshow:"", swLowBotWshow:"", nbTopShow:"",
@@ -174,10 +174,14 @@ near(vol.cap,  q.V_cap,  0.001, "网格体积:帽梁");
 near(vol.bw,   q.V_bw,   0.001, "网格体积:背墙");
 near(vol.nb,   q.V_nb,   0.001, "网格体积:牛腿(直角梯形断面×全长)");
 isTrue((parts.nb||[]).length===1, "牛腿 1 块");
-checkBox("nb", {"min.x":1.2,"max.x":1.5,"min.y":-6.1,"max.y":6.1,"min.z":5.6,"max.z":6.2}, 0.01,
-  "牛腿 bbox(x 背墙背面1.2→外端1.5、z 帽梁顶5.6→顶面6.2)");
+checkBox("nb", {"min.x":1.2,"max.x":1.5,"min.y":-3.5,"max.y":3.5,"min.z":5.6,"max.z":6.2}, 0.01,
+  "牛腿 bbox(x 背墙背面1.2→外端1.5、y 以帽梁中心±L腿/2=±3.5、z 帽梁顶5.6→顶面6.2)");
 near(q.nbTop, 6.2, 1e-9, "牛腿顶面标高=帽梁顶+h端+h腋=6.2");
-near(q.V_nb, 12.2*0.3*(0.6+0.3)/2, 1e-9, "牛腿 V=Lb×b腿×(h端+h腋/2)=1.647");
+near(q.V_nb, 7*0.3*(0.6+0.3)/2, 1e-9, "牛腿 V=L腿×b腿×(h端+h腋/2)=0.945");
+els.nbL.value = "20";
+const pN = api.readP(), qN = api.calcQ(pN);
+near(qN.nbL, 12.2, 1e-9, "L腿>背墙总长时按背墙总长截断(20→12.2)");
+els.nbL.value = "7";
 near(vol.fd,   q.V_fd,   0.001, "网格体积:基础");
 near(vol.fill, q.V_fill, 0.10,  "网格体积:回填");
 near(vol.exR, q.V_exRock, 0.001, "网格体积:石方开挖棱台");
@@ -211,14 +215,14 @@ near(q.excLb, 9, 0.001, "坑底顺桥向长=fdL1+2×工作宽度");
 near(q.V_exRock, 270+96+32/3, 0.01, "石方开挖 V=∫₀²(15+2z)(9+2z)dz=376.667");
 near(q.V_exSoil, 247+32+4/3, 0.01, "土方开挖 V=∫₀¹(19+2z)(13+2z)dz=280.333");
 near(q.V_ex, 376+2/3+280+1/3, 0.01, "开挖合计 V=657.0");
-near(q.total, 122+57.774074+9.516+5.49+1.647+112, 0.2, "圬工合计=308.427（含牛腿1.647，回填另计）");
+near(q.total, 122+57.774074+9.516+5.49+0.945+112, 0.2, "圬工合计=307.725（含牛腿0.945，回填另计）");
 near(q.V_fill, 266.625926, 0.5, "回填 V≈266.63（m2=0 腔体加大）");
 
 /* 勾选二层基础复算（二层平面=一层+各边再放1m：28×11.56×1） */
 els.useFd2.checked = true;
 const p2 = api.readP(), q2 = api.calcQ(p2);
 near(q2.V_fd2, 16*10*1, 0.01, "二层基础 V=160");
-near(q2.total - q2.V_fd, 122+57.774074+9.516+5.49+1.647, 0.2, "勾选二层台上部圬工不变（含牛腿）");
+near(q2.total - q2.V_fd, 122+57.774074+9.516+5.49+0.945, 0.2, "勾选二层台上部圬工不变（含牛腿）");
 els.useFd2.checked = false;
 
 /* 桥台总宽 W：Wf 自动同步=W，台身与基础横向均随 W */
