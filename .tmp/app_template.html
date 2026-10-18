@@ -134,6 +134,10 @@
           <div class="field"><label>背墙总长度 Lb <small>=帽梁总长度，自动</small></label><input type="number" id="bwLshow" value="" step="0.01" disabled style="background:#eef2f6;"></div>
           <div class="field"><label>背墙厚 tb <small>顺桥向，立于帽梁后端</small></label><input type="number" id="bwT" value="0.5" step="0.01"></div>
           <div class="field"><label>背墙高 hb</label><input type="number" id="bwH" value="0.90" step="0.01"></div>
+          <div class="field"><label>牛腿悬出宽度 b腿 <small>自背墙背面向台后</small></label><input type="number" id="nbB" value="0.30" step="0.01"></div>
+          <div class="field"><label>牛腿端部高度 h端 <small>外端竖面，搭板支承高</small></label><input type="number" id="nbH" value="0.30" step="0.01"></div>
+          <div class="field"><label>牛腿加腋高度 h腋 <small>根部下缘加厚量</small></label><input type="number" id="nbA" value="0.30" step="0.01"></div>
+          <div class="field"><label>牛腿顶面标高 <small>相对(前墙底=0.000)，自动</small></label><input type="number" id="nbTopShow" value="" disabled style="background:#eef2f6;"></div>
         </div>
       </div>
 
@@ -226,7 +230,7 @@
         <h2>说明</h2>
         <div class="note" style="margin-top:0;">
           坐标系：原点位于前墙底前缘中点（前墙底边中点，同剖面图），x=纵桥向（指向台后，前墙前缘竖直面 x=0，帽梁前缘 x=−ec）、y=横桥向（桥台宽度方向）、z=竖向；标高以前墙底=0.000 计，绝对标高=相对标高+原点绝对标高。
-          汇总计算：台身（前墙）、侧墙（两道）、帽梁、背墙、基础、回填。
+          汇总计算：台身（前墙）、侧墙（两道）、帽梁、背墙、牛腿、基础、回填。
         </div>
       </div>
     </div>
@@ -317,6 +321,7 @@ function readP(){
     excMs:g("excMs"), excMr:g("excMr"), excW:g("excW"), excH:g("excH"), excHs:g("excHs"),
     excHst:g("excHst"), excB:g("excB"),
     capH:g("capH"), capCant:g("capCant"), capWid:g("capWid"), bwT:g("bwT"), bwH:g("bwH"),
+    nbB:g("nbB"), nbH:g("nbH"), nbA:g("nbA"),
     fd1H:g("fd1H"), fd1X:g("fd1X"), fd1Zf:g("fd1Zf"), fd1Zb:g("fd1Zb"),
     useFd2:$("useFd2").checked, fd2H:g("fd2H"), fd2X:g("fd2X"), fd2Zf:g("fd2Zf"), fd2Zb:g("fd2Zb")
   };
@@ -376,6 +381,14 @@ function calcQ(p){
   q.V_cap = q.capL * p.capH * q.capWid;
   /* 背墙：总长度×厚×高（立方体） */
   q.V_bw = q.bwL * p.bwT * p.bwH;
+  /* 牛腿（搭板牛腿）：贴背墙背面（x=capWid）、根部坐于帽梁顶面（z=H1+capH），全长=背墙总长；
+     断面为直角梯形（竖边为平行边）：根部高 h根=h端+h腋、端部高 h端、悬出宽度 b腿，
+     底面向外斜升形成加腋；A=(h根+h端)/2×b腿，V=A×牛腿全长 */
+  q.nbL    = q.bwL;                                  // 牛腿全长（横桥向）= 背墙总长
+  q.nbBase = p.H1 + p.capH;                          // 根部底面标高 = 帽梁顶
+  q.nbRoot = p.nbH + p.nbA;                          // 根部高度 = 端部高度 + 加腋高度
+  q.nbTop  = q.nbBase + q.nbRoot;                    // 牛腿顶面（搭板搁置面）标高
+  q.V_nb   = (p.nbB > 1e-9) ? q.nbL * p.nbB * (q.nbRoot + p.nbH)/2 : 0;
   /* 基础：平面=前墙+侧墙整体轮廓+襟边（顺桥向前缘自 -fdZf 至侧墙尾端+fdZb） */
   q.fdW1 = Math.max(p.W, p.Wf) + 2*p.fd1X;
   q.fdL1 = p.L2 + p.fd1Zf + p.fd1Zb;
@@ -434,7 +447,7 @@ function calcQ(p){
   }
   q.V_fill = fillV;
   /* 圬工合计 */
-  q.total = q.V_fw + q.V_sw + q.V_cap + q.V_bw + q.V_fd;
+  q.total = q.V_fw + q.V_sw + q.V_cap + q.V_bw + q.V_nb + q.V_fd;
   return q;
 }
 
@@ -781,6 +794,15 @@ const PARAM_HL = {
             return {pts:[ (p.capWid-p.bwT)-datumX,yE,z, p.capWid-datumX,yE,z]}; },
   bwH:   (p,q)=>{ const yE = q.capL/2, z0 = p.H1 + p.capH;
             return {pts:[ p.capWid-datumX,yE,z0, p.capWid-datumX,yE,z0+p.bwH]}; },
+  nbB:   (p,q)=>{ if(!(p.nbB > 1e-6)) return null;                 /* 牛腿顶面：背墙背面→外端，顺桥向量线 */
+            const yE = q.nbL/2, z = q.nbTop;
+            return {pts:[ q.capWid-datumX,yE,z, (q.capWid+p.nbB)-datumX,yE,z ]}; },
+  nbH:   (p,q)=>{ if(!(p.nbB > 1e-6) || !(p.nbH > 1e-6)) return null;   /* 端部竖面高度（搭板支承高度） */
+            const yE = q.nbL/2, x = (q.capWid+p.nbB)-datumX;
+            return {pts:[ x,yE,q.nbTop-p.nbH, x,yE,q.nbTop ]}; },
+  nbA:   (p,q)=>{ if(!(p.nbB > 1e-6) || !(p.nbA > 1e-6)) return null;   /* 根部加腋高度（竖向） */
+            const yE = q.nbL/2, x = q.capWid-datumX;
+            return {pts:[ x,yE,q.nbBase, x,yE,q.nbTop-p.nbH ]}; },
   /* ---- 前墙 ---- */
   H1:    (p,q)=>{ const xF = p.capCant - datumX;                /* 前墙前缘立面 */
             return {pts:[ xF,-p.W/2,0, xF,-p.W/2,p.H1 ]}; },     /* 竖向量线：基础顶(墙底)→前墙顶(帽梁底) */
@@ -978,6 +1000,19 @@ function buildModel(p, q){
     ], MAT.bw());
     bw.userData.part = "bw"; group.add(bw);
   }
+  /* 牛腿（搭板牛腿）：断面=直角梯形（两条竖边平行），贴背墙背面（x=capWid）向台后悬出 b腿，
+     根部底面坐于帽梁顶（z=H1+capH），根部高 h端+h腋、端部高 h端，底面向外斜升形成加腋；全长=背墙总长。
+     顶点序：v0~v3=前侧(y=−L/2) 断面环 [根部下, 根部上, 端部上, 端部下]，v4~v7=后侧(y=+L/2) 对应四点 */
+  if(p.nbB > 1e-6 && q.nbRoot > 1e-6){
+    const he = Math.max(p.nbH, 0.01), hr = he + Math.max(p.nbA, 0);   /* 防退化：端部高/根部高均取正 */
+    const z0 = q.nbBase, z1 = z0 + hr, z2 = z0 + he;   /* z0根部底=帽梁顶、z1顶面、z2端部底 */
+    const x0 = q.capWid, x1 = q.capWid + p.nbB, yb = q.nbL/2;
+    const nb = hexaMesh([
+      V3(-yb,z0,x0), V3(-yb,z1,x0), V3(-yb,z1,x1), V3(-yb,z2,x1),
+      V3( yb,z0,x0), V3( yb,z1,x0), V3( yb,z1,x1), V3( yb,z2,x1)
+    ], MAT.cap());
+    nb.userData.part = "nb"; group.add(nb);
+  }
 
   /* 回填（半透明）：台腔内填土，前缘为前墙背坡面/帽梁背缘/背墙背缘，顶面填至侧墙顶 */
   const zf = y => y < p.H1 ? xF(y) : p.capWid;
@@ -1107,6 +1142,13 @@ function buildModel(p, q){
       if(p.bwH>0) L.add(makeDimRaw(V(q.capWid-p.bwT/2,q.capL/2,p.H1+p.capH), V(q.capWid-p.bwT/2,q.capL/2,p.H1+p.capH+p.bwH), V(0,1.5,0), `hb=${ft(p.bwH)}`, DC, "bw"));
       if(p.bwT>0) L.add(makeDimRaw(V(q.capWid-p.bwT,q.capL/2,p.H1+p.capH), V(q.capWid,q.capL/2,p.H1+p.capH), V(0,1.1,0), `tb=${ft(p.bwT)}`, DC, "bw"));
     }
+    /* 牛腿：悬出宽度 b腿（顶面）、端部高度 h端（外端竖面）、加腋高度 h腋（根部竖向量） */
+    if(p.nbB>1e-6 && q.nbRoot>1e-6){
+      const yE = q.capL/2;
+      L.add(makeDimRaw(V(q.capWid,yE,q.nbTop), V(q.capWid+p.nbB,yE,q.nbTop), V(0,1.2,0), `b腿=${ft(p.nbB)}`, DC, "nb"));
+      L.add(makeDimRaw(V(q.capWid+p.nbB,yE,q.nbTop-p.nbH), V(q.capWid+p.nbB,yE,q.nbTop), V(0,0.9,0), `h端=${ft(p.nbH)}`, DC, "nb"));
+      if(p.nbA>1e-6) L.add(makeDimRaw(V(q.capWid,yE,q.nbBase), V(q.capWid,yE,q.nbTop-p.nbH), V(0,0.9,0), `h腋=${ft(p.nbA)}`, DC, "nb"));
+    }
     L.add(makeDimRaw(V(p.capCant,-p.Wf/2,0), V(p.capCant+q.t1b,-p.Wf/2,0), V(0,-1.8,0), `b1=${ft(q.t1b)}`, DC, "fw"));
     L.add(makeDimRaw(V(xT,W2,p.Hs), V(xT,W2-p.t2,p.Hs), V(0,0,1.0), `t2=${ft(p.t2)}`, DC, "sw"));
     L.add(makeDimRaw(V(xT,W2,zS), V(xT,W2-t2b,zS), V(0,0,0.8), `t2b=${ft(t2b)}`, DC, "sw"));
@@ -1142,11 +1184,13 @@ function buildModel(p, q){
       ["前墙顶",  p.H1,              -W2-2.8,        p.H1+0.4,             p.capCant+p.t1*0.5,  "fw"],
       ["帽梁顶",  p.H1+p.capH,       -W2-2.8,        p.H1+p.capH+0.4,      q.capWid/2,          "cap"],
       ["背墙顶",  p.H1+p.capH+p.bwH, -W2-2.8,        p.H1+p.capH+p.bwH+0.4,q.capWid-p.bwT/2,    "bw"],
+      ["牛腿顶",  q.nbTop,           -W2-2.8,        q.nbTop+0.4,          q.capWid+p.nbB*0.5,  "nb"],
       ["侧墙顶",  p.Hs,               W2+2.8,        p.Hs+0.4,             p.capCant+p.L2*0.75, "sw"]
     ];
     for(const [nm, z, x, y, zs, part] of items){
       if(part==="cap" && !(p.capH>0)) continue;
       if(part==="bw" && !(p.bwH>0)) continue;
+      if(part==="nb" && !(p.nbB>1e-6)) continue;
       if($("showEL").checked)  L.add(makeLabel(`${nm} ▽${ft(z,3)}`, x, y, zs, eC, 0.95, part));
       if($("showELa").checked) L.add(makeLabel(`${nm} ▽${ft(z+ea,3)}`, x, y+($("showEL").checked?2.4:0), zs, eA, 0.95, part));
     }
@@ -1172,7 +1216,7 @@ function buildModel(p, q){
 function applyPartVisibility(){
   if(!group) return;
   const show = {
-    fw:$("pFw").checked, sw:$("pSw").checked, cap:$("pCap").checked,
+    fw:$("pFw").checked, sw:$("pSw").checked, cap:$("pCap").checked, nb:$("pCap").checked,
     bw:$("pBw").checked, fd:$("pFd").checked, fill:$("pFill").checked,
     ground:$("exGround").checked, exS:$("exSoil").checked, exR:$("exRock").checked
   };
@@ -1195,9 +1239,10 @@ function renderTable(p, q){
   add("侧墙（两道）", `V=Σh/6(A下＋4A中＋A上)×2道＝2×[${swTerms}]（每道，分段点=上/下段分界与前墙顶，段内厚与前端缘随高度线性）`, q.V_sw, "m³", mat("matSw"));
   add("帽梁", `横桥向长(W+2×ec，两端各悬出ec)×高×宽 = ${f(q.capL)}×${f(p.capH)}×${f(q.capWid)}（立方体）`, q.V_cap, "m³", mat("matCap"));
   add("背墙", `长(=帽梁总长)×厚×高 = ${f(q.bwL)}×${f(p.bwT)}×${f(p.bwH)}（立方体）`, q.V_bw, "m³", mat("matCap"));
+  add("牛腿", `长(=背墙总长)×b腿×(h端+h腋/2) = ${f(q.nbL)}×${f(p.nbB)}×(${f(p.nbH)}+${f(p.nbA)}/2)（断面直角梯形：根部高${f(q.nbRoot)}=h端+h腋、端部高${f(p.nbH)}，底面自帽梁顶向外斜升加腋）`, q.V_nb, "m³", mat("matCap"));
   add("基础", `${f(q.fdW1)}×${f(q.fdL1)}×${f(p.fd1H)}` + (q.V_fd2>0 ? ` + ${f(q.fdW2)}×${f(q.fdL2)}×${f(p.fd2H)}` : "") +
       `（整体轮廓+襟边）`, q.V_fd, "m³", mat("matFd"));
-  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">台身+侧墙+帽梁+背墙+基础</td><td>—</td>`+
+  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">台身+侧墙+帽梁+背墙+牛腿+基础</td><td>—</td>`+
     `<td class="num">${f(q.total,3)}</td><td>m³</td></tr>`);
   rows.push(`<tr class="sep"><td colspan="5">开挖（不计入圬工）</td></tr>`);
   const segTerms = rock => q.exSegs.filter(s=>s.rock===rock)
@@ -1213,9 +1258,9 @@ function renderTable(p, q){
     `② U形结构：前墙外面竖直、背坡按 m1:1 放坡（竖:横，0=竖直）；侧墙外面竖直、内面放坡（上段顶厚 t2＝横桥向自外缘向内的墙厚，内坡 m2:1，0=竖直），腔体向下收窄，并按上段（高=帽梁高+背墙高）与下段分段建模；`,
     `③ 侧墙前端缘贴合前墙背坡面（前墙顶以上竖直 x=t1）——即纵桥向视图所示形状；`,
     `④ 帽梁为全宽立方体：总长度=桥台总宽 W+2×悬出长度（两端超出台身/前墙外缘各 ec），前缘自前墙前缘向前悬出 ec（前墙顶面 x∈[0, t1]，帽梁前缘 x=−ec，帽梁后缘与前墙顶后缘齐平），顺桥向宽度=帽梁宽度参数，背墙立于帽梁后端顶部（竖肢，组成 L 形台帽）；`,
-    `⑤ 帽梁/背墙均为矩形断面的立方体（无斜边），背墙总长度=帽梁总长度、立于帽梁后端顶部；`,
+    `⑤ 帽梁/背墙均为矩形断面的立方体（无斜边），背墙总长度=帽梁总长度、立于帽梁后端顶部；牛腿（搭板牛腿）贴背墙背面沿台后方向悬出 b腿，全长=背墙总长，根部底面坐于帽梁顶面、根部高 h端+h腋，外端竖面高 h端，底面向外斜升形成加腋，顶面标高=帽梁顶+(h端+h腋)（搭板搁置面），断面为直角梯形；`,
     `⑥ 基础按前墙+侧墙整体平面轮廓外扩襟边（横向±、前缘、后缘），可选第二层；`,
-    `⑦ 回填为台腔内填土：前缘为前墙背坡面/帽梁后缘/背墙后缘，顶面填至侧墙顶，背墙顶以上按竖直面向上近似；`,
+    `⑦ 回填为台腔内填土：前缘为前墙背坡面/帽梁后缘/背墙后缘，顶面填至侧墙顶，背墙顶以上按竖直面向上近似（按台腔净空计，未扣除牛腿等局部突出体，占比很小）；`,
     `⑧ 开挖：坑底平面=最底层基础轮廓+每侧工作宽度 c，坑底=基础底面（标高 −(d1+d2)）；现状地面标高=开挖总高度 H挖−d1−d2（地面在坑底以上 H挖）；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
     `侧墙（两道）、回填及土/石方量均采用**分段拟棱台体积公式** V=∑hᵢ/6·(A下+4A中+A上)（分段点：侧墙/回填为上、下段分界与前墙顶，开挖为每级平台与石土界面；各段内断面面积随高度线性变化、为高度的二次函数，故该公式解析精确）。经典棱台公式 V=h/3·(S₁+S₂+√S₁S₂) 仅当顶底面相似时精确，本模型坑底及侧墙断面顶底不相似，套用会产生系统性偏小（约0.01%~0.07%，随放坡段高度增大而增大），故本表不用经典公式；三维网格体积独立测量与拟棱台公式结果一致，已相互印证。`
   ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
@@ -1226,6 +1271,7 @@ function rebuild(){
   try{
     $("capLshow").value = f(q.capL);
     $("bwLshow").value = f(q.bwL);
+    $("nbTopShow").value = f(q.nbTop);
     $("t1bshow").value = f(q.t1b);
     $("swUpHshow").value = f(q.swUpH);
     $("swTopWshow").value = f(q.swTopW);
@@ -1270,10 +1316,11 @@ function exportCSV(){
   row("台身(前墙)", `${f(p.Wf)}×${f(p.H1)}×(${f(p.t1)}+${f(q.t1b)})/2, 背坡${sl0(p.m1)}`, q.V_fw, "m3", mt("matFw"));  row("侧墙(两道)", `分段拟棱台 V=Σh/6(A下+4A中+A上)×2道=2×[${q.swSegs.map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+")}]`, q.V_sw, "m3", mt("matSw"));
   row("帽梁", `${f(q.capL)}×${f(p.capH)}×${f(q.capWid,3)}`, q.V_cap, "m3", mt("matCap"));
   row("背墙", `${f(q.bwL)}×${f(p.bwT)}×${f(p.bwH)}`, q.V_bw, "m3", mt("matCap"));
+  row("牛腿", `${f(q.nbL)}×${f(p.nbB)}×(${f(p.nbH)}+${f(p.nbA)}/2), 断面直角梯形(根部高${f(q.nbRoot)}、端部高${f(p.nbH)}、底面向外加腋), 顶面标高${f(q.nbTop)}`, q.V_nb, "m3", mt("matCap"));
   row("基础", `${f(q.fdW1)}×${f(q.fdL1)}×${f(p.fd1H)}` + (q.V_fd2>0 ? `+${f(q.fdW2)}×${f(q.fdL2)}×${f(p.fd2H)}` : ""), q.V_fd, "m3", mt("matFd"));
   row("土方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(false)}, 坑底${f(q.excWb)}×${f(q.excLb)}(含工作宽度每侧${f(p.excW)}), 坡比(竖:横)${sl0(p.excMs)}, 分级高度${f(p.excHst,2)}/平台宽${f(p.excB,2)}`, q.V_exSoil, "m3");
   row("石方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(true)}, 坑底同上, 坡比(竖:横)${sl0(p.excMr)}`, q.V_exRock, "m3");
-  row("圬工合计", "台身+侧墙+帽梁+背墙+基础", q.total, "m3");
+  row("圬工合计", "台身+侧墙+帽梁+背墙+牛腿+基础", q.total, "m3");
   row("回填", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${q.fillSegs.map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+")}, 台腔内填土, 顶填至侧墙顶`, q.V_fill, "m3", mt("matFill"));
   lines.push("说明:三维参数化估算,最终以施工图工程数量表为准");
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type:"text/csv;charset=utf-8"});

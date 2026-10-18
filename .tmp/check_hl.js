@@ -149,6 +149,17 @@ nearHL(b.max.z - b.min.z, 1, 0.45, "桥台 fd2H 竖向跨=二层厚度(仅竖棱
 nearHL(b.max.x - b.min.x, 10, 0.45, "桥台 fd2H 顺桥向跨=二层基础总长");
 nearHL(b.min.z, -2, 0.25, "桥台 fd2H 竖棱下沿=二层底");
 els.useFd2.checked = false;
+/* 牛腿：三条量线（顶面顺桥向= b腿、外端竖面= h端、根部竖向= h腋） */
+b = bbOf("nbB");
+nearHL(b.max.x - b.min.x, 0.3, 0.25, "桥台 nbB 高亮顺桥向跨=b腿");
+nearHL(b.max.z - b.min.z, 0, 0.25, "桥台 nbB 位于牛腿顶面(水平量线)");
+nearHL(b.max.y - b.min.y, 0, 0.25, "桥台 nbB 位于台帽端部(横向单线)");
+b = bbOf("nbH");
+nearHL(b.max.z - b.min.z, 0.3, 0.25, "桥台 nbH 高亮竖向跨=h端");
+nearHL(b.max.x - b.min.x, 0, 0.25, "桥台 nbH 位于牛腿外端竖面");
+b = bbOf("nbA");
+nearHL(b.max.z - b.min.z, 0.3, 0.25, "桥台 nbA 高亮竖向跨=h腋");
+nearHL(b.max.x - b.min.x, 0, 0.25, "桥台 nbA 位于背墙背面");
 `;
 
 makeCheck("pier_harness.js", "桥墩", pierExpects);
