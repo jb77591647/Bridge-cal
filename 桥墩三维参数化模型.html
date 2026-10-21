@@ -162,7 +162,8 @@
           <div class="field"><label>挡块上部宽</label><input type="number" id="dkWT" value="0.20" step="0.01"></div>
           <div class="field"><label>挡块下部宽</label><input type="number" id="dkWB" value="0.20" step="0.01"></div>
         </div>
-        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），变截面断面：跨中高 hc、两端高 he（生效值≤hc）；左/右悬臂长=梁端至变高点的横桥向距离，该段底面自端部斜向上抬至中部高；挡块设于两端顶面（断面梯形：下部宽→上部宽，沿厚度 bc 全宽贯通）。总长 Lc 直接输入，宜与墩身横桥向尺寸+左右悬臂一致。单位：m。</div>
+        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），变截面断面：跨中高 hc、两端高 he（生效值≤hc）；左/右悬臂长=梁端至变高点的横桥向距离，该段底面自端部斜向上抬至中部高；挡块设于两端顶面（断面梯形：下部宽→上部宽，沿厚度 bc 全宽贯通）。总长 Lc 直接输入，宜与墩身横桥向尺寸+左右悬臂一致。<b>限值：Lc ＞ 墩身横桥向尺寸（矩形墩=Wp，圆柱墩=最外侧圆柱外缘距 Wd），且 (Lc−aL−aR) ＞ 同一尺寸；不满足时按限值取用（aL/aR 等比压缩）并见下方红字提示。</b>单位：m。</div>
+        <div class="note" id="capWarn" style="display:none; margin-top:5px; border-left:3px solid #dc2626; background:#fef2f2; color:#991b1b; font-weight:600;"></div>
       </div>
 
       <div class="card">
@@ -231,7 +232,7 @@
         <div class="note" style="margin-top:0;">
           坐标系：原点=<strong>基础最低面（最下层基础底面）中心</strong>，x=纵桥向、y=横桥向、z=竖向（向上为正）；标高以<strong>基础底面=0.000</strong> 计（墩底标高即等于基础总厚），绝对标高=相对标高+高程基准绝对标高。<br>
           基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。<br>
-          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），变截面断面：横桥向总长 Lc 直接输入（宜=墩身横桥向尺寸+左右悬臂），顺桥向厚度 bc；跨中高 hc、两端高 he（≤hc），左右悬臂段（梁端→变高点）底面斜向上抬；两端顶面可设挡块（高 h挡、断面梯形 上部宽/下部宽，沿 bc 贯通）；勾掉「设置盖梁」即不计盖梁。
+          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），变截面断面：横桥向总长 Lc 直接输入（宜=墩身横桥向尺寸+左右悬臂），顺桥向厚度 bc；跨中高 hc、两端高 he（≤hc），左右悬臂段（梁端→变高点）底面斜向上抬；两端顶面可设挡块（高 h挡、断面梯形 上部宽/下部宽，沿 bc 贯通）；勾掉「设置盖梁」即不计盖梁。<b>限值（违反时按限值取用并红字提示）：Lc ＞ 墩身横桥向尺寸 Wp（圆柱墩取最外侧圆柱外缘距 Wd），且 (Lc−aL−aR) ＞ 同一尺寸。</b>
         </div>
       </div>
     </div>
@@ -357,12 +358,24 @@ function calcQ(p){
      挡块：设于两端顶面，断面梯形（下部宽 wb → 上部宽 wt、高 h挡）沿 bc 全宽贯通，
      单个体积 = (wt+wb)/2×h挡×bc，两端共 2 个 */
   q.capBase = baseB;
-  q.capL  = p.useCap ? Math.max(p.capL, 0.1) : 0;
-  q.capHm = p.useCap ? p.caph : 0;
-  q.capHe = p.useCap ? Math.min(Math.max(p.caphe, 0), q.capHm) : 0;
-  q.cantL = p.useCap ? Math.min(Math.max(p.cantL, 0), q.capL - 1e-6) : 0;
-  q.cantR = p.useCap ? Math.min(Math.max(p.cantR, 0), q.capL - q.cantL) : 0;
+  /* 【盖梁尺寸限值】（严格大于，违反时按限值取用并在参数卡提示）
+     ① Lc ＞ 墩身横桥向基准尺寸（矩形墩=Wp、圆柱墩=最外侧圆柱外缘距 Wd）：盖梁须横桥向盖住墩身；
+     ② (Lc − aL − aR) ＞ 同一基准尺寸：跨中等高段须完全覆盖墩顶，变高点落在墩身以外。
+     违反②时 aL、aR 按原比例等比压缩至刚好满足；违反①时 Lc 抬至 baseB（+1e-6）后再判②。 */
+  const CAP_EPS = 1e-6;
+  q.capLmin   = baseB + CAP_EPS;
+  q.capL      = p.useCap ? Math.max(p.capL, q.capLmin) : 0;
+  q.capHm     = p.useCap ? Math.max(p.caph, 0) : 0;
+  q.capHe     = p.useCap ? Math.min(Math.max(p.caphe, 0), q.capHm) : 0;
+  const cantMax = Math.max(q.capL - q.capLmin, 0);       // aL+aR 上限
+  const cantSum = Math.max(p.cantL, 0) + Math.max(p.cantR, 0);
+  const cantK   = (cantSum > cantMax && cantSum > 1e-9) ? cantMax/cantSum : 1;
+  q.cantL = p.useCap ? Math.max(p.cantL, 0)*cantK : 0;
+  q.cantR = p.useCap ? Math.max(p.cantR, 0)*cantK : 0;
   const flatL = Math.max(q.capL - q.cantL - q.cantR, 0);
+  q.capFlat   = flatL;                                  // 跨中等高段长（须＞baseB）
+  q.capLbad   = p.useCap && p.capL <= q.capLmin;        // 违反①
+  q.capCantBad = p.useCap && cantK < 1 - 1e-12;         // 违反②
   q.V_cap = p.useCap ? p.capb * (q.capHm*flatL + (q.capHm+q.capHe)/2*(q.cantL+q.cantR)) : 0;
   q.dkOn  = p.useCap && p.dkOn;
   q.dkH   = Math.max(p.dkH, 0);
@@ -1255,6 +1268,21 @@ function rebuild(){
     $("f1ABshow").value = `${f(q.a1)}×${f(q.b1)}`;
     $("f2ABshow").value = p.useFd2 ? `${f(q.a2)}×${f(q.b2)}` : "—";
     $("excHr").value = f(q.excHr);
+    /* 盖梁尺寸限值提示（违反时生效值已按限值取用） */
+    const bw = [];
+    if(q.capLbad)
+      bw.push(`盖梁宽度 Lc 必须＞墩身横桥向尺寸 ${f(q.capBase,2)} m（矩形墩取 Wp，圆柱墩取最外侧圆柱外缘距 Wd）；当前按 ${f(q.capL,2)} m 取用`);
+    if(q.capCantBad)
+      bw.push(`跨中等高段 (Lc−aL−aR) 必须＞墩身横桥向尺寸 ${f(q.capBase,2)} m；aL、aR 已按原比例压缩为 ${f(q.cantL,3)} / ${f(q.cantR,3)} m（等高段 ${f(q.capFlat,3)} m）`);
+    const wel = $("capWarn");
+    wel.style.display = bw.length ? "" : "none";
+    wel.innerHTML = bw.map(s=>`<div style="margin-top:3px;">⚠ ${s}</div>`).join("");
+    [["capL", q.capLbad], ["cantL", q.capCantBad], ["cantR", q.capCantBad]].forEach(pair => {
+      const e = $(pair[0]);
+      if(!e) return;
+      e.style.border = pair[1] ? "1px solid #dc2626" : "";
+      e.style.background = pair[1] ? "#fff5f5" : "";
+    });
   }catch(_){}
   try{
     renderTable(p, q);
