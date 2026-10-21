@@ -52,10 +52,10 @@
     font-size:13px; font-weight:700; margin-bottom:8px; padding-left:8px;
     border-left:3px solid var(--accent); line-height:1.4;
   }
-  .fields{display:grid; grid-template-columns:1fr; gap:0;}
-  .field{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0;}
+  .fields{display:grid; grid-template-columns:1fr; gap:0; min-width:0;}
+  .field{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0; min-width:0;}
   .field + .field{border-top:1px dashed #cbd5e1;}
-  .field label{color:#334155; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .field label{color:#334155; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto;}
   .field small{color:var(--sub); font-size:10.5px;}
   input[type=number]{
     width:78px; padding:3px 6px; border:1px solid #96d3ab; border-radius:5px;
@@ -64,7 +64,8 @@
   input[type=number]:focus{outline:none; border-color:#2e9e5b; background:#c2ecd2;}
   input[type=number]:disabled{background:#eef2f6; border-color:var(--line);}
   input[type=text]{padding:4px 8px; border:1px solid #96d3ab; border-radius:5px; font-size:13px; background:#d6f2e0;}
-  select{padding:3px 4px; border:1px solid #96d3ab; border-radius:5px; font-size:12.5px; background:#d6f2e0; width:118px; color:var(--ink);}
+  select{padding:3px 4px; border:1px solid #96d3ab; border-radius:5px; font-size:12.5px; background:#d6f2e0; width:118px; max-width:118px; min-width:0; box-sizing:border-box; color:var(--ink);}
+.field select{flex:0 0 118px; min-width:0;}   /* 防止 option 文字把下拉框撑出卡片 */
   #view3d{
     width:100%; height:560px; border:1px solid var(--line); border-radius:10px;
     background:#eef2f6; position:relative; overflow:hidden; cursor:grab;
@@ -234,7 +235,7 @@
           <div class="field"><label>支座竖向荷载 Nk <small>标准值，支座传来</small></label><input type="number" id="Nk" value="1000" step="10"></div>
           <div class="field"><label>制动力 Hk <small>自动时按规范公式给出并锁定</small></label><input type="number" id="Hk" value="165" step="10"></div>
           <div class="field"><label>加载长度 Lk <small>相邻跨跨径，自动算制动力</small></label><input type="number" id="brkL" value="20" step="1"></div>
-          <div class="field"><label>荷载等级 <small>决定制动力下限</small></label><select id="brkGrade"><option value="I" selected>公路—Ⅰ级（≥165kN）</option><option value="II">公路—Ⅱ级（≥90kN）</option></select></div>
+          <div class="field"><label>荷载等级 <small>Ⅰ级≥165、Ⅱ级≥90kN</small></label><select id="brkGrade"><option value="I" selected>公路—Ⅰ级</option><option value="II">公路—Ⅱ级</option></select></div>
           <div class="field"><label>同向车道数 <small>制动力车道折减</small></label><select id="brkN"><option value="1" selected>1 车道 ×1.00</option><option value="2">2 车道 ×2.00</option><option value="3">3 车道 ×2.34</option><option value="4">4 车道 ×2.68</option></select></div>
           <div class="field"><label>台后填土高度 h填 <small>自基础顶至路基顶，留空=侧墙总高</small></label><input type="number" id="chkHf" value="" placeholder="自动" step="0.1"></div>
           <div class="field"><label>填土内摩擦角 φ <small>度，默认 30</small></label><input type="number" id="chkPhi" value="30" step="1"></div>
@@ -617,15 +618,13 @@ function calcCheck(p, q){
   c.Mh  = c.MhB + c.MhE;
   /* 抗滑移 */
   c.Kc = c.Htot > 1e-9 ? p.fric*c.Vsum/c.Htot : Infinity;
-  /* 抗倾覆：绕前趾 / 后趾 */
-  let MsF = 0, MsB = 0;
-  items.forEach(it=>{ MsF += it.W*(it.z - c.zF); MsB += it.W*(c.zB - it.z); });
-  MsF += p.Nk*(c.zN - c.zF); MsB += p.Nk*(c.zB - c.zN);
-  c.MsF = MsF; c.MsB = MsB;
-  c.K0F = c.Mh > 1e-9 ? MsF/c.Mh : Infinity;
-  c.K0B = c.Mh > 1e-9 ? MsB/c.Mh : Infinity;
-  c.K0  = Math.min(c.K0F, c.K0B);
-  c.gov = c.K0F <= c.K0B ? "前趾" : "后趾";
+  /* 抗倾覆：只验算绕基底前趾（河心侧）取矩，即"向河心倾覆"。
+     台后土压力恒指向河心且远大于制动力，水平力合力方向不可能指向台后，后趾工况不控制，故不验算。 */
+  let MsF = 0;
+  items.forEach(it=>{ MsF += it.W*(it.z - c.zF); });
+  MsF += p.Nk*(c.zN - c.zF);
+  c.MsF = MsF;
+  c.K0  = c.Mh > 1e-9 ? MsF/c.Mh : Infinity;
   /* 基底应力（直线分布） */
   let Mm = 0;
   items.forEach(it=>{ Mm += it.W*(it.z - c.zc); });
@@ -1508,12 +1507,19 @@ function renderCheck(p, q){
   row("Kc = μ·ΣV / ΣH", `= ${f(p.fric,2)}×${f(c.Vsum,1)} / ${f(c.Htot,1)}，要求 ≥ ${f(K_SLIDE,1)}`,
       c.Kc, "—", c.okKc);
 
-  sep("抗倾覆稳定（绕基底边缘取矩）");
-  row("K0(前趾) = ΣM稳 / ΣM倾", `ΣM稳＝${f(c.MsF,1)} kN·m；ΣM倾＝制动力 ${f(c.MhB,1)}＋土压力 ${f(c.MhE,1)}＝${f(c.Mh,1)}，要求 ≥ ${f(K_OVER,1)}`,
-      c.K0F, "—", c.okK0);
-  row("K0(后趾) = ΣM稳 / ΣM倾", `ΣM稳＝${f(c.MsB,1)} kN·m`, c.K0B, "—", c.okK0);
-  rows.push(`<tr class="total"><td>控制值 K0</td><td class="fx">取前趾/后趾不利者（本例${c.gov}控制）</td>`+
-    `<td class="num">${num(c.K0)}</td><td>—</td><td style="text-align:center;">${mk(c.okK0)}</td></tr>`);
+  sep("抗倾覆稳定（绕基底前趾取矩，即向河心倾覆；ΣM稳＝Σ 竖向力×力臂）");
+  c.items.forEach(it=>{
+    const gm = it.kind === "s" ? p.gamS : p.gamC;
+    row(it.n + "自重", `V=${f(it.V,3)}×${f(gm,1)}＝${f(it.W,1)} kN；力臂 ${f(it.z - c.zF,3)}（作用点 z=${f(it.z,3)}，前趾 z=${f(c.zF,3)}）`,
+        it.W*(it.z - c.zF), "kN·m");
+  });
+  row("支座竖向反力 Nk", `Nk=${f(p.Nk,1)} kN；力臂 ${f(c.zN - c.zF,3)}（作用点 z=${f(c.zN,3)}，前趾 z=${f(c.zF,3)}）`,
+      p.Nk*(c.zN - c.zF), "kN·m");
+  rows.push(`<tr class="total"><td>ΣM稳 合计</td><td class="fx">圬工自重＋回填土重＋支座反力，均对前趾取矩</td>`+
+    `<td class="num">${f(c.MsF,1)}</td><td>kN·m</td><td></td></tr>`);
+  rows.push(`<tr><td>ΣM倾 合计</td><td class="fx">制动力 ${f(c.MhB,1)}＋土压力 ${f(c.MhE,1)}，即 Hk·hH＋EaH·yEa</td>`+
+    `<td class="num">${f(c.Mh,1)}</td><td>kN·m</td><td></td></tr>`);
+  row("K0 = ΣM稳 / ΣM倾", `要求 ≥ ${f(K_OVER,1)}`, c.K0, "—", c.okK0);
 
   sep("基底承载力（直线分布假定）");
   row("基底面积 A", `B×L = ${f(c.Wb,2)}×${f(c.Lb,2)}`, c.A, "m²");
@@ -1532,7 +1538,7 @@ function renderCheck(p, q){
 
   $("checkNote").innerHTML = `<b>验算依据与假定</b>` + [
     `① 荷载均取<strong>标准值</strong>。制动力按 JTG D60—2015 第 4.3.6 条自动计算：一个设计车道取车道荷载总重力的 10%（qk=10.5 kN/m，Pk 随加载长度内插），公路—Ⅰ级不小于 165 kN、Ⅱ级不小于 90 kN，同向多车道乘 1.00/2.00/2.34/2.68；取消勾选可手输，此时应自行叠加温度力等。台后主动土压力按库仑公式自动计算（墙背竖直、填土面水平），<strong>仅取水平分量、竖向分量偏安全不计</strong>，并与制动力按同向叠加。未计入水浮力、地震作用、横桥向偏心及斜交影响。承载能力极限状态应另按 JTG D60 组合、JTG 3363 复核。`,
-    `② 抗滑移 Kc = μ·ΣV/ΣH ≥ 1.3；抗倾覆分别绕基底前趾（河心侧）与后趾（台后侧）取矩，K0 = ΣM稳/ΣM倾 ≥ 1.5，取不利者控制；基底应力按直线分布，p均 ≤ fa、p最大 ≤ 1.2fa，偏心距 e ≤ L/6（土基）或 L/4（岩石）。限值取自《公路桥涵地基与基础设计规范》JTG 3363—2019 的常规规定，项目另有规定或持力层软弱时应按实际调整。`,
+    `② 抗滑移 Kc = μ·ΣV/ΣH ≥ 1.3。抗倾覆<strong>只验算绕基底前趾（河心侧）取矩</strong>，即向河心倾覆：ΣM稳 由台身、侧墙、帽梁、背墙、牛腿、基础的自重（V×γc）、台腔回填土重（V×γs）与支座反力 Nk 各自乘以"作用点至前趾的顺桥向距离"累加而成（表中逐项列出）；ΣM倾 = Hk·hH＋EaH·yEa。K0 = ΣM稳/ΣM倾 ≥ 1.5。台后土压力恒指向河心且远大于制动力，水平力合力不可能指向台后，后趾工况不控制，故不再验算。基底应力按直线分布，p均 ≤ fa、p最大 ≤ 1.2fa，偏心距 e ≤ L/6（土基）或 L/4（岩石）。限值取自《公路桥涵地基与基础设计规范》JTG 3363—2019 的常规规定，项目另有规定或持力层软弱时应按实际调整。`,
     `③ 各构件自重按几何形心取矩（前墙梯形按解析形心，侧墙、回填按断面面积加权数值积分，牛腿按直角梯形断面形心），与三维模型同源；竖向力作用点、基底轮廓均随参数联动。`,
     `④ 土压力计算宽度取前墙横桥向宽度 B，高度取自基础顶至路基顶（留空时默认＝侧墙总高）。若台后设搭板并做柔性隔离、或由耳墙/翼墙独立挡土，实际传给台身者小于此值，可按实际挡土高度折减 h填，但不应取零；若路基顶高于背墙顶，应据实加大 h填。台腔回填对两侧墙的土压力左右对称、相互抵消，不产生横桥向合力。`,
     `⑤ 本表用于方案比较与初判；施工图阶段应按实际荷载组合、地基容许承载力深宽修正、下卧层验算及沉降验算另行复核。`

@@ -385,7 +385,7 @@ const statOf = part => {
   (parts[part]||[]).forEach(m=>{ const r = meshStat(m); V += r.V; sx += r.V*r.c.x; });
   return { V, z: V > 1e-9 ? sx/V + ec0 : NaN };
 };
-let SV = 0, SZ = 0, SZF = 0, SZB = 0, SZc = 0;
+let SV = 0, SZ = 0, SZF = 0, SZc = 0;
 [["台身（前墙）","fw",pChk.gamC], ["侧墙（两道）","sw",pChk.gamC], ["帽梁","cap",pChk.gamC],
  ["背墙","bw",pChk.gamC], ["牛腿","nb",pChk.gamC], ["基础","fd",pChk.gamC],
  ["台腔回填","fill",pChk.gamS]].forEach(([n,part,gm])=>{
@@ -393,16 +393,21 @@ let SV = 0, SZ = 0, SZF = 0, SZB = 0, SZc = 0;
   if(it) near(it.z, st.z, 0.02, "验算形心 z：" + n + "（网格 vs 公式）");
   const W = st.V*gm;
   SV += W; SZ += W*st.z;
-  SZF += W*(st.z - cChk.zF); SZB += W*(cChk.zB - st.z); SZc += W*(st.z - cChk.zc);
+  SZF += W*(st.z - cChk.zF); SZc += W*(st.z - cChk.zc);
 });
 SV += pChk.Nk; SZ += pChk.Nk*cChk.zN;
 SZF += pChk.Nk*(cChk.zN - cChk.zF);
-SZB += pChk.Nk*(cChk.zB - cChk.zN);
 SZc += pChk.Nk*(cChk.zN - cChk.zc);
 near(cChk.Vsum, SV, 2.0, "验算 ΣV（网格体积×容重，侧墙含0.002显示偏移）");
 near(cChk.zbar, SZ/SV, 0.01, "验算 合力作用点（网格形心加权）");
-near(cChk.MsF, SZF, 10.0, "验算 前趾稳定力矩 ΣM稳");
-near(cChk.MsB, SZB, 10.0, "验算 后趾稳定力矩 ΣM稳");
+near(cChk.MsF, SZF, 10.0, "验算 绕前趾稳定力矩 ΣM稳（网格体积×容重×力臂）");
+const sumArm = cChk.items.reduce((a,it)=>a + it.W*(it.z - cChk.zF), 0) + pChk.Nk*(cChk.zN - cChk.zF);
+near(cChk.MsF, sumArm, 1e-9, "ΣM稳 = Σ(各竖向力×至前趾的力臂)，逐项可复核");
+near(cChk.K0, cChk.MsF/cChk.Mh, 1e-9, "K0 = ΣM稳/ΣM倾（只验算前趾）");
+isTrue(cChk.MsB === undefined && cChk.K0B === undefined && cChk.K0F === undefined,
+       "后趾稳定力矩与 K0(后趾) 已移除");
+isTrue(cChk.items.length >= 7 && cChk.items.every(it=>it.W > 0 && it.z > -1),
+       "抗倾覆明细含 7 个及以上竖向力分项（各自带 W 与作用点 z）");
 near(cChk.M, SZc + cChk.Mh, 10.0, "验算 基底弯矩（竖向偏心＋水平力）");
 /* 几何基准与代数关系 */
 near(cChk.zF, -0.9, 1e-9, "基底前趾 z=ec−fd1Zf=−0.9");
@@ -446,6 +451,10 @@ const ckTbl = els.checkBody.innerHTML;
 isTrue(ckTbl.indexOf("抗滑移")>=0 && ckTbl.indexOf("抗倾覆")>=0 && ckTbl.indexOf("偏心距")>=0 &&
        ckTbl.indexOf("p最大")>=0 && ckTbl.indexOf("验算结论")>=0, "验算表含抗滑移/抗倾覆/承载力/结论");
 isTrue(els.checkNote.innerHTML.indexOf("标准值")>=0 && els.checkNote.innerHTML.indexOf("3363")>=0, "验算说明含荷载标准值与规范依据");
+isTrue(ckTbl.indexOf("ΣM稳 合计")>=0 && ckTbl.indexOf("支座竖向反力 Nk")>=0 &&
+       ckTbl.indexOf("台身（前墙）自重")>=0, "验算表逐项列出 ΣM稳（各构件自重＋支座反力，带力臂）");
+isTrue(ckTbl.indexOf("K0(后趾)")<0 && ckTbl.indexOf("控制值 K0")<0, "验算表不再出现后趾验算（合力位置仍标注距后趾距离）");
+isTrue(ckTbl.indexOf("ΣM倾 合计")>=0, "验算表列出 ΣM倾 合计");
 
 /* ===== 制动力自动计算（JTG D60—2015 第 4.3.6 条） ===== */
 els.incEa.checked = false; els.autoHk.checked = true;
