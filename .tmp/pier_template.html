@@ -363,12 +363,15 @@ function readP(){
              二层=一层边长+每侧襟边 c2（自上而下分层） */
 function calcQ(p){
   const q = {};
+  /* 限值判红容差：输入框按 0.01 步进、显示两位小数，容差取半个步长，
+     保证「显示上相等」（如 bc=2.50 与 Lp=2.5）绝不报错 */
+  const CAP_TOL = 0.005;
   const isRect = p.type==="实体矩形桥墩";
   /* 【墩身顺桥向长限值】墩身顺桥向长（矩形墩=Lp、圆柱墩=d）须 ≥ 圆柱直径 d：
      圆柱式时两者同为 d，自动满足；矩形墩若 Lp＜d 则按 d 取用并在参数卡提示 */
   q.pierLmin = p.d;
   q.pierL    = Math.max(isRect ? p.Lp : p.d, p.d);
-  q.pierLbad = isRect && p.Lp < p.d - 1e-9;
+  q.pierLbad = isRect && p.Lp < p.d - CAP_TOL;
   const baseA = q.pierL;                         // 纵桥向基准尺寸（生效值）
   const baseB = isRect ? p.Wp : (p.n-1)*p.s + p.d; // 横桥向基准尺寸（最外侧圆柱外缘距）
   q.Wd  = (p.n-1)*p.s + p.d;
@@ -410,7 +413,7 @@ function calcQ(p){
      违反时 bc 按该限值取用（≥ 直接取限值本身）并在参数卡提示 */
   q.capBmin = q.pierL;
   q.capB    = Math.max(p.capb, q.capBmin);
-  q.capBbad = p.useCap && p.capb < q.capBmin - 1e-9;
+  q.capBbad = p.useCap && p.capb < q.capBmin - CAP_TOL;
   q.V_cap = p.useCap ? q.capB * (q.capHm*flatL + (q.capHm+q.capHe)/2*(q.cantL+q.cantR)) : 0;
   q.dkOn  = p.useCap && p.dkOn;
   q.dkH   = Math.max(p.dkH, 0);
