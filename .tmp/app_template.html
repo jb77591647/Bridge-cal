@@ -1774,7 +1774,14 @@ function dgBody(m, p, q, c, o){
   if(o.fill!==false)
     s+=`<path d="M${m.X(x0+t1b).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(zFill).toFixed(1)} L${m.X(xCapR).toFixed(1)},${m.Y(zFill).toFixed(1)} L${m.X(xCapR).toFixed(1)},${m.Y(zCap0).toFixed(1)} L${m.X(x0+t1b).toFixed(1)},${m.Y(fd).toFixed(1)} Z" fill="${DGC.fill}" fill-opacity=".5" stroke="none"/>`;
   s+=`<path d="M${m.X(xCapR).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(fd+p.H1+q.swUpH).toFixed(1)} L${m.X(xCapR).toFixed(1)},${m.Y(fd+p.H1+q.swUpH).toFixed(1)}" fill="none" stroke="#aab7c6" stroke-width=".8" stroke-dasharray="4 3"/>`;
-  s+=`<rect x="${m.X(0).toFixed(1)}" y="${m.Y(fd).toFixed(1)}" width="${(L*m.k).toFixed(1)}" height="${(fd*m.k).toFixed(1)}" ${st}/>`;
+  const use2 = p.useFd2 && p.fd2H > 1e-9;      /* 两层基础：示意图画台阶形，各层带各自襟边 */
+  if(use2){
+    const xa1 = x0 - p.fd1Zf, xb1 = x0 + p.L2 + p.fd1Zb;   /* 一层前/后缘（前缘在二层前趾之后 fd2Zf） */
+    s+=`<rect x="${m.X(0).toFixed(1)}" y="${m.Y(p.fd2H).toFixed(1)}" width="${(L*m.k).toFixed(1)}" height="${(p.fd2H*m.k).toFixed(1)}" ${st}/>`;
+    s+=`<rect x="${m.X(xa1).toFixed(1)}" y="${m.Y(fd).toFixed(1)}" width="${((xb1-xa1)*m.k).toFixed(1)}" height="${(p.fd1H*m.k).toFixed(1)}" ${st}/>`;
+  }else{
+    s+=`<rect x="${m.X(0).toFixed(1)}" y="${m.Y(fd).toFixed(1)}" width="${(L*m.k).toFixed(1)}" height="${(fd*m.k).toFixed(1)}" ${st}/>`;
+  }
   s+=`<polygon points="${m.X(x0).toFixed(1)},${m.Y(fd).toFixed(1)} ${m.X(x0).toFixed(1)},${m.Y(zCap0).toFixed(1)} ${m.X(xCapR).toFixed(1)},${m.Y(zCap0).toFixed(1)} ${m.X(x0+t1b).toFixed(1)},${m.Y(fd).toFixed(1)}" ${st}/>`;
   s+=`<rect x="${m.X(xCapL).toFixed(1)}" y="${m.Y(zCap1).toFixed(1)}" width="${((xCapR-xCapL)*m.k).toFixed(1)}" height="${(p.capH*m.k).toFixed(1)}" ${st}/>`;
   s+=`<rect x="${m.X(xCapR-p.bwT).toFixed(1)}" y="${m.Y(zTop).toFixed(1)}" width="${(p.bwT*m.k).toFixed(1)}" height="${(p.bwH*m.k).toFixed(1)}" ${st}/>`;
@@ -1785,7 +1792,12 @@ function dgBody(m, p, q, c, o){
   s+=`<path d="${h}" stroke="#bdc9d6" stroke-width=".8" fill="none"/>`;
   if(o.lab){
     s+=dgT(m.X(x0+t1b*0.30), m.Y(fd+p.H1*0.45), "前墙", {sz:7.2, col:"#44546a"});
-    s+=dgT(m.X(L/2), m.Y(fd*0.5)+2.6, "基础", {sz:7.2, col:"#44546a"});
+    if(use2){
+      s+=dgT(m.X((x0-p.fd1Zf + x0+p.L2+p.fd1Zb)/2), m.Y(fd-p.fd1H/2)+2.6, "基础一层", {sz:7.2, col:"#44546a"});
+      s+=dgT(m.X(L/2), m.Y(p.fd2H/2)+2.6, "基础二层", {sz:7.2, col:"#44546a"});
+    }else{
+      s+=dgT(m.X(L/2), m.Y(fd*0.5)+2.6, "基础", {sz:7.2, col:"#44546a"});
+    }
     s+=dgT(m.X((x0+t1b+xEnd)/2), m.Y(fd+zFill*0.32), "台腔回填", {sz:7.2, col:"#7a6a3a"});
   }
   return s;
@@ -2360,7 +2372,7 @@ function wSepRow(text, grid){
     wCell(wRun(text, {b:true, sz:19}), tot, {span:grid.length, fill:"F1F5F9", para:{before:120, after:40}}) +
     '</w:tr>';
 }
-/* ===== 计算参数表：直接扫描左侧参数卡的 DOM（输入框当前值 + 自动计算值） ===== */
+/* ===== 验算参数表：只取「稳定与承载力验算」卡片（输入框当前值 + 自动计算值） ===== */
 function collectParamRows(){
   const rows = [];
   const txt = el => (el ? (el.textContent || "") : "").replace(/[▼▲]/g, "").trim();
@@ -2370,6 +2382,7 @@ function collectParamRows(){
     const h = card.querySelector("h2");
     if(!h) continue;
     const title = txt(h);
+    if(title.indexOf("稳定与承载力验算") < 0) continue;   /* 其余参数卡（总体/台帽/前墙/侧墙/基础/材料/开挖）不进验算书 */
     const items = [];
     card.querySelectorAll(".chk").forEach(c => {
       const cb = c.querySelector("input[type=checkbox]");
@@ -2527,7 +2540,7 @@ async function exportWord(){
   const now = new Date();
   const stamp = now.getFullYear() + "-" + ("0"+(now.getMonth()+1)).slice(-2) + "-" + ("0"+now.getDate()).slice(-2) +
                 " " + ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2);
-  /* 表1：计算参数（直接取自左侧参数卡当前值，含自动计算项） */
+  /* 表1：验算参数（只取「稳定与承载力验算」卡片当前值，含自动计算项） */
   const PW = [3100, 1400, 4800];
   let pbody = "", nParam = 0;
   try{
@@ -2545,11 +2558,11 @@ async function exportWord(){
   const head =
     wPara(wRun(proj + " — 稳定与承载力验算（标准值组合）", {b:true, sz:32}), {after:60}) +
     wPara(wRun("坐标原点＝基底前趾底边中点（倾覆点），x 指向台后，z 自基底底面起算；力臂即作用点坐标。", {sz:18}), {after:20}) +
-    wPara(wRun("导出时间 " + stamp + " · 计算参数 " + nParam + " 项 · 验算 " + nRow + " 行 · 公式 " + nEq +
+    wPara(wRun("导出时间 " + stamp + " · 验算参数 " + nParam + " 项 · 验算 " + nRow + " 行 · 公式 " + nEq +
                " 处（Word 原生公式对象，双击可编辑） · 计算示意图 " + nFig + " 张", {sz:16}), {after:60});
   const tblChk = wTbl(COLW, body.join(''));
   const bodyXml =
-    (paramTbl ? wPara(wRun("表1  计算参数表", {b:true, sz:22}), {before:60, after:60}) + paramTbl + wPara(wRun("")) : "") +
+    (paramTbl ? wPara(wRun("表1  验算参数表（稳定与承载力）", {b:true, sz:22}), {before:60, after:60}) + paramTbl + wPara(wRun("")) : "") +
     wPara(wRun("表" + nTbl + "  稳定与承载力验算（标准值组合）", {b:true, sz:22}), {before:160, after:60}) +
     tblChk;
   const sectPr = '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>' +

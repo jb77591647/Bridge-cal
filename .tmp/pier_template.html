@@ -1425,7 +1425,7 @@ function wNotes(el, size){
   }
   return out;
 }
-/* ===== 计算参数表：直接扫描左侧参数卡的 DOM（输入框当前值 + 自动计算值） ===== */
+/* ===== 验算参数表：只取「验算参数（标准值）」卡片（输入框当前值 + 自动计算值） ===== */
 function collectParamRows(){
   const rows = [];
   const txt = el => (el ? (el.textContent || "") : "").replace(/[▼▲]/g, "").trim();
@@ -1435,6 +1435,7 @@ function collectParamRows(){
     const h = card.querySelector("h2");
     if(!h) continue;
     const title = txt(h);
+    if(title.indexOf("验算参数") < 0) continue;   /* 其余参数卡（总体/墩身/盖梁/基础/材料/开挖）不进验算书 */
     const items = [];
     card.querySelectorAll(".chk").forEach(c => {
       const cb = c.querySelector("input[type=checkbox]");
@@ -1506,7 +1507,7 @@ function exportWord(){
     (p.useFd2 ? `，二层 ${f(q.a2,2)}×${f(q.b2,2)}×${f(p.fh2,2)}` : "");
   const pierTxt = isRect ? `墩身 Lp ${f(p.Lp,2)}×Wp ${f(p.Wp,2)}×H ${f(p.H,2)}`
                          : `墩身 ${p.n} 根圆柱 d ${f(p.d,2)}，中心距 ${f(p.s,2)}，H ${f(p.H,2)}`;
-  const tP = wParamTbl([3400, 1600, 5300]);                  /* 表1 计算参数（取自参数卡当前值） */
+  const tP = wParamTbl([3400, 1600, 5300]);                  /* 表1 验算参数（只取「验算参数」卡片当前值） */
   const head =
     wPara(wRun(proj + " — 桥墩工程量与稳定、承载力验算书", {b:true, sz:32}), {after:60}) +
     wPara(wRun("一、主要参数：" + p.type + "；" + pierTxt + "；" + capTxt + "；" + fdTxt +
@@ -1515,13 +1516,13 @@ function exportWord(){
                `基底摩擦系数 μ ${f(p.mu,2)}；地基承载力 fa ${f(p.fa,1)} kPa（${p.fndRock ? "岩石地基" : "土地基"}）。`, {sz:18}), {after:20}) +
     wPara(wRun("三、坐标系：原点=基础最低面（最下层基础底面）中心，标高以基础底面=0.000 计（墩底标高=基础总厚）；" +
                "基础底面为验算截面，抗倾覆绕基底纵桥向最外边缘。", {sz:16}), {after:60}) +
-    wPara(wRun("导出时间 " + stamp + " · 计算参数 " + tP.n + " 项", {sz:16}), {after:120});
+    wPara(wRun("导出时间 " + stamp + " · 验算参数 " + tP.n + " 项", {sz:16}), {after:120});
 
   const nT = tP.xml ? 1 : 0;
   const tQ = wTable(tbQ, [1800, 5600, 1100, 1100, 700], ["left","left","left","right","center"]);
   const tC = wTable(tbC, [1900, 5400, 1150, 800, 1050], ["left","left","right","center","center"]);
   const bodyXml =
-    (tP.xml ? wPara(wRun("表1  计算参数表", {b:true, sz:22}), {before:120, after:60}) + tP.xml + wPara(wRun("")) : "") +
+    (tP.xml ? wPara(wRun("表1  验算参数表（稳定与承载力）", {b:true, sz:22}), {before:120, after:60}) + tP.xml + wPara(wRun("")) : "") +
     wPara(wRun("表" + (1 + nT) + "  工程量计算表", {b:true, sz:22}), {before:120, after:60}) + tQ.xml +
     wPara(wRun("")) +
     wPara(wRun("表" + (2 + nT) + "  稳定与承载力验算（标准值组合）", {b:true, sz:22}), {before:160, after:60}) + tC.xml +

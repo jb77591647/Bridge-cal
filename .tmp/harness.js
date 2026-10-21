@@ -898,16 +898,22 @@ api.rebuild();
 const pEL = api.readP(), qEL = api.calcQ(pEL);
 near(parseFloat(els.nbTopShow.value), qEL.nbTop + qEL.fdT, 1e-3, "牛腿顶面标高按基底基准显示（= nbTop + 基础总厚）");
 
-/* ===== 导出验算书：先导出计算参数，并内嵌计算示意图 ===== */
-isTrue(tpl.indexOf("表1  计算参数表") >= 0 && tpl.indexOf("function collectParamRows(") >= 0 &&
+/* ===== 导出验算书：只导验算参数，并内嵌计算示意图 ===== */
+isTrue(tpl.indexOf("表1  验算参数表（稳定与承载力）") >= 0 && tpl.indexOf("function collectParamRows(") >= 0 &&
        tpl.indexOf('document.querySelectorAll(".side .card")') >= 0,
-       "验算书先输出「表1 计算参数表」（扫描参数卡 DOM 的当前值，含自动计算项）");
+       "验算书先输出「表1 验算参数表（稳定与承载力）」（扫描参数卡 DOM 的当前值，含自动计算项）");
+isTrue(tpl.indexOf('title.indexOf("稳定与承载力验算") < 0) continue') >= 0,
+       "参数表只取「稳定与承载力验算」卡片，其余参数卡（总体/台帽/前墙/侧墙/基础/材料/开挖）不导出");
 isTrue(tpl.indexOf('wRun("表" + nTbl + "  稳定与承载力验算（标准值组合）"') >= 0 &&
        tpl.indexOf("const nTbl = paramTbl ? 2 : 1") >= 0,
        "参数表之后另表输出验算内容（表号顺延，不与参数表混排）");
 isTrue(tpl.indexOf("function svgToPng(") >= 0 && tpl.indexOf("function wDrawing(") >= 0 &&
        tpl.indexOf("const b64ToU8 = b64 =>") >= 0,
        "示意图导出链路齐备（SVG→PNG→Word DrawingML）");
+isTrue(tpl.indexOf("const use2 = p.useFd2 && p.fd2H > 1e-9") >= 0 &&
+       tpl.indexOf("p.fd2H*m.k") >= 0 && tpl.indexOf("p.fd1H*m.k") >= 0 &&
+       tpl.indexOf("基础一层") >= 0 && tpl.indexOf("基础二层") >= 0,
+       "示意图基础分层：两层时画台阶形（一层前缘=二层前趾后移 fd2Zf，各层带各自襟边），标注基础一层/基础二层");
 isTrue(tpl.indexOf("word/media/pic") >= 0 && tpl.indexOf('ContentTypes\' Extension="png"') < 0 &&
        tpl.indexOf('<Default Extension="png" ContentType="image/png"/>') >= 0,
        "docx 包内建 word/media/*.png 且 [Content_Types] 声明 png");
