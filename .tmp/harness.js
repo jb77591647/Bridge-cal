@@ -474,6 +474,24 @@ isTrue(ckTbl.indexOf("ΣM稳 合计")>=0 && ckTbl.indexOf("支座竖向反力 Nk
        ckTbl.indexOf("台身（前墙）自重")>=0, "验算表逐项列出 ΣM稳（各构件自重＋支座反力，带力臂）");
 isTrue(ckTbl.indexOf("K0(后趾)")<0 && ckTbl.indexOf("控制值 K0")<0, "验算表不再出现后趾验算（合力位置仍标注距后趾距离）");
 isTrue(ckTbl.indexOf("ΣM倾 合计")>=0, "验算表列出 ΣM倾 合计");
+/* ΣM倾 计算式明细：力臂分列 + 数值代入可逐步复核 */
+isTrue(ckTbl.indexOf("制动力力臂 hH")>=0 && ckTbl.indexOf("土压力力臂 yEa")>=0,
+       "ΣM倾 分列两根力臂（制动力 hH / 土压力 yEa）");
+isTrue(ckTbl.indexOf("前墙高 "+pChk.H1.toFixed(2)+"＋帽梁高 "+pChk.capH.toFixed(2)+"＋dH "+pChk.dH.toFixed(2))>=0,
+       "制动力力臂行逐段列出 前墙高＋帽梁高＋dH");
+isTrue(ckTbl.indexOf(qChk.fdT.toFixed(3))>=0, "力臂行列出基础总厚（前墙底至基底）");
+isTrue(ckTbl.indexOf("h填/3＝"+cChk.hf.toFixed(2)+"/3＝"+(cChk.hf/3).toFixed(3))>=0,
+       "土压力力臂行展开为 基础厚＋h填/3，并给出 h填/3 的数值");
+isTrue(ckTbl.indexOf(cChk.Hk.toFixed(1)+"×"+cChk.hH.toFixed(3))>=0,
+       "ΣM倾 合计行代入 Hk×hH 的数值");
+isTrue(ckTbl.indexOf(cChk.EaH.toFixed(1)+"×"+cChk.yEa.toFixed(3))>=0,
+       "ΣM倾 合计行代入 EaH×yEa 的数值");
+isTrue(ckTbl.indexOf(cChk.MhB.toFixed(1)+"＋"+cChk.MhE.toFixed(1))>=0,
+       "ΣM倾 合计行给出两项分力矩之和");
+near(cChk.hH, pChk.H1 + pChk.capH + pChk.dH + qChk.fdT, 1e-9,
+     "hH ＝ 前墙高＋帽梁高＋dH＋基础总厚（表中所列算式与计算值一致）");
+near(cChk.yEa, qChk.fdT + cChk.hf/3, 1e-9,
+     "yEa ＝ 基础总厚＋h填/3（表中所列算式与计算值一致）");
 /* 坐标符号与原点口径：顺桥向一律记作 x，竖向才是 z；表中 x 以「前墙前缘=0」为原点 */
 isTrue(ckTbl.indexOf("前趾 x=")>=0 && ckTbl.indexOf("作用点 x=")>=0,
        "结果表把顺桥向坐标标为 x（作用点 x= / 前趾 x=）");
