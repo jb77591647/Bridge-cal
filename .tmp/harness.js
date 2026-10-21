@@ -683,7 +683,29 @@ const cAll = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 isTrue(cAll.Htot > 820 && cAll.Htot < 890, "默认工况 ΣH ≈ 165＋687 = 852kN（分段后比全高斜墙口径大 5%）");
 isTrue(cAll.EaH > 3*cAll.Hk, "土压力水平分量约为制动力的 4 倍（默认工况）");
 isTrue(cAll.okAll, "默认工况（自动制动力＋台后土压力）三项验算全部通过");
+/* 基底承载力段：算式必须代入数值，且各步可逐位复算 */
+api.renderCheck(api.readP(), api.calcQ(api.readP()));
+const ckTbl3 = els.checkBody.innerHTML;
+const d1 = x => x.toFixed(1), d2 = x => x.toFixed(2), d3 = x => x.toFixed(3), d5 = x => x.toFixed(5);
+const s6All = 6*Math.abs(cAll.M)/(cAll.Wb*cAll.Lb*cAll.Lb);
+isTrue(ckTbl3.indexOf(`M竖＝ΣV·(x形心−x合力)＝${d1(cAll.Vsum)}×(${d3(cAll.zc)}−${d5(cAll.zbar)})＝${d1(cAll.Mc)}`)>=0 &&
+       ckTbl3.indexOf(`M＝M竖＋M水＝${d1(cAll.Mc)}＋${d1(cAll.Mh)}`)>=0,
+       "弯矩行代入数值：ΣV×(x形心−x合力) 与 M竖＋M水");
+isTrue(ckTbl3.indexOf(`e＝|M|/N＝${d1(Math.abs(cAll.M))}/${d1(cAll.Vsum)}＝${d3(Math.abs(cAll.e))}`)>=0 &&
+       ckTbl3.indexOf(`L/6＝${d2(cAll.Lb)}/6＝${d3(cAll.eLim)}`)>=0,
+       "偏心距行代入数值：e=|M|/N 与限值 L/6");
+isTrue(ckTbl3.indexOf(`p均＝N/A＝${d1(cAll.Vsum)}/(${d2(cAll.Wb)}×${d2(cAll.Lb)})＝${d1(cAll.Vsum)}/${d2(cAll.A)}`)>=0,
+       "p均行代入数值：N/(B×L)");
+isTrue(ckTbl3.indexOf(`＋${s6All.toFixed(4)}`)>=0 && ckTbl3.indexOf(`−${s6All.toFixed(4)}`)>=0,
+       "p最大 / p最小 两行都给出偏心应力项 6|M|/(B·L²) 的数值（一加一减）");
+isTrue(ckTbl3.indexOf(`${d1(cAll.Vsum)}/${d2(cAll.A)}`)>=0, "p均行把 A 展开为 14.00×8.00＝112.00 后再代入");
+near(cAll.pMean + s6All, cAll.pMax, 1e-9, "所显示的 6|M|/(B·L²) 与 p最值之差一致（±" + s6All.toFixed(4) + "）");
+isTrue(ckTbl3.indexOf("N/A，")<0, "承载力段不再出现 N/A 占位符");
 els.autoHk.checked = false; els.Hk.value = "100";
 
+if(process.env.DUMP){
+  const k = ["Vsum","zbar","zc","Wb","Lb","A","Mc","Mh","M","e","eLim","pMean","pMax","pMin","MsF","K0","Kc"];
+  console.log("DUMP " + k.map(x => x + "=" + (v => isFinite(v) ? v.toFixed(8) : "?") (cAll[x])).join(" "));
+}
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail?1:0);

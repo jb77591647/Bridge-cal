@@ -1644,14 +1644,30 @@ function renderCheck(p, q){
       c.K0, "—", c.okK0);
 
   sep("基底承载力（直线分布假定）");
-  row("基底面积 A", `B×L = ${f(c.Wb,2)}×${f(c.Lb,2)}`, c.A, "m²");
-  row("竖向力 N", `= ΣV`, c.Vsum, "kN");
-  row("对基底形心弯矩 M", `竖向偏心 ${f(c.Mc,1)}＋水平力 ${f(c.Mh,1)}，两者同向叠加（均使前趾受压）`, c.M, "kN·m");
-  row("偏心距 e", `|M|/N，合力偏${c.e >= 0 ? "河心（前趾）" : "台后（后趾）"}，限值 ${f(c.eLim,3)}（${p.fndRock ? "岩石 b/4" : "土基 b/6"}）`,
+  const s6 = 6*Math.abs(c.M)/(c.Wb*c.Lb*c.Lb);   /* 6|M|/(B·L²)，最大/最小应力的偏心应力项 */
+  row("基底面积 A", `B×L＝${f(c.Wb,2)}×${f(c.Lb,2)}＝${f(c.A,2)}`, c.A, "m²");
+  row("竖向力 N", `ΣV＝Nk＋圬工自重＋台腔回填＋土压力竖向分量 EaV（逐项见第 1 节）`, c.Vsum, "kN");
+  row("对基底形心弯矩 M",
+      `M竖＝ΣV·(x形心−x合力)＝${f(c.Vsum,1)}×(${f(c.zc,3)}−${f(c.zbar,5)})＝${f(c.Mc,1)}；` +
+      `M水＝ΣM倾＝${f(c.Mh,1)}；` +
+      `M＝M竖＋M水＝${f(c.Mc,1)}＋${f(c.Mh,1)}（同向叠加，均使前趾受压）`,
+      c.M, "kN·m");
+  row("偏心距 e",
+      `e＝|M|/N＝${f(Math.abs(c.M),1)}/${f(c.Vsum,1)}＝${f(Math.abs(c.e),3)}；` +
+      `合力偏${c.e >= 0 ? "河心（前趾）" : "台后（后趾）"}，限值 L/${p.fndRock ? 4 : 6}＝${f(c.Lb,2)}/${p.fndRock ? 4 : 6}＝${f(c.eLim,3)}（${p.fndRock ? "岩石 b/4" : "土基 b/6"}）`,
       Math.abs(c.e), "m", c.okE);
-  row("平均应力 p均", `N/A，要求 ≤ fa = ${f(p.fa,0)}`, c.pMean, "kPa", c.okPm);
-  row("最大应力 p最大", `N/A＋6|M|/(B·L²)，要求 ≤ 1.2fa = ${f(P_MAX_RATIO*p.fa,0)}`, c.pMax, "kPa", c.okPx);
-  row("最小应力 p最小", `N/A−6|M|/(B·L²)，要求 ≥ 0`, c.pMin, "kPa", c.pMin >= -1e-9);
+  row("平均应力 p均",
+      `p均＝N/A＝${f(c.Vsum,1)}/(${f(c.Wb,2)}×${f(c.Lb,2)})＝${f(c.Vsum,1)}/${f(c.A,2)}；要求 ≤ fa＝${f(p.fa,0)}`,
+      c.pMean, "kPa", c.okPm);
+  row("最大应力 p最大",
+      `p最大＝N/A＋6|M|/(B·L²)＝${f(c.pMean,4)}＋6×${f(Math.abs(c.M),3)}/(${f(c.Wb,2)}×${f(c.Lb,2)}²)` +
+      `＝${f(c.pMean,4)}＋${f(6*Math.abs(c.M),1)}/${f(c.Wb*c.Lb*c.Lb,1)}＝${f(c.pMean,4)}＋${f(s6,4)}；` +
+      `要求 ≤ 1.2fa＝${f(P_MAX_RATIO*p.fa,0)}`,
+      c.pMax, "kPa", c.okPx);
+  row("最小应力 p最小",
+      `p最小＝N/A−6|M|/(B·L²)＝${f(c.pMean,4)}−6×${f(Math.abs(c.M),3)}/(${f(c.Wb,2)}×${f(c.Lb,2)}²)` +
+      `＝${f(c.pMean,4)}−${f(s6,4)}；要求 ≥ 0`,
+      c.pMin, "kPa", c.pMin >= -1e-9);
 
   rows.push(`<tr class="total"><td>验算结论</td><td class="fx">抗滑移 / 抗倾覆 / 承载力</td>`+
     `<td class="num">—</td><td>—</td><td style="text-align:center;">${mk(c.okAll)}</td></tr>`);
