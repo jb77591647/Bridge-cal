@@ -881,6 +881,12 @@ isTrue(hdChk.indexOf('class="btnHd no-print"') >= 0 && /\.btn,\.no-print\{displa
 isTrue(tpl.slice(0, tpl.indexOf('id="view3d"')).indexOf("exportWord") < 0, "页头不再保留「导出Word（公式可编辑）」按钮");
 isTrue(tpl.indexOf('a.download = proj + "-验算书.docx"') > 0, "下载文件名为「项目名-验算书.docx」，与按钮文案一致");
 
+/* ===== 示意图文字：字号累计 +2px、统一黑色 ===== */
+isTrue(tpl.indexOf('font-size="${(o.sz||9)+2}"') >= 0, "示意图文字字号在原始 sz 上累计加大 2px（dgT 输出 (o.sz||9)+2）");
+isTrue(tpl.indexOf('" fill="#000"`+') >= 0 && (tpl.match(/<text[^]*?fill="#000"/) || [""])[0].length > 0,
+       "示意图所有文字统一纯黑（dgT 固定 fill=#000，不再继承构件配色灰蓝）");
+isTrue((tpl.match(/fill="\$\{o\.col\|\|DGC\.ink\}"/g) || []).length === 0, "dgT 无彩色文字残留（o.col 不再决定文字填充色）");
+
 /* ===== 标高基准：与坐标原点同面（基础底面 = 0.000） ===== */
 isTrue(tpl.indexOf("基础底面(标高0.000") > 0, "高程基准输入框说明：基础底面(标高0.000)，与坐标原点同面");
 isTrue(tpl.indexOf("const zB = q.fdT || 0") > 0, "标高标注以基础总厚 zB 折算（场景竖坐标 → 基底基准）");

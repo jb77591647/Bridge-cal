@@ -5164,7 +5164,8 @@ function dgHead(x, y, dir, s, col){
 }
 function dgT(x, y, s, o){
   o = o || {};
-  return `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${(o.sz||9)+1}" fill="${o.col||DGC.ink}"`+
+  /* 示意图文字：在原始 sz 基础上累计 +2px，统一黑色（用户要求文字醒目、纯黑） */
+  return `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${(o.sz||9)+2}" fill="#000"`+
          ` text-anchor="${o.a||"middle"}"${o.b?' font-weight="700"':''}>${s}</text>`;
 }
 /* 比例映射：竖向上限 46px/m，按高度取比例尺后反算画布宽度（等比例，不放大变形） */
