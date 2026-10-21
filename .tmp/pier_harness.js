@@ -176,6 +176,25 @@ near(bbCap.min.z, 8, 1e-6, "A2 盖梁底 z=H=8（平段底坐墩顶）");
 near(bbCap.max.z, 9.5, 1e-6, "A2 盖梁顶 z=H+hc=9.5");
 near(bbCap.max.x - bbCap.min.x, 1.8, 1e-6, "A2 盖梁顺桥向厚度=bc=1.8");
 near(sumMeshVol(parts.cap), 32.67 + 0.216, 1e-3, "A2 网格体积=盖梁32.67+挡块0.216（散度定理，互证）");
+/* 渲染三角形必须与体积三角形一一对应：prismMesh 无索引缓冲，WebGL 按连续 3 顶点渲染；
+   若端面只压入多边形环顶点会被当作 2 个错乱三角形，断面缺失（外观扭转/破面）。
+   断言：每个连续三元组都等值于某条 userData.faces 记录，且 faces 数=三角形数 */
+{
+  const key3 = (pos, idx) => idx.map(v => pos[v*3]+","+pos[v*3+1]+","+pos[v*3+2]).sort().join("|");
+  let bad = 0, meshN = 0;
+  parts.cap.forEach(mm => {
+    const pos = mm.geometry.attributes.position.array;
+    const fs = mm.userData.faces || [];
+    meshN++;
+    if(pos.length/9 !== fs.length){ bad++; return; }
+    const faceSet = new Set(fs.map(f => key3(pos, f)));
+    for(let t=0;t<pos.length/9;t++){
+      if(!faceSet.has(key3(pos, [t*3, t*3+1, t*3+2]))){ bad++; break; }
+    }
+  });
+  isTrue(meshN === 3 && bad === 0,
+    "A2 盖梁/挡块网格渲染三角形与体积三角形一一对应（断面扇形已展开为显式顶点，无破面）");
+}
 /* 两端梁端高度=he：端部断面 z 范围 = [H+hc−he, H+hc] */
 const capEnds = parts.cap.filter(m=>{
   const b = bb(m); return (b.max.y - b.min.y) < 0.5;      /* 挡块：横桥向宽 0.2 */

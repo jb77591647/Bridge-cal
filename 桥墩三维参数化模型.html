@@ -553,10 +553,17 @@ function prismMesh(poly, x0, x1, mat){
     pos.push(...P(i,x0), ...P(j,x0), ...P(j,x1),  ...P(i,x0), ...P(j,x1), ...P(i,x1));
     faces.push([s,s+1,s+2], [s+3,s+4,s+5]);        /* 两个三角形面（展开位置的两组） */
   }
-  for(const x of [x0,x1]){                         /* 两端面：三角扇 */
-    const s0 = pos.length/3;
-    for(let k=0;k<n;k++) pos.push(...P(k,x));
-    for(let k=1;k<n-1;k++) faces.push(x===x0 ? [s0,s0+k,s0+k+1] : [s0,s0+k+1,s0+k]);
+  for(const x of [x0,x1]){                         /* 两端面：扇形三角形逐个展开为显式顶点。
+      本几何无索引缓冲，WebGL 按连续 3 顶点渲染；若只压入多边形环顶点，
+      会被当作 2 个错乱三角形绘制，断面大面积缺失（外观呈扭转/破面）。
+      userData.faces 仍按展开后顶点记录，供 meshVol 散度积分使用 */
+    const flip = (x === x0);
+    for(let k=1;k<n-1;k++){
+      const order = flip ? [0,k,k+1] : [0,k+1,k];
+      const s = pos.length/3;
+      order.forEach(pi => pos.push(...P(pi,x)));
+      faces.push([s,s+1,s+2]);
+    }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
