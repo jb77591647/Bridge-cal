@@ -710,6 +710,17 @@ isTrue(ckTbl2.indexOf("支座竖向荷载 Nk")>=0 && ckTbl2.indexOf("土压力�
 /* 顺桥向水平力段：Ka / Ea 计算公式紧随制动力 Hk 行（逐项可复核） */
 /* 窗口 4000 字符（.mj 带 data-tex 属性，HTML 比纯文本长），返回纯文本便于字面量匹配 */
 const rowOf = (html, name) => { const i = html.indexOf(name); return i<0 ? "" : plainify(html.slice(i, i+4000)); };
+
+/* Gc 行要把 ΣVi 逐项拆开列出（V台身/V侧墙/V帽梁/V背墙/V牛腿/V基础），不能只给合计 */
+const rGc = rowOf(ckTbl2, "桥台圬工自重 G<sub>c</sub>");
+isTrue(["V台身","V侧墙","V帽梁","V背墙","V牛腿","V基础"].every(k=>rGc.indexOf(k)>=0),
+       "Gc 行逐项列出各构件体积 Vi（台身/侧墙/帽梁/背墙/牛腿/基础）");
+isTrue(rGc.indexOf(`${qChk.total.toFixed(3)} m³`)>=0 &&
+       rGc.indexOf(`×${pChk.gamC.toFixed(1)}`)>=0,
+       `Gc 行 ΣVi 合计 ${qChk.total.toFixed(3)} m³ 与 ×γc=${pChk.gamC.toFixed(1)} 代入一致`);
+isTrue(cChk.items.filter(it=>it.kind==="c")
+         .every(it=>rGc.indexOf(it.V.toFixed(3))>=0),
+       "Gc 行各 Vi 数值与 calcCheck 分项体积一致");
 const iHk  = ckTbl2.indexOf("制动力 Hk</td>");
 const iKa  = ckTbl2.indexOf("K<sub>a</sub>（库仑，α＝90°+θ）");
 const iEa  = ckTbl2.indexOf("E<sub>a</sub>（三角形分布，全高 h填）");

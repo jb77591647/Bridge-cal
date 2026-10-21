@@ -333,7 +333,7 @@ V = Σ hᵢ/6 · (A下 + 4·A中 + A上)
 ├── mathjax_tex_svg.js     MathJax 3（TeX→SVG，2.1 MB，构建时内嵌）
 ├── mml2omml.xsl           微软 Office 的 MathML→OMML 样式表（构建时剥离注释后内嵌）
 ├── build.js               构建：把 three.js 注入模板 → 输出到上级目录
-├── harness.js             桥台校验 331 项（含制动力自动计算、单段土压力、稳定验算与示意图结构、公式排版/Word 导出链路、示意图文字字号与纯黑）
+├── harness.js             桥台校验 334 项（含制动力自动计算、单段土压力、稳定验算与示意图结构、公式排版/Word 导出链路、示意图文字字号与纯黑）
 ├── pier_harness.js        桥墩校验 147 项（含盖梁变截面+挡块体积/三维、导出.docx验算书链路、稳定与承载力验算、二层基础换基底）
 ├── check_hl.js            参数高亮坐标校验（桥台 43 / 桥墩 54 项）
 ├── check_elev.js          桥台标高专项校验
@@ -350,13 +350,13 @@ V = Σ hᵢ/6 · (A下 + 4·A中 + A上)
 ```bash
 cd .tmp
 node build.js          # 生成两个成品 html 到上一级目录
-node harness.js        # 331 项
+node harness.js        # 334 项
 node pier_harness.js   # 147 项
 node check_hl.js       # 高亮坐标 桥台 43 + 桥墩 54 项
 node check_pier_elev.js # 桥墩标高 15 项
 ```
 
-校验脚本用轻量 DOM 桩在 Node 里直接跑页面脚本，不需要浏览器或 jsdom；当前状态：**331 + 147 + 43 + 54 + 15 项全部 PASS**。
+校验脚本用轻量 DOM 桩在 Node 里直接跑页面脚本，不需要浏览器或 jsdom；当前状态：**334 + 147 + 43 + 54 + 15 项全部 PASS**。
 
 > 注意：`build.js` 用 `__dirname` 定位，请不要改成绝对路径；搬移工作目录后构建产物会静默写到旧位置。
 
