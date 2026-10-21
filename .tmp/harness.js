@@ -498,7 +498,7 @@ isTrue(ckTbl.indexOf("K0(后趾)")<0 && ckTbl.indexOf("控制值 K0")<0, "验算
 isTrue(ckTbl.indexOf("ΣM倾 合计")>=0, "验算表列出 ΣM倾 合计");
 /* ΣM倾 计算式明细：力臂分列 + 数值代入可逐步复核 */
 const ckPlain = plainify(ckTbl);
-isTrue(ckTbl.indexOf("制动力力臂 hH")>=0 && ckTbl.indexOf("土压力力臂 yEa")>=0,
+isTrue(ckTbl.indexOf("制动力力臂 hH")>=0 && ckTbl.indexOf("土压力力臂 y<sub>Ea</sub>")>=0,
        "ΣM倾 分列两根力臂（制动力 hH / 土压力 yEa）");
 isTrue(ckTbl.indexOf("前墙高 "+pChk.H1.toFixed(2)+"＋帽梁高 "+pChk.capH.toFixed(2)+"＋dH "+pChk.dH.toFixed(2))>=0,
        "制动力力臂行逐段列出 前墙高＋帽梁高＋dH");
@@ -694,7 +694,7 @@ els.chkDelta.value = "20";
 api.renderCheck(api.readP(), api.calcQ(api.readP()));
 const ckTbl2 = els.checkBody.innerHTML;
 const ckPlain2 = plainify(ckTbl2);
-isTrue(ckTbl2.indexOf("土压力竖向分量 EaV")>=0, "ΣM稳 段列出 EaV 分项");
+isTrue(ckTbl2.indexOf("土压力竖向分量 E<sub>aV</sub>")>=0, "ΣM稳 段列出 EaV 分项");
 isTrue(ckPlain2.indexOf("EaV＝Ea·sin(θ+δ)")>=0, "EaV 行标注 EaV＝Ea·sin(θ+δ)");
 isTrue(ckPlain2.indexOf("α＝90°+θ")>=0, "Ka 行标注墙背倾角 α＝90°+θ");
 isTrue(ckPlain2.indexOf("三角形分布")>=0 && ckPlain2.indexOf("h填/3")>=0,
@@ -704,14 +704,14 @@ isTrue(ckTbl2.indexOf("已计入 ΣM稳")>=0, "K0 行注明 EaV 已计入 ΣM稳
 /* 窗口 4000 字符（.mj 带 data-tex 属性，HTML 比纯文本长），返回纯文本便于字面量匹配 */
 const rowOf = (html, name) => { const i = html.indexOf(name); return i<0 ? "" : plainify(html.slice(i, i+4000)); };
 const iHk  = ckTbl2.indexOf("制动力 Hk</td>");
-const iKa  = ckTbl2.indexOf("Ka（库仑，α＝90°+θ）");
-const iEa  = ckTbl2.indexOf("Ea（三角形分布，全高 h填）");
-const iEaH = ckTbl2.indexOf("土压力水平分量 EaH");
+const iKa  = ckTbl2.indexOf("K<sub>a</sub>（库仑，α＝90°+θ）");
+const iEa  = ckTbl2.indexOf("E<sub>a</sub>（三角形分布，全高 h填）");
+const iEaH = ckTbl2.indexOf("土压力水平分量 E<sub>aH</sub>");
 isTrue(iHk>=0 && iHk<iKa && iKa<iEa && iEa<iEaH,
        "Ka/Ea 公式行紧接在制动力 Hk 行下方，顺序 Ka→Ea→EaH");
-const rKa = rowOf(ckTbl2, "Ka（库仑，α＝90°+θ）");
-const rEa = rowOf(ckTbl2, "Ea（三角形分布，全高 h填）");
-const rEaH = rowOf(ckTbl2, "土压力水平分量 EaH");
+const rKa = rowOf(ckTbl2, "K<sub>a</sub>（库仑，α＝90°+θ）");
+const rEa = rowOf(ckTbl2, "E<sub>a</sub>（三角形分布，全高 h填）");
+const rEaH = rowOf(ckTbl2, "土压力水平分量 E<sub>aH</sub>");
 isTrue(rKa.indexOf("Ka＝sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√(sin(φ+δ)·sinφ／(sin(α−δ)·sinα)))²〕")>=0,
        "Ka 行给出库仑主动土压力系数通式（sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√·)²〕）");
 isTrue(rKa.indexOf("α＝90°+θ＝108.43°")>=0 && rKa.indexOf("θ＝atan(1/m1)")>=0,
@@ -728,7 +728,7 @@ isTrue(rEaH.indexOf("EaH＝Ea·cos(θ+δ)")>=0 && rEaH.indexOf(`×cos(${cE.angDe
 isTrue(rEaH.indexOf("h填/3")>=0, "EaH 行注明合力点距基底 yEa 即 h填/3 处");
 /* ΣM稳 段：EaV 的力臂也要有计算式（竖向力段与 ΣM稳 段各有一行同名"土压力竖向分量 EaV"，取最后一行） */
 const rowOfLast = (html, name) => { const i = html.lastIndexOf(name); return i<0 ? "" : plainify(html.slice(i, i+4000)); };
-const rEaV = rowOfLast(ckTbl2, "土压力竖向分量 EaV");
+const rEaV = rowOfLast(ckTbl2, "土压力竖向分量 E<sub>aV</sub>");
 isTrue(rEaV.indexOf("EaV＝Ea·sin(θ+δ)")>=0 && rEaV.indexOf(`×sin(${cE.angDeg.toFixed(2)}°)`)>=0,
        "EaV 行给出 EaV＝Ea·sin(θ+δ) 及代入值");
 isTrue(rEaV.indexOf("基础前伸")>=0 && rEaV.indexOf("＋t1")>=0 && rEaV.indexOf("(H1−yc)/m1")>=0,
