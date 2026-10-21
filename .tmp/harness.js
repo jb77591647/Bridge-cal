@@ -541,6 +541,34 @@ isTrue(els.resultBody.innerHTML.indexOf('class="sep"')>=0 &&
        els.resultBody.innerHTML.indexOf('class="sepChk"')<0,
        "工程量表分节行（开挖/回填）不受影响，仍用常规 sep 样式");
 
+/* ===== 验算示意图：每节一张内联 SVG，随参数联动 ===== */
+const dgRows = ckTbl.match(/<tr class="diagChk"><td colspan="5">[\s\S]*?<\/tr>/g) || [];
+isTrue(dgRows.length === 6, "6 个分节各带 1 张计算示意图（diagChk 行 6 条）");
+isTrue((ckTbl.match(/<svg /g) || []).length === 6, "示意图以 6 个内联 SVG 渲染（不依赖外部图片/脚本）");
+isTrue(dgRows.every(r => r.indexOf("NaN") < 0 && r.indexOf("undefined") < 0),
+       "示意图坐标全部为有限数值（无 NaN / undefined 属性）");
+isTrue(dgRows.every(r => r.indexOf('class="dgFig"') >= 0 && r.indexOf('class="dgCap"') >= 0),
+       "每张图均为「图 + 图注」两栏结构");
+isTrue([1,2,3,4,5,6].every(i => ckTbl.indexOf("图 " + i + "　") >= 0),
+       "图注编号 图 1～图 6 齐全且连续");
+/* 分节行与图行的先后关系：每节标题后紧跟该节示意图 */
+const seq = ckTbl.match(/<tr class="(sepChk|diagChk)"/g) || [];
+isTrue(seq.length === 12 && seq.every((v,i)=> i%2===0 ? v.indexOf("sepChk")>=0 : v.indexOf("diagChk")>=0),
+       "每个分节标题行之后紧接该节示意图（sepChk / diagChk 交替 6 组）");
+/* 图内应画出的关键要素 */
+isTrue((ckTbl.match(/<circle /g) || []).length >= 6, "图 1/4 的分项编号圈与图 5 的力臂编号均为实心编号圈");
+isTrue((ckTbl.match(/<polygon points=/g) || []).length >= 8, "箭头与倾覆点三角标记用 polygon 绘制");
+const dgV = dgRows[0] || "", dgMs = dgRows[3] || "", dgBase = dgRows[5] || "";
+isTrue(dgV.indexOf("图 1") >= 0 && dgV.indexOf("前墙") >= 0 && dgV.indexOf("台腔回填") >= 0 &&
+       dgV.indexOf("基底前趾") >= 0,
+       "图 1 标注了构件名（前墙/台腔回填）与基底前趾位置");
+isTrue(dgMs.indexOf("倾覆点") >= 0 && dgMs.indexOf("ΣM稳") >= 0,
+       "图 4 标出倾覆点与 ΣM稳");
+isTrue(dgBase.indexOf("p最大") >= 0 && dgBase.indexOf("p均") >= 0,
+       "图 6 的应力梯形图标注 p最大 / p均");
+isTrue(ckTbl.indexOf("μΣV＝") >= 0 && ckTbl.indexOf("ΣH＝") >= 0,
+       "图 3 标出摩擦阻力 μΣV 与滑移力 ΣH");
+
 /* ===== 制动力自动计算（JTG D60—2015 第 4.3.6 条） ===== */
 els.incEa.checked = false; els.autoHk.checked = true;
 els.brkL.value = "20"; els.brkGrade.value = "I"; els.brkN.value = "1";
@@ -703,6 +731,19 @@ api.renderCheck(api.readP(), api.calcQ(api.readP()));
 const ckTbl3 = els.checkBody.innerHTML;
 const d1 = x => x.toFixed(1), d2 = x => x.toFixed(2), d3 = x => x.toFixed(3), d5 = x => x.toFixed(5);
 const s6All = 6*Math.abs(cAll.M)/(cAll.Wb*cAll.Lb*cAll.Lb);
+/* 示意图与计算值必须一致（图注/尺寸线里的数字来自 calcCheck，不是手写常量） */
+const dgAll = (els.checkBody.innerHTML.match(/<tr class="diagChk"><td colspan="5">[\s\S]*?<\/tr>/g) || []);
+isTrue(dgAll.length === 6 && dgAll.every(r => r.indexOf("NaN") < 0),
+       "默认工况下 6 张示意图全部生成且无 NaN 坐标");
+isTrue((dgAll[0]||"").indexOf(`a合＝${d3(cAll.MsF/cAll.Vsum)}`) >= 0,
+       "图 1 的合力点尺寸线数值 = ΣM稳/ΣV");
+isTrue((dgAll[3]||"").indexOf(`ΣM稳＝${d1(cAll.MsF)} kN·m`) >= 0,
+       "图 4 图注的 ΣM稳 与计算值一致");
+isTrue((dgAll[4]||"").indexOf(`ΣM倾＝${d1(cAll.Mh)} kN·m`) >= 0 &&
+       (dgAll[4]||"").indexOf(`K0＝ΣM稳/ΣM倾＝${d2(cAll.K0)}`) >= 0,
+       "图 5 图注的 ΣM倾 与 K0 与计算值一致");
+isTrue((dgAll[5]||"").indexOf(`p最大＝${d1(cAll.pMax)} kPa`) >= 0,
+       "图 6 的 p最大 标注与计算值一致");
 isTrue(ckTbl3.indexOf(`M＝M竖＋M水＝${d1(cAll.Mc)}＋${d1(cAll.Mh)}`)>=0,
        "弯矩行给出 M竖＋M水 的分项相加");
 isTrue(ckTbl3.indexOf(`e＝|M|/N＝${d1(Math.abs(cAll.M))}/${d1(cAll.Vsum)}＝${d3(Math.abs(cAll.e))}`)>=0 &&

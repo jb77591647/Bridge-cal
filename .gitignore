@@ -18,6 +18,15 @@ desktop.ini
 .tmp/_axes.html
 .tmp/_check.html
 .tmp/_tmp_run.js
+.tmp/_dg*.png
+.tmp/_all.png
+.tmp/_narrow.png
+.tmp/_nw.png
+.tmp/_probe.html
+.tmp/_dom.html
+.tmp/_t[0-9].html
+.tmp/_mk_t8.py
+.tmp/_mj/
 .tmp/probe*.js
 .tmp/ref_text.txt
 .tmp/uabutment_ref.html

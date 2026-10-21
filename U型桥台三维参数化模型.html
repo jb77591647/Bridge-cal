@@ -89,6 +89,18 @@
   /* 验算表分节行：带 1、2、3 序号，加粗，字号较常规分节行大 1px */
   tr.sepChk td{background:#f8fafc; font-weight:700; color:#334155; font-size:12.5px;}
   tr.sepChk td .sn{color:var(--accent); margin-right:2px;}
+  /* 验算示意图行：左侧等比例剖面 SVG，右侧图注 */
+  tr.diagChk td{padding:7px 9px 9px; background:#fbfcfe;}
+  .dgWrap{display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;}
+  .dgFig{flex:0 0 auto; max-width:100%;}
+  .dgCap{flex:1 1 260px; min-width:210px; font-size:11px; line-height:1.7; color:#475569;}
+  .dgHd{font-weight:700; color:#1f2937; font-size:11.5px; margin-bottom:3px;}
+  .dgLi{padding:1px 0;}
+  .dgLi b{color:#1d4ed8;}
+  .dgLi sub{font-size:9px;}
+  .dgNo{display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px;
+        border:1px solid #1d4ed8; border-radius:50%; color:#1d4ed8; font-size:9px; font-weight:700;
+        margin-right:5px; vertical-align:1px;}
   .neg{color:var(--warn);}
   .note{
     font-size:11.5px; color:var(--sub); background:#fffbeb; border:1px solid #fde68a;
@@ -1561,6 +1573,274 @@ function renderTable(p, q){
   ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
 }
 
+/* ================= 验算示意图（内联 SVG，随参数联动；纯字符串生成，不依赖 DOM） ================= */
+const DGC = { ink:"#334155", sub:"#64748b", line:"#7b8a9c", str:"#ccd6e0",
+              V:"#1d4ed8", H:"#b91c1c", fr:"#15803d", arm:"#7c3aed", fill:"#f2e3b3" };
+
+/* 箭头（实心三角形），dir：d/u/l/r 为箭头指向 */
+function dgHead(x, y, dir, s, col){
+  const P = { d:[[x,y],[x-s*.5,y-s],[x+s*.5,y-s]],
+              u:[[x,y],[x-s*.5,y+s],[x+s*.5,y+s]],
+              l:[[x,y],[x+s,y-s*.5],[x+s,y+s*.5]],
+              r:[[x,y],[x-s,y-s*.5],[x-s,y+s*.5]] }[dir];
+  return `<polygon points="${P.map(v=>v[0].toFixed(1)+","+v[1].toFixed(1)).join(" ")}" fill="${col}"/>`;
+}
+function dgT(x, y, s, o){
+  o = o || {};
+  return `<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="${o.sz||9}" fill="${o.col||DGC.ink}"`+
+         ` text-anchor="${o.a||"middle"}"${o.b?' font-weight="700"':''}>${s}</text>`;
+}
+/* 比例映射：竖向上限 46px/m，按高度取比例尺后反算画布宽度（等比例，不放大变形） */
+function dgMap(L, zmax, H, pad){
+  const l = pad.l===undefined?14:pad.l, r = pad.r===undefined?14:pad.r,
+        t = pad.t===undefined?10:pad.t, b = pad.b===undefined?28:pad.b;
+  const k = Math.min((H-t-b)/Math.max(zmax,1e-6), 46);
+  return { k, H, W: l + L*k + r, pl:l, pt:t, pt1:t-54, pt2:t-30,
+           X:x=>l+x*k, Y:z=>H-b-z*k };
+}
+/* 顺桥向剖面轮廓：基础＋前墙（上窄下宽）＋帽梁＋背墙＋台腔回填（虚线示侧墙） */
+function dgBody(m, p, q, c, o){
+  o = o || {};
+  const fd=q.fdT, t1=p.t1, t1b=q.t1b, x0=c.x0, L=c.Lb;
+  const zCap0=fd+p.H1, zCap1=zCap0+p.capH, zTop=zCap1+p.bwH;
+  const xCapL=x0-p.capCant, xCapR=x0+t1, xEnd=x0+p.L2;
+  const zFill=fd+Math.max(c.hf, p.H1+q.swUpH);
+  const st=`fill="${DGC.str}" stroke="${DGC.line}" stroke-width=".9"`;
+  let s="";
+  if(o.fill!==false)
+    s+=`<path d="M${m.X(x0+t1b).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(zFill).toFixed(1)} L${m.X(xCapR).toFixed(1)},${m.Y(zFill).toFixed(1)} L${m.X(xCapR).toFixed(1)},${m.Y(zCap0).toFixed(1)} L${m.X(x0+t1b).toFixed(1)},${m.Y(fd).toFixed(1)} Z" fill="${DGC.fill}" fill-opacity=".5" stroke="none"/>`;
+  s+=`<path d="M${m.X(xCapR).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(fd).toFixed(1)} L${m.X(xEnd).toFixed(1)},${m.Y(fd+p.H1+q.swUpH).toFixed(1)} L${m.X(xCapR).toFixed(1)},${m.Y(fd+p.H1+q.swUpH).toFixed(1)}" fill="none" stroke="#aab7c6" stroke-width=".8" stroke-dasharray="4 3"/>`;
+  s+=`<rect x="${m.X(0).toFixed(1)}" y="${m.Y(fd).toFixed(1)}" width="${(L*m.k).toFixed(1)}" height="${(fd*m.k).toFixed(1)}" ${st}/>`;
+  s+=`<polygon points="${m.X(x0).toFixed(1)},${m.Y(fd).toFixed(1)} ${m.X(x0).toFixed(1)},${m.Y(zCap0).toFixed(1)} ${m.X(xCapR).toFixed(1)},${m.Y(zCap0).toFixed(1)} ${m.X(x0+t1b).toFixed(1)},${m.Y(fd).toFixed(1)}" ${st}/>`;
+  s+=`<rect x="${m.X(xCapL).toFixed(1)}" y="${m.Y(zCap1).toFixed(1)}" width="${((xCapR-xCapL)*m.k).toFixed(1)}" height="${(p.capH*m.k).toFixed(1)}" ${st}/>`;
+  s+=`<rect x="${m.X(xCapR-p.bwT).toFixed(1)}" y="${m.Y(zTop).toFixed(1)}" width="${(p.bwT*m.k).toFixed(1)}" height="${(p.bwH*m.k).toFixed(1)}" ${st}/>`;
+  const y0=m.Y(0);
+  s+=`<line x1="${m.X(0).toFixed(1)}" y1="${y0.toFixed(1)}" x2="${m.X(L).toFixed(1)}" y2="${y0.toFixed(1)}" stroke="#475569" stroke-width="1.7"/>`;
+  let h="";
+  for(let x=0.16; x<L-0.05; x+=0.30) h+=`M${m.X(x).toFixed(1)},${(y0+1.4).toFixed(1)} l3.6,4.2 `;
+  s+=`<path d="${h}" stroke="#bdc9d6" stroke-width=".8" fill="none"/>`;
+  if(o.lab){
+    s+=dgT(m.X(x0+t1b*0.30), m.Y(fd+p.H1*0.45), "前墙", {sz:7.2, col:"#44546a"});
+    s+=dgT(m.X(L/2), m.Y(fd*0.5)+2.6, "基础", {sz:7.2, col:"#44546a"});
+    s+=dgT(m.X((x0+t1b+xEnd)/2), m.Y(fd+zFill*0.32), "台腔回填", {sz:7.2, col:"#7a6a3a"});
+  }
+  return s;
+}
+const dgPivot = (m, col) => {
+  const x=m.X(0), y=m.Y(0);
+  return `<polygon points="${(x-4.4).toFixed(1)},${y.toFixed(1)} ${(x+4.4).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y+6).toFixed(1)}" fill="${col}"/>`;
+};
+/* 尺寸线 */
+function dgDimX(x1, x2, y, txt, col){
+  col = col || DGC.arm;
+  const t=3.6;
+  return `<line x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width=".7"/>`+
+    `<line x1="${x1.toFixed(1)}" y1="${(y-t).toFixed(1)}" x2="${x1.toFixed(1)}" y2="${(y+t).toFixed(1)}" stroke="${col}" stroke-width=".7"/>`+
+    `<line x1="${x2.toFixed(1)}" y1="${(y-t).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${(y+t).toFixed(1)}" stroke="${col}" stroke-width=".7"/>`+
+    (txt ? dgT((x1+x2)/2, y-3.2, txt, {sz:7.2, col}) : "");
+}
+function dgDimY(x, y1, y2, txt, col){
+  col = col || DGC.arm;
+  const t=3.6;
+  return `<line x1="${x.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width=".7"/>`+
+    `<line x1="${(x-t).toFixed(1)}" y1="${y1.toFixed(1)}" x2="${(x+t).toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${col}" stroke-width=".7"/>`+
+    `<line x1="${(x-t).toFixed(1)}" y1="${y2.toFixed(1)}" x2="${(x+t).toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width=".7"/>`+
+    (txt ? dgT(x+4, (y1+y2)/2+2.4, txt, {sz:7.2, col, a:"start"}) : "");
+}
+const dgSvg = (m, inner) =>
+  `<svg width="${m.W.toFixed(0)}" height="${m.H}" viewBox="0 0 ${m.W.toFixed(0)} ${m.H}"`+
+  ` style="max-width:100%;height:auto;display:block" font-family="Microsoft YaHei,PingFang SC,sans-serif">${inner}</svg>`;
+const dgCapHtml = (title, lines) =>
+  `<div class="dgHd">${title}</div>` + lines.map(t=>`<div class="dgLi">${t}</div>`).join("");
+
+/* 六张图：V 竖向力 / H 水平力 / slide 抗滑移 / Ms 稳定力矩 / Mo 倾覆力矩 / base 基底应力 */
+function dgFig(kind, p, q, c){
+  const fd=q.fdT, x0=c.x0, L=c.Lb, t1=p.t1;
+  const zStr = fd + Math.max(p.H1+p.capH+p.bwH, c.hf, p.H1+p.capH+p.dH);
+  const gW = kk => c.items.filter(it=>it.kind===kk).reduce((a,it)=>a+it.W,0);
+  const gM = kk => c.items.filter(it=>it.kind===kk).reduce((a,it)=>a+it.W*it.z,0);
+  const Gc=gW("c"), Gs=gW("s");
+  const xGc = Gc>1e-9 ? gM("c")/Gc : 0, xGs = Gs>1e-9 ? gM("s")/Gs : 0;
+  const aBar = c.MsF/c.Vsum;
+  const grp = [];
+  if(Gc>1e-9) grp.push({n:"圬工自重", s:"G<sub>c</sub>", W:Gc, x:xGc});
+  if(Gs>1e-9) grp.push({n:"台腔回填", s:"G<sub>s</sub>", W:Gs, x:xGs});
+  grp.push({n:"支座竖向荷载", s:"N<sub>k</sub>", W:p.Nk, x:c.zN});
+  if(c.EaV>1e-9) grp.push({n:"土压力竖向分量", s:"E<sub>aV</sub>", W:c.EaV, x:c.xEa});
+  const sky = (m, col) => {          /* 顶部两排错开：编号圈 + 向下箭头 + 竖向虚线到基底（防 x 相近时重叠） */
+    let s="";
+    const y1 = m.pt1, y2 = m.pt2;
+    grp.forEach((g,i)=>{
+      const X=m.X(g.x), yS = (i%2===0) ? y1 : y2;
+      s+=`<line x1="${X.toFixed(1)}" y1="${(yS+22).toFixed(1)}" x2="${X.toFixed(1)}" y2="${m.Y(0).toFixed(1)}" stroke="#d7dfe8" stroke-width=".8" stroke-dasharray="3 3"/>`;
+      s+=`<line x1="${X.toFixed(1)}" y1="${(yS+9).toFixed(1)}" x2="${X.toFixed(1)}" y2="${(yS+23).toFixed(1)}" stroke="${col}" stroke-width="1.3"/>`;
+      s+=dgHead(X, yS+27, "d", 5.4, col);
+      s+=`<circle cx="${X.toFixed(1)}" cy="${yS.toFixed(1)}" r="5.3" fill="#fff" stroke="${col}" stroke-width=".9"/>`;
+      s+=dgT(X, yS+2.6, i+1, {sz:7, col, b:1});
+    });
+    return s;
+  };
+
+  if(kind === "V"){
+    const m = dgMap(L, zStr, 344, {l:18, r:18, t:66, b:52});
+    let s = dgBody(m,p,q,c,{lab:true}) + sky(m, DGC.V);
+    const yD = m.Y(0) + 34, xa = m.X(aBar);
+    s += `<line x1="${xa.toFixed(1)}" y1="${(m.Y(0)+3).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${(m.Y(0)+22).toFixed(1)}" stroke="${DGC.H}" stroke-width="2.4"/>`;
+    s += dgHead(xa, m.Y(0)+24, "d", 7, DGC.H);
+    s += dgDimX(m.X(0), xa, yD, `a合＝${f(aBar,3)}`, DGC.H);
+    s += dgT(m.X(0), yD+12, "倾覆点 x=0", {sz:7, col:DGC.sub, a:"start"});
+    s += dgT(m.X(L), yD+12, `后趾 x=${f(L,3)}`, {sz:7, col:DGC.sub, a:"end"});
+    const cap = dgCapHtml("图 1　竖向力及其作用点（顺桥向剖视，x 自基底前趾＝倾覆点量起）",
+      grp.map((g,i)=>`<span class="dgNo">${i+1}</span>${g.s}　${f(g.W,1)} kN，x＝${f(g.x,3)} m`).concat([
+        `<b>ΣV＝${f(c.Vsum,1)} kN</b>，合力点距前趾 a合＝ΣM稳/ΣV＝${f(aBar,3)} m（红色粗箭头）`,
+        `编号与下列分项一一对应；箭头位置即作用点 x，力臂＝x 本身（原点在前趾）。`
+      ]));
+    return {svg: dgSvg(m, s), cap};
+  }
+
+  if(kind === "H"){
+    const m = dgMap(L, zStr*1.12, 296, {l:30, r:78, t:12, b:44});
+    let s = dgBody(m,p,q,c);
+    const arr = (x, y, col, lab, up) => {
+      const Lp = 42;
+      let t = `<line x1="${(x+Lp).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x+3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="1.4"/>`;
+      t += dgHead(x, y, "l", 6, col);
+      t += up ? dgT(x-5, y+2.8, lab, {sz:8, col, a:"end"})
+              : dgT(x+Lp+4, y+2.8, lab, {sz:8, col, a:"start"});
+      return t;
+    };
+    if(c.Hk>1e-9) s += arr(m.X(c.zN), m.Y(fd+c.yH), DGC.H, "Hk", true);
+    if(c.EaH1>1e-9) s += arr(m.X(c.xEa1), m.Y(c.yEa1), "#ea580c", "EaH1");
+    if(c.EaH2>1e-9) s += arr(m.X(c.xEa2), m.Y(c.yEa2), "#ea580c", "EaH2");
+    s += dgT(m.X(0), m.Y(0)+24, "← 河心", {sz:7.5, col:DGC.sub, a:"start"});
+    s += dgT(m.X(L), m.Y(0)+24, "台后 →", {sz:7.5, col:DGC.sub, a:"end"});
+    const cap = dgCapHtml("图 2　顺桥向水平力（标准值，均取指向河心的不利方向）", [
+      `制动力 H<sub>k</sub>＝${f(c.Hk,1)} kN，作用高度 hH＝${f(c.hH,3)} m（距基底）`,
+      `土压力下段 E<sub>aH1</sub>＝${f(c.EaH1,1)} kN，y<sub>Ea1</sub>＝${f(c.yEa1,3)} m（梯形分布，含顶部超载）`,
+      `土压力上段 E<sub>aH2</sub>＝${f(c.EaH2,1)} kN，y<sub>Ea2</sub>＝${f(c.yEa2,3)} m（三角形分布）`,
+      `<b>ΣH＝${f(c.Htot,1)} kN</b>；两段土压力与水平方向分别成 θ+δ＝${f(c.angDeg,2)}°、δ＝${f(c.dlDeg,0)}°`,
+      `竖向分量 E<sub>aV</sub> 向下，见图 1；水平力的竖向力臂见图 5。`
+    ]);
+    return {svg: dgSvg(m, s), cap};
+  }
+
+  if(kind === "slide"){
+    const m = dgMap(L, zStr*1.08, 286, {l:20, r:20, t:8, b:64});
+    let s = dgBody(m,p,q,c);
+    const y0 = m.Y(0) + 24, xc = m.X(L*0.52);
+    s += `<line x1="${(xc-24).toFixed(1)}" y1="${y0.toFixed(1)}" x2="${(xc-84).toFixed(1)}" y2="${y0.toFixed(1)}" stroke="${DGC.H}" stroke-width="1.6"/>`;
+    s += dgHead(xc-88, y0, "l", 6.5, DGC.H);
+    s += dgT(xc-56, y0+9, `ΣH＝${f(c.Htot,1)}`, {sz:7.4, col:DGC.H});
+    s += `<line x1="${(xc+24).toFixed(1)}" y1="${y0.toFixed(1)}" x2="${(xc+84).toFixed(1)}" y2="${y0.toFixed(1)}" stroke="${DGC.fr}" stroke-width="1.6"/>`;
+    s += dgHead(xc+88, y0, "r", 6.5, DGC.fr);
+    s += dgT(xc+56, y0+9, `μΣV＝${f(p.fric*c.Vsum,1)}`, {sz:7.4, col:DGC.fr});
+    s += dgT(xc, y0+24, `Kc＝${f(c.Kc,2)} ≥ ${f(K_SLIDE,1)}`, {sz:7.4, col:DGC.sub});
+    const cap = dgCapHtml("图 3　抗滑移：基底摩擦阻力与水平滑移力", [
+      `滑移力 ΣH＝${f(c.Htot,1)} kN（向左，指向河心）`,
+      `摩擦阻力 μΣV＝${f(p.fric,2)}×${f(c.Vsum,1)}＝${f(p.fric*c.Vsum,1)} kN（向右，随竖向力增大而增大）`,
+      `Kc＝μΣV/ΣH＝${f(c.Kc,3)}，要求 ≥ ${f(K_SLIDE,1)}`,
+      `提高 Kc 的途径：加大基底摩擦系数 μ（换填/齿坎）、增大竖向力（ΣV 已含回填与 EaV）。`
+    ]);
+    return {svg: dgSvg(m, s), cap};
+  }
+
+  if(kind === "Ms"){
+    const n = grp.length;
+    const m = dgMap(L, zStr, 344, {l:52, r:56, t:66, b:22+n*8});
+    let s = dgBody(m,p,q,c,{lab:true}) + sky(m, DGC.V) + dgPivot(m, "#b91c1c");
+    const y0 = m.Y(0);
+    s += `<line x1="${m.X(0).toFixed(1)}" y1="${(y0+4).toFixed(1)}" x2="${m.X(0).toFixed(1)}" y2="${(y0+10+n*8).toFixed(1)}" stroke="${DGC.arm}" stroke-width=".8"/>`;
+    grp.forEach((g,i)=>{
+      const yd = y0 + 12 + i*8;
+      s += dgDimX(m.X(0), m.X(g.x), yd, null, DGC.arm);
+      s += dgT(m.X(g.x)+4, yd+2.6, f(g.x,3), {sz:7, col:DGC.arm, a:"start"});
+    });
+    s += dgT(m.X(0)-7, y0+6, "倾覆点", {sz:7.2, col:"#b91c1c", a:"end"});
+    const cap = dgCapHtml("图 4　稳定力矩：各竖向力对倾覆点（基底前趾，x=0、z=0）取矩", 
+      grp.map((g,i)=>`<span class="dgNo">${i+1}</span>${g.s}　${f(g.W,1)}×${f(g.x,3)}＝${f(g.W*g.x,1)} kN·m`).concat([
+        `<b>ΣM稳＝${f(c.MsF,1)} kN·m</b>，全部为顺时针（压向前趾）方向的稳定力矩`,
+        `紫色尺寸线＝力臂 a（作用点至倾覆点的水平距离），数值即作用点 x。`
+      ]));
+    return {svg: dgSvg(m, s), cap};
+  }
+
+  if(kind === "Mo"){
+    const m = dgMap(L, zStr*1.12, 296, {l:30, r:104, t:12, b:40});
+    let s = dgBody(m,p,q,c) + dgPivot(m, "#b91c1c");
+    const arr = (x, y, col, lab, up) => {
+      const Lp = 40;
+      return `<line x1="${(x+Lp).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x+3).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="1.4"/>`+
+        dgHead(x, y, "l", 6, col) +
+        (up ? dgT(x-5, y+2.8, lab, {sz:8, col, a:"end"}) : dgT(x+Lp+4, y+2.8, lab, {sz:8, col, a:"start"}));
+    };
+    if(c.Hk>1e-9) s += arr(m.X(c.zN), m.Y(fd+c.yH), DGC.H, "Hk", true);
+    if(c.EaH1>1e-9) s += arr(m.X(c.xEa1), m.Y(c.yEa1), "#ea580c", "EaH1");
+    if(c.EaH2>1e-9) s += arr(m.X(c.xEa2), m.Y(c.yEa2), "#ea580c", "EaH2");
+    /* 竖向力臂：右侧分层尺寸线（倾覆点 z=0 起算） */
+    const xd0 = m.X(L) + 12;
+    const rows = [];
+    if(c.Hk>1e-9) rows.push({z:c.hH, lab:`hH＝${f(c.hH,3)}`, col:DGC.H});
+    if(c.EaH1>1e-9) rows.push({z:c.yEa1, lab:`yEa1＝${f(c.yEa1,3)}`, col:"#ea580c"});
+    if(c.EaH2>1e-9) rows.push({z:c.yEa2, lab:`yEa2＝${f(c.yEa2,3)}`, col:"#ea580c"});
+    rows.forEach((r,i)=>{
+      const x = xd0 + i*17;
+      s += `<line x1="${x.toFixed(1)}" y1="${m.Y(0).toFixed(1)}" x2="${x.toFixed(1)}" y2="${m.Y(r.z).toFixed(1)}" stroke="${r.col}" stroke-width=".6" stroke-dasharray="2 2"/>`;
+      s += dgDimY(x, m.Y(r.z), m.Y(0), null, r.col);
+      s += `<circle cx="${x.toFixed(1)}" cy="${(m.Y(r.z)-7).toFixed(1)}" r="5.2" fill="#fff" stroke="${r.col}" stroke-width=".9"/>`;
+      s += dgT(x, m.Y(r.z)-4.4, i+1, {sz:7, col:r.col, b:1});
+    });
+    const cap = dgCapHtml("图 5　倾覆力矩：水平力×竖向力臂（力臂起算于倾覆点 z=0，即基底）", [
+      `<span class="dgNo">1</span>H<sub>k</sub>×hH＝${f(c.Hk,1)}×${f(c.hH,3)}＝${f(c.MhB,1)} kN·m`,
+      `<span class="dgNo">2</span>E<sub>aH1</sub>×y<sub>Ea1</sub>＝${f(c.EaH1,1)}×${f(c.yEa1,3)}＝${f(c.MhE1,1)} kN·m`,
+      `<span class="dgNo">3</span>E<sub>aH2</sub>×y<sub>Ea2</sub>＝${f(c.EaH2,1)}×${f(c.yEa2,3)}＝${f(c.MhE2,1)} kN·m`,
+      `<b>ΣM倾＝${f(c.Mh,1)} kN·m</b>，方向均使桥台绕前趾向河心倾覆`,
+      `<b>K0＝ΣM稳/ΣM倾＝${f(c.K0,2)} ≥ ${f(K_OVER,1)}</b>`
+    ]);
+    return {svg: dgSvg(m, s), cap};
+  }
+
+  /* 基底应力分布：抬头看基底（顺桥向），压力图绘于基底下 */
+  const HW = 440, padL = 22, padR = 22;
+  const kx = (HW - padL - padR)/L;
+  const y0 = 104, rp = c.pMax > 1e-9 ? 56/c.pMax : 0;
+  const X = x => padL + x*kx;
+  const yP = pv => y0 + rp*pv;
+  let s = "";
+  s += `<rect x="${X(0).toFixed(1)}" y="${(y0-58).toFixed(1)}" width="${(L*kx).toFixed(1)}" height="57" fill="#e6ecf3" stroke="#98a7b8" stroke-width=".9"/>`;
+  s += dgT(X(L/2), y0-34, "桥台基底以上结构（自重＋支座反力＋土压力竖向分量）", {sz:7.6, col:"#5b6b7d"});
+  s += `<line x1="${X(0).toFixed(1)}" y1="${y0}" x2="${X(L).toFixed(1)}" y2="${y0}" stroke="#475569" stroke-width="1.7"/>`;
+  s += `<path d="M${X(0).toFixed(1)},${y0} L${X(0).toFixed(1)},${yP(c.pMax).toFixed(1)} L${X(L).toFixed(1)},${yP(c.pMin).toFixed(1)} L${X(L).toFixed(1)},${y0} Z" fill="#fde2e2" fill-opacity=".85" stroke="${DGC.H}" stroke-width="1"/>`;
+  s += `<line x1="${X(0).toFixed(1)}" y1="${yP(c.pMean).toFixed(1)}" x2="${X(L).toFixed(1)}" y2="${yP(c.pMean).toFixed(1)}" stroke="${DGC.arm}" stroke-width=".8" stroke-dasharray="5 3"/>`;
+  s += dgT(X(L*0.30), yP(c.pMean)-3.6, `p均＝${f(c.pMean,1)}`, {sz:7.2, col:DGC.arm});
+  s += dgT(X(0)+4, yP(c.pMax)+9, `p最大＝${f(c.pMax,1)} kPa`, {sz:7.4, col:DGC.H, a:"start", b:1});
+  s += dgT(X(L)-4, Math.max(yP(c.pMin), y0)+9, `p最小＝${f(c.pMin,1)}`, {sz:7.4, col:DGC.H, a:"end"});
+  /* 三个竖向位置线：形心 L/2、竖向合力点 aBar、基底反力点 L/2−e */
+  const xN2 = Math.min(Math.max(L/2 - c.e, 0), L);
+  s += `<line x1="${X(L/2).toFixed(1)}" y1="${(y0-58).toFixed(1)}" x2="${X(L/2).toFixed(1)}" y2="${(y0+rp*c.pMax+6).toFixed(1)}" stroke="#94a3b8" stroke-width=".7" stroke-dasharray="4 3"/>`;
+  s += `<line x1="${X(aBar).toFixed(1)}" y1="${(y0-58).toFixed(1)}" x2="${X(aBar).toFixed(1)}" y2="${(y0-8).toFixed(1)}" stroke="${DGC.V}" stroke-width=".9" stroke-dasharray="4 3"/>`;
+  s += dgT(X(aBar), y0-64, `竖向力 ΣV`, {sz:7.2, col:DGC.V});
+  s += `<line x1="${X(xN2).toFixed(1)}" y1="${(y0-10).toFixed(1)}" x2="${X(xN2).toFixed(1)}" y2="${(y0+rp*c.pMax+6).toFixed(1)}" stroke="${DGC.fr}" stroke-width=".9" stroke-dasharray="4 3"/>`;
+  s += dgT(X(xN2), y0-46, `基底反力 N`, {sz:7.2, col:DGC.fr});
+  const yD = y0 + rp*c.pMax + 16;
+  s += dgDimX(X(L/2), X(xN2), yD, `e＝${f(Math.abs(c.e),3)}`, DGC.arm);
+  s += dgDimX(X(0), X(L), yD+18, `L＝${f(L,3)}`, "#475569");
+  s += dgT(X(0), yD+32, "前趾（倾覆点）", {sz:7.2, col:DGC.sub, a:"start"});
+  s += dgT(X(L), yD+32, "后趾", {sz:7.2, col:DGC.sub, a:"end"});
+  const mB = {W:HW, H:yD+40};
+  const cap = dgCapHtml("图 6　基底反力分布（直线分布假定，前趾受压为不利）", [
+    `基底长 L＝${f(L,3)} m、宽 B＝${f(c.Wb,2)} m，形心距前趾 L/2＝${f(L/2,3)} m`,
+    `p均＝N/A＝${f(c.pMean,1)} kPa；p最大＝${f(c.pMax,1)} kPa（前趾）；p最小＝${f(c.pMin,1)} kPa`,
+    `偏心距 e＝|M|/N＝${f(Math.abs(c.e),3)} m ≤ L/${p.fndRock?4:6}＝${f(c.eLim,3)} m（${p.fndRock?"岩石":"土基"}）`,
+    `基底反力合力点距前趾 L/2−e＝${f(xN2,3)} m，与竖向合力点 ${f(aBar,3)} 相差 ${f(Math.abs(xN2-aBar),3)} m（＝M水/ΣV）`,
+    `p最大 ≤ 1.2fa＝${f(P_MAX_RATIO*p.fa,0)} kPa、p最小 ≥ 0，即基底不出现拉应力。`
+  ]);
+  return {svg: dgSvg(mB, s), cap};
+}
+
+const dgRow = d => d
+  ? `<tr class="diagChk"><td colspan="5"><div class="dgWrap"><div class="dgFig">${d.svg}</div><div class="dgCap">${d.cap}</div></div></td></tr>`
+  : "";
+
 function renderCheck(p, q){
   const rows = [];
   const c = calcCheck(p, q);
@@ -1572,10 +1852,15 @@ function renderCheck(p, q){
     `<tr><td>${n}</td><td class="fx">${fx}</td><td class="num">${num(v)}</td><td>${u}</td>`+
     `<td style="text-align:center;">${mk(ok)}</td></tr>`);
   let sepNo = 0;                    /* 分节序号：1、2、3… 自动递增，调整顺序无需手工改号 */
-  const sep = t => rows.push(
-    `<tr class="sepChk"><td colspan="5"><span class="sn">${++sepNo}、</span>${t}</td></tr>`);
+  const sep = (t, d) => {
+    rows.push(`<tr class="sepChk"><td colspan="5"><span class="sn">${++sepNo}、</span>${t}</td></tr>`);
+    if(d) rows.push(dgRow(d));      /* 分节下方的计算示意图（随参数联动） */
+  };
+  /* 六张示意图先全部算好；单张出错不影响表格本体 */
+  const dg = {};
+  try{ ["V","H","slide","Ms","Mo","base"].forEach(kk=>{ dg[kk] = dgFig(kk, p, q, c); }); }catch(_){ }
 
-  sep("竖向力（标准值，基底以上全部竖向力）");
+  sep("竖向力（标准值，基底以上全部竖向力）", dg.V);
   row("支座竖向荷载 Nk", `支座中心 x=${f(c.zN,2)}（自背墙前缘向河心 ${f(c.dBear,2)}）`, p.Nk, "kN");
   row("桥台圬工自重", `ΣVi×γc = ${f(q.total,3)}×${f(p.gamC,1)}`, c.Gc, "kN");
   row("台腔回填土重", p.incFill ? `V填×γs = ${f(q.V_fill,2)}×${f(p.gamS,1)}` : "按偏安全不计入", c.Gs, "kN");
@@ -1593,7 +1878,7 @@ function renderCheck(p, q){
       `距后趾 ${f(c.Lb - aBar,3)}`,
       aBar, "m");
 
-  sep("顺桥向水平力（标准值，均取指向河心的不利方向）");
+  sep("顺桥向水平力（标准值，均取指向河心的不利方向）", dg.H);
   const brk = c.brk;
   row("制动力 Hk", (brk && p.autoHk)
         ? `车道荷载 ${f(brk.qk,1)}×${f(brk.Lk,2)}＋Pk ${f(brk.Pk,1)}＝${f(brk.G,1)} kN，×10%＝${f(0.1*brk.G,1)}；下限 ${f(brk.lo,0)}×车道系数 ${f(brk.kf,2)}`
@@ -1611,11 +1896,11 @@ function renderCheck(p, q){
   rows.push(`<tr class="total"><td>ΣH 合计</td><td class="fx">制动力＋土压力水平分量</td>`+
     `<td class="num">${f(c.Htot,3)}</td><td>kN</td><td></td></tr>`);
 
-  sep("抗滑移稳定");
+  sep("抗滑移稳定", dg.slide);
   row("Kc = μ·ΣV / ΣH", `= ${f(p.fric,2)}×${f(c.Vsum,1)} / ${f(c.Htot,1)}，要求 ≥ ${f(K_SLIDE,1)}`,
       c.Kc, "—", c.okKc);
 
-  sep("抗倾覆稳定 ①——稳定力矩 ΣM稳＝Σ（竖向力×该力至倾覆点的顺桥向力臂），绕倾覆点（基底前趾，x=0、z=0）取矩，即向河心倾覆");
+  sep("抗倾覆稳定 ①——稳定力矩 ΣM稳＝Σ（竖向力×该力至倾覆点的顺桥向力臂），绕倾覆点（基底前趾，x=0、z=0）取矩，即向河心倾覆", dg.Ms);
   c.items.forEach(it=>{
     const gm = it.kind === "s" ? p.gamS : p.gamC;
     row(it.n + "自重", `V=${f(it.V,3)}×${f(gm,1)}＝${f(it.W,1)} kN；力臂 ${f(it.z - c.zF,3)}（作用点 x=${f(it.z,3)}，前趾 x=${f(c.zF,3)}）`,
@@ -1630,7 +1915,7 @@ function renderCheck(p, q){
   rows.push(`<tr class="total"><td>ΣM稳 合计</td><td class="fx">圬工自重＋回填土重＋支座反力＋土压力竖向分量，均对前趾取矩</td>`+
     `<td class="num">${f(c.MsF,1)}</td><td>kN·m</td><td></td></tr>`);
 
-  sep("抗倾覆稳定 ②——倾覆力矩 ΣM倾＝Σ（水平力×该力至倾覆点的竖向力臂），力臂即距基础底面的高度（倾覆点 z=0）");
+  sep("抗倾覆稳定 ②——倾覆力矩 ΣM倾＝Σ（水平力×该力至倾覆点的竖向力臂），力臂即距基础底面的高度（倾覆点 z=0）", dg.Mo);
   row("制动力力臂 hH",
       `作用点标高 yH=${f(c.yH,3)}（前墙高 ${f(p.H1,2)}＋帽梁高 ${f(p.capH,2)}＋dH ${f(p.dH,2)}）＋前墙底至基底 ${f(q.fdT,3)}（基础总厚）`,
       c.hH, "m");
@@ -1658,7 +1943,7 @@ function renderCheck(p, q){
       `= ${f(c.MsF,1)} / ${f(c.Mh,1)}，要求 ≥ ${f(K_OVER,1)}；土压力竖向分量 EaV＝${f(c.EaV,1)} kN 已计入 ΣM稳`,
       c.K0, "—", c.okK0);
 
-  sep("基底承载力（直线分布假定）");
+  sep("基底承载力（直线分布假定）", dg.base);
   const s6 = 6*Math.abs(c.M)/(c.Wb*c.Lb*c.Lb);   /* 6|M|/(B·L²)，最大/最小应力的偏心应力项 */
   row("基底面积 A", `B×L＝${f(c.Wb,2)}×${f(c.Lb,2)}＝${f(c.A,2)}`, c.A, "m²");
   row("基底长度 L", `基础前伸 ${f(c.x0,2)}＋桥台长 L2 ${f(p.L2,2)}＋基础后伸 ${f(c.zB - c.x0 - p.L2,2)}（前趾 x=0.000，后趾 x=${f(c.zB,3)}）`, c.Lb, "m");
