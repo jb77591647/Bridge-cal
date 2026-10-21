@@ -145,7 +145,7 @@
         <div class="fields">
           <div class="field"><label>桥台总宽 W <small>横桥向台身全宽＝侧墙外缘间</small></label><input type="number" id="W" value="12" step="0.01"></div>
           <div class="field"><label>桥台顺桥向总长 B <small>顺桥向：前墙前缘→台尾</small></label><input type="number" id="L2" value="6" step="0.01"></div>
-          <div class="field"><label>高程基准绝对标高 <small>前墙底(标高0.000)对应高程</small></label><input type="number" id="elAbs" value="146" step="0.01"></div>
+          <div class="field"><label>高程基准绝对标高 <small>基础底面(标高0.000，与坐标原点同面)对应高程</small></label><input type="number" id="elAbs" value="146" step="0.01"></div>
         </div>
       </div>
 
@@ -164,7 +164,7 @@
           <div class="field"><label>牛腿槽口高度 h槽 <small>≈搭板厚，自背墙顶下量</small></label><input type="number" id="nbG" value="0.30" step="0.01"></div>
           <div class="field"><label>牛腿高度 h腿 <small>外端竖面高度</small></label><input type="number" id="nbHt" value="0.30" step="0.01"></div>
           <div class="field"><label>牛腿加腋高度 h腋 <small>根部截面变化段高度</small></label><input type="number" id="nbA" value="0.30" step="0.01"></div>
-          <div class="field"><label>牛腿顶面标高 <small>相对(前墙底=0.000)，自动</small></label><input type="number" id="nbTopShow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>牛腿顶面标高 <small>相对(基础底面=0.000)，自动</small></label><input type="number" id="nbTopShow" value="" disabled style="background:#eef2f6;"></div>
         </div>
       </div>
 
@@ -293,7 +293,7 @@
       <div class="card">
         <h2>说明</h2>
         <div class="note" style="margin-top:0;">
-          坐标系：原点位于<strong>基底前趾底边中点</strong>（基础河心侧最外边缘、基础底面的中点，也就是抗倾覆的<strong>倾覆点</strong>），x=纵桥向（指向台后；前趾 x=0，前墙前缘 x=基础前伸，后趾 x=基底长 L）、y=横桥向（桥台宽度中点 y=0）、z=竖向（自基础底面起算，倾覆点 z=0）。该基准下顺桥向坐标的数值就等于「距基底前趾的距离」、竖向坐标的数值就等于「距基底的高度」（即验算表中的力臂），全为非负，计算式中不再出现负坐标。标高仍以前墙底=0.000 计，绝对标高=相对标高+高程基准绝对标高。
+          坐标系：原点位于<strong>基底前趾底边中点</strong>（基础河心侧最外边缘、基础底面的中点，也就是抗倾覆的<strong>倾覆点</strong>），x=纵桥向（指向台后；前趾 x=0，前墙前缘 x=基础前伸，后趾 x=基底长 L）、y=横桥向（桥台宽度中点 y=0）、z=竖向（自基础底面起算，倾覆点 z=0）。该基准下顺桥向坐标的数值就等于「距基底前趾的距离」、竖向坐标的数值就等于「距基底的高度」（即验算表中的力臂），全为非负，计算式中不再出现负坐标。标高以<strong>基础底面</strong>（即坐标原点 z=0 所在面）=0.000 计，绝对标高=相对标高+高程基准绝对标高（前墙底标高即等于基础总厚）。
           汇总计算：台身（前墙）、侧墙（两道）、帽梁、背墙、牛腿、基础、回填。
         </div>
       </div>
@@ -4159,6 +4159,7 @@ function calcQ(p){
 
 /* ================= 稳定与承载力验算 =================
    坐标系同 calcQ：z=顺桥向（前墙前缘=ec、帽梁前缘=0、帽梁后缘=背墙背面=capWid），y=竖向（前墙底=0.000）；
+   注意：此处的「前墙底=0」是 calcCheck 内部量取基准，界面上显示的标高以基础底面=0.000 计（y 加基础总厚）。
    基底=最底层基础底面（y=−fdT），竖向力、水平力均取标准值。
    取矩轴：抗倾覆只绕基底前趾 zF（向河心倾覆）；基底应力按直线分布假定（p=N/A±6M/(W·L²)）。
    台后土压力按库仑通式分段计入（下段前墙背坡斜墙＋上段帽梁/背墙竖直墙），其竖向分量计入 ΣV 与 ΣM稳。
@@ -4659,8 +4660,8 @@ const PARAM_HL = {
   L2:    (p,q)=>{ const xF = p.capCant - datumX, zr = p.L2 + p.capCant - datumX;
             return {pts:[ xF,-p.W/2,0, zr,-p.W/2,0,           /* 侧墙外缘底边（顺桥向）：前墙前缘→台尾（仅底边，不加竖直刻度） */
                          xF, p.W/2,0, zr, p.W/2,0 ]}; },
-  elAbs: (p,q)=>{ const xF = p.capCant - datumX;                /* 标高基准点标记（前墙底前缘，场景 x） */
-            return {pts:[ xF-0.6,0,0, xF+0.6,0,0,  xF,-0.6,0, xF,0.6,0,  xF,0,-0.6, xF,0,0.6 ]}; },
+  elAbs: (p,q)=>{ const xF = p.capCant - datumX, zb = -(q.fdT || 0);   /* 标高基准点=基础底面（▽0.000 与坐标原点 z=0 同面） */
+            return {pts:[ xF-0.6,0,zb, xF+0.6,0,zb,  xF,-0.6,zb, xF,0.6,zb,  xF,0,zb-0.6, xF,0,zb+0.6 ]}; },
   /* ---- 台帽 ---- */
   capH:  (p,q)=>{ const dx = -datumX, yE = q.capL/2;
             return {pts:[ dx,yE,p.H1, dx,yE,p.H1+p.capH]}; },
@@ -5065,10 +5066,12 @@ function buildModel(p, q){
     slopeSpr3.userData.x = p.capCant+p.L2*0.55 - datumX; slopeSpr3.userData.y0 = W2-txL; slopeSpr3.userData.z = zL;
     L.add(slopeSpr3);
   }
-  /* ---- 部件标高：相对标高（前墙底=0.000）/ 绝对标高（=相对+高程基准绝对标高），
-          分别受"显示相对标高/显示绝对标高"及分构件开关控制；两者同开时绝对标高外移一列避免重叠 ---- */
+  /* ---- 部件标高：相对标高（基础底面=0.000，与坐标原点 z=0 同面）/ 绝对标高（=相对+高程基准绝对标高），
+          分别受"显示相对标高/显示绝对标高"及分构件开关控制；两者同开时绝对标高外移一列避免重叠 ----
+          注意：items 的 z 为场景竖坐标（前墙底=0、基底=−基础总厚），显示值须加基础总厚 zB 折算到基底基准 ---- */
   if($("showEL").checked || $("showELa").checked){
     const L = labelGroup, eC = "#0f766e", eA = "#0e7490", ea = isFinite(+p.elAbs) ? +p.elAbs : 0;
+    const zB = q.fdT || 0;                         /* 前墙底相对基础底面的高度=基础总厚 */
     const items = [
       ["基础底", -q.fdT,             -q.fdW1/2-2.8, -q.fdT+0.3,            p.capCant+p.L2/2,    "fd"],
       ["前墙底",  0,                 -W2-2.8,        0.35,                 p.capCant+0.5,       "fw"],
@@ -5082,8 +5085,8 @@ function buildModel(p, q){
       if(part==="cap" && !(p.capH>0)) continue;
       if(part==="bw" && !(p.bwH>0)) continue;
       if(part==="nb" && !(p.nbB>1e-6)) continue;
-      if($("showEL").checked)  L.add(makeLabel(`${nm} ▽${ft(z,3)}`, x, y, zs, eC, 0.95, part));
-      if($("showELa").checked) L.add(makeLabel(`${nm} ▽${ft(z+ea,3)}`, x, y+($("showEL").checked?2.4:0), zs, eA, 0.95, part));
+      if($("showEL").checked)  L.add(makeLabel(`${nm} ▽${ft(z + zB, 3)}`, x, y, zs, eC, 0.95, part));
+      if($("showELa").checked) L.add(makeLabel(`${nm} ▽${ft(z + zB + ea, 3)}`, x, y+($("showEL").checked?2.4:0), zs, eA, 0.95, part));
     }
   }
 
@@ -5145,7 +5148,7 @@ function renderTable(p, q){
   add("回填", `V=Σh/6(A下＋4A中＋A上)＝${fillTerms}（台腔内，前缘为背坡面/帽梁/背墙，顶填至侧墙顶）`, q.V_fill, "m³", mat("matFill"));
   $("resultBody").innerHTML = rows.join("");
   $("assumpNote").innerHTML = `<b>模型与计算约定</b>` + [
-    `① 坐标系：原点=<strong>基底前趾底边中点</strong>（基础河心侧最外边缘、基础底面的中点，也就是抗倾覆的<strong>倾覆点</strong>），x 轴=纵桥向（指向台后；前趾 x=0，前墙前缘 x=基础前伸，帽梁前缘 x=基础前伸−ec，后趾 x=基底长 L）、y 轴=横桥向（桥台宽度中点 y=0）、z 轴=竖向（自<strong>基础底面</strong>起算，故倾覆点 z=0，验算表中的竖向力臂 yEa、hH 正是该坐标）。该基准下顺桥向坐标的数值即「距基底前趾的距离」，竖向坐标数值即「距基底的高度」，均为非负。标高仍以前墙底=0.000 计，绝对标高=相对标高+原点绝对标高；与坐标 z 的换算是 z＝相对标高＋基础总厚（基础底面相对标高=−基础总厚，对应 z=0）；`,
+    `① 坐标系：原点=<strong>基底前趾底边中点</strong>（基础河心侧最外边缘、基础底面的中点，也就是抗倾覆的<strong>倾覆点</strong>），x 轴=纵桥向（指向台后；前趾 x=0，前墙前缘 x=基础前伸，帽梁前缘 x=基础前伸−ec，后趾 x=基底长 L）、y 轴=横桥向（桥台宽度中点 y=0）、z 轴=竖向（自<strong>基础底面</strong>起算，故倾覆点 z=0，验算表中的竖向力臂 yEa、hH 正是该坐标）。该基准下顺桥向坐标的数值即「距基底前趾的距离」，竖向坐标数值即「距基底的高度」，均为非负。标高以<strong>基础底面</strong>（坐标原点 z=0 所在面）=0.000 计，故相对标高的数值即坐标 z（距基底的高度），二者无需换算，前墙底标高=基础总厚；绝对标高=相对标高+高程基准绝对标高；`,
     `② U形结构：前墙外面竖直、背坡按 m1:1 放坡（竖:横，0=竖直）；侧墙外面竖直、内面放坡（上段顶厚 t2＝横桥向自外缘向内的墙厚，内坡 m2:1，0=竖直），腔体向下收窄，并按上段（高=帽梁高+背墙高）与下段分段建模；`,
     `③ 侧墙前端缘贴合前墙背坡面（前墙顶以上为竖直面，位于前墙前缘后方 t1 处）——即纵桥向视图所示形状；`,
     `④ 帽梁为全宽立方体：总长度=桥台总宽 W+2×悬出长度（两端超出台身/前墙外缘各 ec），前缘自前墙前缘向前悬出 ec（前墙顶面顺桥向宽 t1，帽梁前缘在前墙前缘的河心侧 ec 处，帽梁后缘与前墙顶后缘齐平），顺桥向宽度=帽梁宽度参数，背墙立于帽梁后端顶部（竖肢，组成 L 形台帽）；`,
@@ -5567,7 +5570,7 @@ function renderCheck(p, q){
 
   sep("抗倾覆稳定 ②——倾覆力矩 ΣM倾＝Σ（水平力×该力至倾覆点的竖向力臂），力臂即距基础底面的高度（倾覆点 z=0）", dg.Mo);
   row("制动力力臂 hH",
-      `作用点标高 ${M("y_{H}=" + f(c.yH,3))}（前墙高 ${f(p.H1,2)}＋帽梁高 ${f(p.capH,2)}＋dH ${f(p.dH,2)}）＋前墙底至基底 ${f(q.fdT,3)}（基础总厚）`,
+      `作用点距前墙底 ${M("y_{H}=" + f(c.yH,3))}（前墙高 ${f(p.H1,2)}＋帽梁高 ${f(p.capH,2)}＋dH ${f(p.dH,2)}）＋前墙底至基底 ${f(q.fdT,3)}（基础总厚）`,
       c.hH, "m");
   row("制动力倾覆力矩 Hk·hH",
       `${M("H_{k}\\times h_{H}=" + f(c.Hk,1) + "\\times" + f(c.hH,3) + "=" + f(c.MhB,1))}`, c.MhB, "kN·m");
@@ -5652,7 +5655,7 @@ function rebuild(){
     $("bwLshow").value = f(q.bwL);
     if(q.nbHCut) $("nbHt").value = ft(q.nbH);   /* 超出 帽梁+背墙 高时把修正结果写回输入框 */
     if(q.nbACut) $("nbA").value  = ft(q.nbAx);
-    $("nbTopShow").value = f(q.nbTop);
+    $("nbTopShow").value = f(q.nbTop + q.fdT);   /* 标高基准=基础底面（坐标原点 z=0），故加基础总厚 */
     $("t1bshow").value = f(q.t1b);
     $("swUpHshow").value = f(q.swUpH);
     $("swTopWshow").value = f(q.swTopW);
@@ -5899,7 +5902,7 @@ function exportCSV(){
   const p = readP(), q = calcQ(p);
   const lines = [];
   lines.push(`${$("projName").value || "U型桥台"} - U型桥台工程量计算表`);
-  lines.push(`坡比约定:竖直:水平=m:1,0为竖直面;标高以前墙底=0.000;单位m`);
+  lines.push(`坡比约定:竖直:水平=m:1,0为竖直面;标高以基础底面(坐标原点z=0)=0.000;单位m`);
   lines.push(`项目,计算式,材料,数量,单位`);
   const qq = s => `"${String(s).replace(/"/g,'""')}"`;
   const row = (n2,fx,v,u,mt) => lines.push([qq(n2),qq(fx),qq(mt||""),f(Math.abs(v),3),qq(u)].join(","));

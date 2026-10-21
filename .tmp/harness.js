@@ -895,5 +895,16 @@ isTrue(zipProbe[0] === 0x50 && zipProbe[1] === 0x4B && zipProbe[2] === 0x03 && z
        "zipStore 输出以 PK\\x03\\x04 开头（合法 ZIP 本地文件头）");
 isTrue(tpl.indexOf('id="xslMml2Omml"') > 0 && tpl.indexOf("/*__MATHJAX__*/") > 0 &&
        tpl.indexOf("/*__MML2OMML__*/") > 0, "模板保留 MathJax 与 MML2OMML 注入点");
+
+/* ===== 标高基准：与坐标原点同面（基础底面 = 0.000） ===== */
+isTrue(tpl.indexOf("基础底面(标高0.000") > 0, "高程基准输入框说明：基础底面(标高0.000)，与坐标原点同面");
+isTrue(tpl.indexOf("const zB = q.fdT || 0") > 0, "标高标注以基础总厚 zB 折算（场景竖坐标 → 基底基准）");
+isTrue(tpl.indexOf("ft(z + zB, 3)") > 0 && tpl.indexOf("ft(z + zB + ea, 3)") > 0,
+       "相对标高 = z + 基础总厚；绝对标高 = 相对 + 高程基准（基础底 ▽0.000、前墙底 = 基础总厚）");
+isTrue(tpl.indexOf("zb = -(q.fdT || 0)") > 0, "标高基准十字标记落在基础底面（z = −基础总厚，与坐标原点同面）");
+isTrue(tpl.indexOf("标高以基础底面") > 0 && tpl.indexOf("标高仍以前墙底") < 0, "页面说明与 CSV 表头同步为「标高以基础底面 = 0.000」，无旧口径残留");
+api.rebuild();
+const pEL = api.readP(), qEL = api.calcQ(pEL);
+near(parseFloat(els.nbTopShow.value), qEL.nbTop + qEL.fdT, 1e-3, "牛腿顶面标高按基底基准显示（= nbTop + 基础总厚）");
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail?1:0);
