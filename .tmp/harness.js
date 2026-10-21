@@ -418,7 +418,14 @@ near(cChk.M, cChk.Vsum*(cChk.zc - zR_chk), 10.0,
      "基底弯矩 = ΣV×(形心−合力作用点)，与 Σ(M稳−M倾)=ΣV·力臂 等价");
 near(cChk.e, cChk.zc - zR_chk, 1e-6, "偏心距 e = x形心 − 合力作用点（向河心为正）");
 /* 几何基准与代数关系 */
-near(cChk.zF, 0, 1e-9, "基底前趾 x=0（坐标原点＝基底前趾中点）");
+near(cChk.zF, 0, 1e-9, "基底前趾 x=0（坐标原点＝基底前趾）");
+/* 三维坐标轴原点＝基底前趾底边中点（倾覆点）：轴整体下移到基础底面 */
+isTrue(tpl.indexOf("const axY = -(q.fdT || 0)") >= 0,
+       "坐标轴竖向基准 axY＝−基础总厚（基础底面）");
+isTrue(tpl.indexOf("ax.position.set(0, 0, axY)") >= 0 && tpl.indexOf("axG.position.set(0, 0, axY)") >= 0,
+       "AxesHelper 与箭头组均平移到基础底面，原点落在基底前趾底边中点（倾覆点）");
+isTrue(tpl.indexOf("基底前趾底边中点") >= 0 && tpl.indexOf("倾覆点") >= 0,
+       "页面说明注明原点＝基底前趾底边中点（倾覆点）");
 near(cChk.zB, 8.0, 1e-9, "基底后趾 x＝前伸1.0＋L2 6.0＋后伸1.0＝8.0（＝基底长 L）");
 near(cChk.A, 112, 1e-9, "基底面积 A=(W+2×1)×(L2+1+1)=14×8=112");
 near(cChk.zc, 4.0, 1e-9, "基底形心 x＝L/2＝4.0（同时等于距前趾的距离）");
@@ -505,7 +512,9 @@ isTrue(ckTbl.indexOf("前趾 x=")>=0 && ckTbl.indexOf("作用点 x=")>=0,
 isTrue(ckTbl.indexOf("前趾 z=")<0 && ckTbl.indexOf("作用点 z=")<0,
        "结果表不再把顺桥向坐标误标为 z");
 isTrue(ckTbl.indexOf("前趾 x=0.000")>=0,
-       "表中前趾 x=0.000（坐标原点＝基底前趾中点）");
+       "表中前趾 x=0.000（坐标原点＝基底前趾）");
+isTrue(ckTbl.indexOf("绕倾覆点")>=0 && ckTbl.indexOf("倾覆点 z=0")>=0,
+       "抗倾覆两节标题均以倾覆点（x=0、z=0）为取矩基准");
 isTrue(ckTbl.indexOf("前趾 x=-")<0 && ckTbl.indexOf("前趾 x=−")<0 &&
        ckTbl.indexOf("作用点 x=-")<0 && ckTbl.indexOf("作用点 x=−")<0,
        "表中不再出现任何负的顺桥向坐标（前趾/作用点均非负）");
