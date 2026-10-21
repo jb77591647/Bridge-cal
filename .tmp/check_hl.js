@@ -93,18 +93,38 @@ nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 caph 高亮纵向跨=盖梁宽 bc")
 b = bbOf("capb");
 nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 capb 高亮纵向跨=bc");
 nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 capb 高亮横向跨=Lc");
-b = bbOf("cape");
-nearHL(b.max.y - b.min.y, 0.5, 0.45, "桥墩 cape 高亮横向跨=悬出 ec");
-/* capch：默认 ch=0 无高亮；设 ch=0.3 后高亮为两端倒角斜边 */
-isTrue(bbOf("capch") === null, "桥墩 capch 默认 ch=0 无高亮");
-els.capch.value = "0.3";
+b = bbOf("capL");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 capL 高亮横向跨=总长 Lc（顶面两条长边）");
+nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 capL 高亮纵向跨=厚度 bc");
+/* 默认等高（he=hc）、无悬臂、无挡块 → 这四个参数不适用 */
+isTrue(bbOf("caphe") === null, "桥墩 caphe 等高（he=hc）时无高亮");
+isTrue(bbOf("cantL") === null && bbOf("cantR") === null, "桥墩 cantL/cantR 为 0 时无高亮");
+isTrue(bbOf("dkOn") === null && bbOf("dkH") === null &&
+       bbOf("dkWT") === null && bbOf("dkWB") === null,
+  "桥墩 挡块=否 时 dkOn/dkH/dkWT/dkWB 均无高亮");
+/* 变截面 + 左右悬臂 + 挡块：he=0.6、aL=aR=1.5、挡块 h=0.3（上宽/下宽 0.2） */
+els.caphe.value = "0.6"; els.cantL.value = "1.5"; els.cantR.value = "1.5"; els.dkOn.value = "是";
 const p3 = api.readP(), q3 = api.calcQ(p3);
 api.buildModel(p3, q3);
-b = bbOf("capch");
-nearHL(b.max.z - b.min.z, 0.3, 0.45, "桥墩 capch 高亮竖向跨=倒角 ch");
-nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 capch 高亮纵向跨=bc（两端斜边）");
-nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 capch 高亮横向范围=Lc（左右两端各一条斜边）");
-els.capch.value = "0";
+b = bbOf("caphe");
+nearHL(b.max.z - b.min.z, 0.6, 0.45, "桥墩 caphe 高亮竖向跨=端部高 he");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 caphe 高亮横向范围=Lc（两端梁端竖边）");
+b = bbOf("cantL");
+nearHL(b.max.y - b.min.y, 1.5, 0.45, "桥墩 cantL 高亮横向跨=左悬臂 aL");
+b = bbOf("cantR");
+nearHL(b.max.y - b.min.y, 1.5, 0.45, "桥墩 cantR 高亮横向跨=右悬臂 aR");
+b = bbOf("dkOn");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 dkOn 高亮=整个盖梁（含挡块）横向跨 Lc");
+b = bbOf("dkH");
+nearHL(b.max.z - b.min.z, 0.3, 0.45, "桥墩 dkH 高亮竖向跨=挡块高 h挡");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 dkH 高亮横向范围=Lc（两端各一条竖边）");
+b = bbOf("dkWT");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 dkWT 高亮横向范围=Lc（两端顶面各一段）");
+nearHL(b.max.z - b.min.z, 0, 0.2, "桥墩 dkWT 高亮位于挡块顶面（水平）");
+b = bbOf("dkWB");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 dkWB 高亮横向范围=Lc（两端底面各一段）");
+nearHL(b.max.z - b.min.z, 0, 0.2, "桥墩 dkWB 高亮位于挡块底面=盖梁顶（水平）");
+els.caphe.value = "1.2"; els.cantL.value = "0"; els.cantR.value = "0"; els.dkOn.value = "否";
 api.buildModel(api.readP(), api.calcQ(api.readP()));
 b = bbOf("useCap");
 nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 useCap 高亮=整个盖梁 Lc");

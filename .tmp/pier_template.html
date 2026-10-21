@@ -26,6 +26,16 @@
     text-decoration:none; display:inline-block;
   }
   .btn:hover{border-color:var(--accent); color:var(--accent);}
+  /* 卡片标题栏最右侧的小按钮（如"导出.docx验算书"），与 h2 同一行、靠右对齐；
+     默认即蓝底白字（醒目入口），悬停/聚焦加深以给出反馈 */
+  .card h2 .btnHd{
+    margin-left:auto; flex:0 0 auto; font-family:inherit; font-size:12px; font-weight:600;
+    padding:2px 10px; border:1px solid var(--accent); border-radius:5px;
+    background:var(--accent); color:#fff; cursor:pointer; line-height:1.6;
+    letter-spacing:0; transition:filter .12s, border-color .12s;
+  }
+  .card h2 .btnHd:hover,
+  .card h2 .btnHd:focus-visible{filter:brightness(1.15);}
   .layout{display:grid; grid-template-columns:370px 1fr; gap:14px; align-items:start;}
   /* 左侧参数栏：完整展开，不产生内部滚动条/不被裁剪 */
   /* 左侧参数栏：贴顶固定 + 独立滚动（输入下方参数时仍能看到模型） */
@@ -141,13 +151,18 @@
         <div class="chk" style="margin:0 0 4px;"><input type="checkbox" id="useCap" checked>
           <label for="useCap">设置盖梁</label></div>
         <div class="fields">
-          <div class="field"><label>盖梁高 hc</label><input type="number" id="caph" value="1.20" step="0.01"></div>
-          <div class="field"><label>盖梁宽 bc <small>顺桥向</small></label><input type="number" id="capb" value="2.50" step="0.01"></div>
-          <div class="field"><label>横桥向悬出 ec <small>每侧，自墩身外缘</small></label><input type="number" id="cape" value="0.50" step="0.01"></div>
-          <div class="field"><label>端部倒角 ch <small>45°，左右对称各一处，0=直角</small></label><input type="number" id="capch" value="0" step="0.05"></div>
-          <div class="field"><label>盖梁长 Lc <small>=墩身横桥向尺寸+2×ec，自动</small></label><input type="text" id="capLshow" value="" disabled style="background:#eef2f6; width:78px; text-align:right;"></div>
+          <div class="field"><label>盖梁宽度 Lc <small>横桥向总长</small></label><input type="number" id="capL" value="13.00" step="0.01"></div>
+          <div class="field"><label>盖梁厚度 bc <small>顺桥向</small></label><input type="number" id="capb" value="1.80" step="0.01"></div>
+          <div class="field"><label>盖梁中部高 hc <small>跨中断面高</small></label><input type="number" id="caph" value="1.50" step="0.01"></div>
+          <div class="field"><label>盖梁端部高 he <small>两端断面高，≤中部高</small></label><input type="number" id="caphe" value="0.60" step="0.01"></div>
+          <div class="field"><label>左悬臂长 aL <small>梁端→变高点（横桥向）</small></label><input type="number" id="cantL" value="1.50" step="0.01"></div>
+          <div class="field"><label>右悬臂长 aR <small>梁端→变高点（横桥向）</small></label><input type="number" id="cantR" value="1.50" step="0.01"></div>
+          <div class="field"><label>是否设置挡块</label><select id="dkOn"><option selected>是</option><option>否</option></select></div>
+          <div class="field"><label>挡块高 h挡</label><input type="number" id="dkH" value="0.30" step="0.01"></div>
+          <div class="field"><label>挡块上部宽</label><input type="number" id="dkWT" value="0.20" step="0.01"></div>
+          <div class="field"><label>挡块下部宽</label><input type="number" id="dkWB" value="0.20" step="0.01"></div>
         </div>
-        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），等高断面：横桥向两端自墩身外缘各悬出 ec，端部下缘可设 45° 倒角 ch（左右对称，只输一边的尺寸，0=直角）；倒角取 ch≤min(hc, ec)，超出时按限值取用。</div>
+        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），变截面断面：跨中高 hc、两端高 he（生效值≤hc）；左/右悬臂长=梁端至变高点的横桥向距离，该段底面自端部斜向上抬至中部高；挡块设于两端顶面（断面梯形：下部宽→上部宽，沿厚度 bc 全宽贯通）。总长 Lc 直接输入，宜与墩身横桥向尺寸+左右悬臂一致。单位：m。</div>
       </div>
 
       <div class="card">
@@ -216,7 +231,7 @@
         <div class="note" style="margin-top:0;">
           坐标系：原点=<strong>基础最低面（最下层基础底面）中心</strong>，x=纵桥向、y=横桥向、z=竖向（向上为正）；标高以<strong>基础底面=0.000</strong> 计（墩底标高即等于基础总厚），绝对标高=相对标高+高程基准绝对标高。<br>
           基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。<br>
-          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），等高断面：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；端部下角可设 45° 倒角 ch（左右对称、只输一边尺寸，0=直角）；勾掉「设置盖梁」即不计盖梁。
+          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），变截面断面：横桥向总长 Lc 直接输入（宜=墩身横桥向尺寸+左右悬臂），顺桥向厚度 bc；跨中高 hc、两端高 he（≤hc），左右悬臂段（梁端→变高点）底面斜向上抬；两端顶面可设挡块（高 h挡、断面梯形 上部宽/下部宽，沿 bc 贯通）；勾掉「设置盖梁」即不计盖梁。
         </div>
       </div>
     </div>
@@ -263,7 +278,7 @@
         <div class="note" id="assumpNote"></div>
       </div>
       <div class="card">
-        <h2>稳定与承载力验算（标准值组合）</h2>
+        <h2>稳定与承载力验算（标准值组合）<button class="btnHd no-print" onclick="exportWord()" title="导出 .docx 验算书（工程量表 + 稳定与承载力验算表 + 计算约定）">导出.docx验算书</button></h2>
         <table>
           <thead><tr><th style="width:23%">项目</th><th>计算式</th><th style="width:13%; text-align:right;">数值</th><th style="width:8%;">单位</th><th style="width:10%; text-align:center;">判定</th></tr></thead>
           <tbody id="checkBody"></tbody>
@@ -301,7 +316,9 @@ function readP(){
     Lp:g("Lp"), Wp:g("Wp"),
     d:g("d"), n, s:Math.max(g("d"), g("s")),  // 中心距小于直径时按直径取值，避免柱体重叠
     useFd2:$("useFd2").checked, fh1:g("fh1"), c1:g("c1"), fh2:g("fh2"), c2:g("c2"),
-    useCap:$("useCap").checked, caph:g("caph"), capb:g("capb"), cape:g0("cape"), capch:g0("capch"),
+    useCap:$("useCap").checked, capL:g("capL"), capb:g("capb"), caph:g("caph"), caphe:g0("caphe"),
+    cantL:g0("cantL"), cantR:g0("cantR"),
+    dkOn:$("dkOn").value==="是", dkH:g0("dkH"), dkWT:g0("dkWT"), dkWB:g0("dkWB"),
     Nk:g0("Nk"), Hk:g0("Hk"), dH:g0("dH"), gamC:g0("gamC"), mu:g0("mu"), fa:g("fa"),
     fndRock:$("fndType").value==="岩石",
     excMs:g("excMs"), excMr:g("excMr"), excW:g("excW"), excH:g("excH"), excHs:g("excHs"),
@@ -327,17 +344,27 @@ function calcQ(p){
   q.V_fd1  = q.a1*q.b1*p.fh1;
   q.V_fd2  = p.useFd2 ? q.a2*q.b2*p.fh2 : 0;
   q.V_fd   = q.V_fd1 + q.V_fd2;
-  /* 盖梁（墩帽）：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec；
-     顺桥向宽 bc、高 hc，等高断面，坐于墩顶（底面 z=H，顶面 z=H+hc）。
-     端部 45° 倒角 ch（左右对称各一处，0=直角）：两端下角各切去一个直角边为 ch 的等腰直角三棱柱
-     （沿 bc 全宽贯通），扣减体积 = 2×½ch²×bc = ch²·bc；ch 生效值 ≤ min(hc, ec)，超出按限值取用 */
+  /* 盖梁（墩帽）：变截面，坐于墩顶（底面平段 z=H、顶面 z=H+hc）。
+     横桥向总长 Lc 直接输入；跨中高 hc、两端高 he（生效值≤hc）；
+     左/右悬臂长 aL/aR = 梁端至变高点的横桥向距离（该段底面自端部斜向上抬），限值 [0, Lc] 且 aL+aR≤Lc。
+     体积 = bc×[hc×(Lc−aL−aR) ＋ (hc+he)/2×(aL+aR)]（平段矩形 + 两端梯形断面）。
+     挡块：设于两端顶面，断面梯形（下部宽 wb → 上部宽 wt、高 h挡）沿 bc 全宽贯通，
+     单个体积 = (wt+wb)/2×h挡×bc，两端共 2 个 */
   q.capBase = baseB;
-  q.capL = p.useCap ? baseB + 2*p.cape : 0;
-  q.capCh = p.useCap ? Math.min(Math.max(p.capch || 0, 0), p.caph, Math.max(p.cape, 0)) : 0;
-  q.capCut = p.useCap ? q.capCh*q.capCh*p.capb : 0;               // 两端倒角扣减合计
-  q.V_cap = p.useCap ? q.capL*p.capb*p.caph - q.capCut : 0;
-  q.capT  = p.useCap ? p.caph : 0;               // 盖梁高（不设盖梁时为 0）
-  q.total  = q.V_pier + q.V_cap + q.V_fd;
+  q.capL  = p.useCap ? Math.max(p.capL, 0.1) : 0;
+  q.capHm = p.useCap ? p.caph : 0;
+  q.capHe = p.useCap ? Math.min(Math.max(p.caphe, 0), q.capHm) : 0;
+  q.cantL = p.useCap ? Math.min(Math.max(p.cantL, 0), q.capL - 1e-6) : 0;
+  q.cantR = p.useCap ? Math.min(Math.max(p.cantR, 0), q.capL - q.cantL) : 0;
+  const flatL = Math.max(q.capL - q.cantL - q.cantR, 0);
+  q.V_cap = p.useCap ? p.capb * (q.capHm*flatL + (q.capHm+q.capHe)/2*(q.cantL+q.cantR)) : 0;
+  q.dkOn  = p.useCap && p.dkOn;
+  q.dkH   = Math.max(p.dkH, 0);
+  q.dkWT  = Math.max(p.dkWT, 0);
+  q.dkWB  = Math.max(p.dkWB, 0);
+  q.V_dk  = q.dkOn ? 2 * (q.dkWT+q.dkWB)/2 * q.dkH * p.capb : 0;
+  q.capT  = p.useCap ? p.caph : 0;               // 盖梁中部高（不设盖梁时为 0）
+  q.total  = q.V_pier + q.V_cap + q.V_dk + q.V_fd;
   /* 开挖：坑底平面=最底层基础轮廓（矩形 边长×边长）+每侧工作宽度，坑底=基础底面（z=−fdT）。
      分层放坡（下层石方 h石 坡比 m石、上层土方 h土 坡比 m土，层间连续，竖:横=m:1，0=竖直）；
      分级放坡：自坑底每累计一个分级高度 h分 设一级平台（宽 b平），平台处开挖线每侧水平外移 b平 再继续放坡。
@@ -510,7 +537,7 @@ function hexaMesh(v8, mat){
   addDualEdges(mesh, g, 12);
   return mesh;
 }
-/* 断面多边形拉伸体（盖梁端部倒角用）：poly=[[y,z],...] 为闭合凸多边形（y-z 平面断面），
+/* 断面多边形拉伸体（盖梁变截面/挡块梯形断面用）：poly=[[y,z],...] 为闭合凸多边形（y-z 平面断面），
    沿 x∈[x0,x1] 拉伸；顶点按面复制保证法线平直；userData.faces 记录各面顶点序号（散度求体积用） */
 function prismMesh(poly, x0, x1, mat){
   const n = poly.length, pos = [], faces = [];
@@ -671,24 +698,46 @@ function excProfile(p, q){
 /* 参数 → 部位/边长映射：{pts:粗线段} / {circles:[x,y,z,R]} / {parts:[部件标签]}，null=不适用 */
 const PARAM_HL = {
   useCap:(p,q)=> p.useCap ? {parts:["cap"]} : null,
-  caph:  (p,q)=> p.useCap ? {pts:[
-            -p.capb/2,-q.capL/2,p.H, -p.capb/2,-q.capL/2,p.H+p.caph,     /* 盖梁四条竖直棱 */
-             p.capb/2,-q.capL/2,p.H,  p.capb/2,-q.capL/2,p.H+p.caph,
-            -p.capb/2, q.capL/2,p.H, -p.capb/2, q.capL/2,p.H+p.caph,
-             p.capb/2, q.capL/2,p.H,  p.capb/2, q.capL/2,p.H+p.caph ]} : null,
-  capb:  (p,q)=> p.useCap ? {pts:[
-            -p.capb/2,-q.capL/2,p.H+p.caph, p.capb/2,-q.capL/2,p.H+p.caph,   /* 顺桥向边（顶/底） */
-            -p.capb/2, q.capL/2,p.H+p.caph, p.capb/2, q.capL/2,p.H+p.caph,
-            -p.capb/2,-q.capL/2,p.H,        p.capb/2,-q.capL/2,p.H,
-            -p.capb/2, q.capL/2,p.H,        p.capb/2, q.capL/2,p.H ]} : null,
-  cape:  (p,q)=> p.useCap ? {pts:[
-            p.capb/2, q.capBase/2, p.H+p.caph, p.capb/2, q.capL/2, p.H+p.caph,   /* 两端悬出段（顶面） */
-           -p.capb/2, q.capBase/2, p.H+p.caph,-p.capb/2, q.capL/2, p.H+p.caph ]} : null,
-  capch: (p,q)=> (p.useCap && q.capCh>1e-9) ? {pts:[
-            p.capb/2,  q.capL/2-q.capCh, p.H,  p.capb/2,  q.capL/2, p.H+q.capCh,    /* 右端倒角斜边（两侧） */
-           -p.capb/2,  q.capL/2-q.capCh, p.H, -p.capb/2,  q.capL/2, p.H+q.capCh,
-            p.capb/2, -(q.capL/2-q.capCh), p.H,  p.capb/2, -q.capL/2, p.H+q.capCh,  /* 左端倒角斜边（对称） */
-           -p.capb/2, -(q.capL/2-q.capCh), p.H, -p.capb/2, -q.capL/2, p.H+q.capCh ]} : null,
+  capL:  (p,q)=> p.useCap ? {pts:[                       /* 顶面两条横桥向长边（总长） */
+            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2, q.capL/2,p.H+q.capHm,
+             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2, q.capL/2,p.H+q.capHm ]} : null,
+  caph:  (p,q)=> p.useCap ? {pts:[                       /* 变高点处四条通高竖棱（中部高） */
+            -p.capb/2,-q.capL/2+q.cantL,p.H, -p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm,
+             p.capb/2,-q.capL/2+q.cantL,p.H,  p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm,
+            -p.capb/2, q.capL/2-q.cantR,p.H, -p.capb/2, q.capL/2-q.cantR,p.H+q.capHm,
+             p.capb/2, q.capL/2-q.cantR,p.H,  p.capb/2, q.capL/2-q.cantR,p.H+q.capHm ]} : null,
+  caphe: (p,q)=> (p.useCap && q.capHe < q.capHm-1e-9) ? {pts:[   /* 两端梁端竖直边（端部高） */
+            -p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe, -p.capb/2,-q.capL/2,p.H+q.capHm,
+             p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe,  p.capb/2,-q.capL/2,p.H+q.capHm,
+            -p.capb/2, q.capL/2,p.H+q.capHm-q.capHe, -p.capb/2, q.capL/2,p.H+q.capHm,
+             p.capb/2, q.capL/2,p.H+q.capHm-q.capHe,  p.capb/2, q.capL/2,p.H+q.capHm ]} : null,
+  cantL: (p,q)=> (p.useCap && q.cantL>1e-9) ? {pts:[     /* 左悬臂段：顶面梁端→变高点 */
+            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm,
+             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm ]} : null,
+  cantR: (p,q)=> (p.useCap && q.cantR>1e-9) ? {pts:[     /* 右悬臂段：顶面变高点→梁端 */
+            -p.capb/2, q.capL/2-q.cantR,p.H+q.capHm, -p.capb/2, q.capL/2,p.H+q.capHm,
+             p.capb/2, q.capL/2-q.cantR,p.H+q.capHm,  p.capb/2, q.capL/2,p.H+q.capHm ]} : null,
+  capb:  (p,q)=> p.useCap ? {pts:[                       /* 顺桥向边：两端面顶/底各一条 */
+            -p.capb/2,-q.capL/2,p.H+q.capHm, p.capb/2,-q.capL/2,p.H+q.capHm,
+            -p.capb/2, q.capL/2,p.H+q.capHm, p.capb/2, q.capL/2,p.H+q.capHm,
+            -p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe, p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe,
+            -p.capb/2, q.capL/2,p.H+q.capHm-q.capHe, p.capb/2, q.capL/2,p.H+q.capHm-q.capHe ]} : null,
+  dkOn:  (p,q)=> (p.useCap && q.dkOn) ? {parts:["cap"]} : null,
+  dkH:   (p,q)=> (p.useCap && q.dkOn && q.dkH>1e-9) ? {pts:[     /* 挡块外缘竖直边（两端×两侧） */
+            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH,
+             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH,
+            -p.capb/2, q.capL/2,p.H+q.capHm, -p.capb/2, q.capL/2,p.H+q.capHm+q.dkH,
+             p.capb/2, q.capL/2,p.H+q.capHm,  p.capb/2, q.capL/2,p.H+q.capHm+q.dkH ]} : null,
+  dkWT:  (p,q)=> (p.useCap && q.dkOn && q.dkWT>1e-9) ? {pts:[    /* 挡块顶面横桥向边 */
+            -p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH, -p.capb/2,-q.capL/2+q.dkWT,p.H+q.capHm+q.dkH,
+             p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH,  p.capb/2,-q.capL/2+q.dkWT,p.H+q.capHm+q.dkH,
+            -p.capb/2, q.capL/2,p.H+q.capHm+q.dkH, -p.capb/2, q.capL/2-q.dkWT,p.H+q.capHm+q.dkH,
+             p.capb/2, q.capL/2,p.H+q.capHm+q.dkH,  p.capb/2, q.capL/2-q.dkWT,p.H+q.capHm+q.dkH ]} : null,
+  dkWB:  (p,q)=> (p.useCap && q.dkOn && q.dkWB>1e-9) ? {pts:[    /* 挡块底面横桥向边（贴盖梁顶） */
+            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2,-q.capL/2+q.dkWB,p.H+q.capHm,
+             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2,-q.capL/2+q.dkWB,p.H+q.capHm,
+            -p.capb/2, q.capL/2,p.H+q.capHm, -p.capb/2, q.capL/2-q.dkWB,p.H+q.capHm,
+             p.capb/2, q.capL/2,p.H+q.capHm,  p.capb/2, q.capL/2-q.dkWB,p.H+q.capHm ]} : null,
   Hp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
             -p.Lp/2,-p.Wp/2,0, -p.Lp/2,-p.Wp/2,p.H,     /* 四条竖直棱（墩底→墩顶） */
              p.Lp/2,-p.Wp/2,0,  p.Lp/2,-p.Wp/2,p.H,
@@ -821,21 +870,28 @@ function buildModel(p, q){
     }
   }
 
-  /* 盖梁（墩帽）：等高断面，坐于墩顶（底面 z=H、顶面 z=H+hc）；
-     横桥向长 Lc（墩身横桥向尺寸 + 两端各悬出 ec）、顺桥向宽 bc；
-     ch>0 时端部下角各设 45° 倒角（断面为六边形，沿 bc 拉伸） */
+  /* 盖梁（墩帽）：变截面断面（顶面平、底面两端斜抬），坐于墩顶（平段底 z=H、顶面 z=H+hc）；
+     断面多边形（y-z）：梁端(端部高 he) → 变高点(中部高 hc) → 平段 → 变高点 → 梁端，沿 bc 拉伸；
+     挡块：两端顶面梯形断面（下部宽 wb → 上部宽 wt、高 h挡），同样沿 bc 拉伸 */
   if(p.useCap){
-    if(q.capCh > 1e-9){
-      const ch = q.capCh, yl = q.capL/2;
-      const capMesh = prismMesh(
-        [[-yl+ch, p.H], [yl-ch, p.H], [yl, p.H+ch], [yl, p.H+p.caph], [-yl, p.H+p.caph], [-yl, p.H+ch]],
-        -p.capb/2, p.capb/2, MAT.cap());
-      capMesh.userData.part = "cap";
-      group.add(capMesh);
-    }else{
-      group.add(Object.assign(
-        box(-p.capb/2, p.capb/2, -q.capL/2, q.capL/2, p.H, p.H+p.caph, MAT.cap()),
-        {userData:{part:"cap"}}));
+    const yl = q.capL/2, zt = p.H + q.capHm, zbE = zt - q.capHe;
+    const yL = -yl + q.cantL, yR = yl - q.cantR;
+    const poly = [];
+    if(q.cantL > 1e-9){ poly.push([-yl, zbE], [yL, p.H]); } else poly.push([-yl, p.H]);
+    if(q.cantR > 1e-9){ poly.push([yR, p.H], [yl, zbE]); } else poly.push([yl, p.H]);
+    poly.push([yl, zt], [-yl, zt]);
+    const capMesh = prismMesh(poly, -p.capb/2, p.capb/2, MAT.cap());
+    capMesh.userData.part = "cap";
+    group.add(capMesh);
+    if(q.dkOn && q.dkH > 1e-9 && q.dkWT + q.dkWB > 1e-9){
+      const mkBlk = (yOut, inw) => {                 /* inw：挡块由梁端指向跨中的方向 */
+        /* 逆时针绕向（底→顶），保证正面朝外、法线正确 */
+        const bp = [[yOut, zt], [yOut+inw*q.dkWB, zt], [yOut+inw*q.dkWT, zt+q.dkH], [yOut, zt+q.dkH]];
+        const m = prismMesh(bp, -p.capb/2, p.capb/2, MAT.cap());
+        m.userData.part = "cap";
+        group.add(m);
+      };
+      mkBlk(-yl, 1); mkBlk(yl, -1);
     }
   }
 
@@ -935,15 +991,19 @@ function buildModel(p, q){
     const xP = isRect ? p.Lp/2 : p.d/2;          /* 墩身纵桥向边缘 */
     /* 竖向：墩身高 H、一层/二层厚度 */
     L.add(makeDimRaw(V(-xP,-q.b1/2,0), V(-xP,-q.b1/2,p.H), V(0,-1.6,0), `H=${ft(p.H)}`, DC, "pier"));
-    /* 盖梁：高 hc（竖向）、宽 bc（顺桥向）、长 Lc（横桥向）、两端悬出 ec */
+    /* 盖梁：中部高 hc（变高点处竖直量）、端部高 he（梁端竖直量）、厚度 bc（顺桥向）、
+       总长 Lc 与左右悬臂 aL/aR（顶面横桥向）、挡块高 */
     if(p.useCap){
-      L.add(makeDimRaw(V(-p.capb/2,-q.capL/2,p.H), V(-p.capb/2,-q.capL/2,p.H+p.caph), V(-1.6,0,0), `hc=${ft(p.caph)}`, DC, "cap"));
-      L.add(makeDimRaw(V(-p.capb/2,-q.capL/2,p.H+p.caph), V(p.capb/2,-q.capL/2,p.H+p.caph), V(0,0,0.9), `bc=${ft(p.capb)}`, DC, "cap"));
-      L.add(makeDimRaw(V(p.capb/2,-q.capL/2,p.H+p.caph), V(p.capb/2,q.capL/2,p.H+p.caph), V(2.4,0,0), `Lc=${ft(q.capL)}`, DC, "cap"));
-      const yE = q.capBase/2;                     /* 墩身横桥向外缘 */
-      L.add(makeDimRaw(V(p.capb/2,yE,p.H+p.caph), V(p.capb/2,q.capL/2,p.H+p.caph), V(1.2,0,0), `ec=${ft(p.cape)}`, DC2, "cap"));
-      if(q.capCh > 1e-9)                          /* 倒角斜边（右端外侧，左右对称只标一处） */
-        L.add(makeDimRaw(V(p.capb/2,q.capL/2-q.capCh,p.H), V(p.capb/2,q.capL/2,p.H+q.capCh), V(1.0,0.7,0.7), `ch=${ft(q.capCh)}(45°)`, DC2, "cap"));
+      const zt = p.H + q.capHm, zbE = zt - q.capHe, yl = q.capL/2;
+      const yL = -yl + q.cantL, yR = yl - q.cantR;
+      L.add(makeDimRaw(V(-p.capb/2,yL,p.H), V(-p.capb/2,yL,zt), V(-1.6,0,0), `hc=${ft(q.capHm)}`, DC, "cap"));
+      L.add(makeDimRaw(V(p.capb/2,yl,zbE), V(p.capb/2,yl,zt), V(1.6,0,0), `he=${ft(q.capHe)}`, DC, "cap"));
+      L.add(makeDimRaw(V(-p.capb/2,-yl,zt), V(p.capb/2,-yl,zt), V(0,0,0.9), `bc=${ft(p.capb)}`, DC, "cap"));
+      L.add(makeDimRaw(V(p.capb/2,-yl,zt), V(p.capb/2,yl,zt), V(2.4,0,0), `Lc=${ft(q.capL)}`, DC, "cap"));
+      L.add(makeDimRaw(V(p.capb/2,-yl,zt), V(p.capb/2,yL,zt), V(1.2,0,0), `aL=${ft(q.cantL)}`, DC2, "cap"));
+      L.add(makeDimRaw(V(p.capb/2,yR,zt), V(p.capb/2,yl,zt), V(1.2,0,0), `aR=${ft(q.cantR)}`, DC2, "cap"));
+      if(q.dkOn && q.dkH > 1e-9)
+        L.add(makeDimRaw(V(-p.capb/2,-yl,zt), V(-p.capb/2,-yl,zt+q.dkH), V(-1.0,0,0), `挡块h=${ft(q.dkH)}`, DC2, "cap"));
     }
     L.add(makeDimRaw(V(-q.a1/2,-q.b1/2,0), V(-q.a1/2,-q.b1/2,-p.fh1), V(0,-1.6,0), `fh1=${ft(p.fh1)}`, DC, "fd1"));
     if(p.useFd2) L.add(makeDimRaw(V(-q.a2/2,-q.b2/2,-p.fh1), V(-q.a2/2,-q.b2/2,-q.fdT), V(0,-1.6,0), `fh2=${ft(p.fh2)}`, DC, "fd2"));
@@ -1024,9 +1084,11 @@ function renderTable(p, q){
     `<td>${mt||"—"}</td><td class="num">${f(Math.abs(val),3)}</td><td>${unit}</td></tr>`);
   const isRect = p.type==="实体矩形桥墩";
   if(p.useCap)
-    add("盖梁（墩帽）", q.capCh>1e-9
-      ? `Lc×bc×hc − ch²·bc（两端45°倒角）= ${f(q.capL)}×${f(p.capb)}×${f(p.caph)} − ${f(q.capCh)}²×${f(p.capb)}（倒角扣 ${f(q.capCut,3)}；横桥向长=${f(q.capBase)}墩身横桥向尺寸+2×悬出${f(p.cape)}）`
-      : `Lc×bc×hc = ${f(q.capL)}×${f(p.capb)}×${f(p.caph)}（横桥向长=${f(q.capBase)}墩身横桥向尺寸+2×悬出${f(p.cape)}；等高矩形断面）`, q.V_cap, "m³", mat("matCap"));
+    add("盖梁（墩帽）", (q.capHe < q.capHm - 1e-9 && (q.cantL > 1e-9 || q.cantR > 1e-9))
+      ? `变截面：V=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]＝${f(p.capb)}×[${f(q.capHm)}×${f(q.capL-q.cantL-q.cantR)}＋(${f(q.capHm)}+${f(q.capHe)})/2×(${f(q.cantL)}+${f(q.cantR)})]（Lc=${f(q.capL)} 直接输入；跨中高 ${f(q.capHm)}、端部高 ${f(q.capHe)}）`
+      : `Lc×bc×hc＝${f(q.capL)}×${f(p.capb)}×${f(q.capHm)}（等高矩形断面，Lc=${f(q.capL)} 直接输入）`, q.V_cap, "m³", mat("matCap"));
+  if(p.useCap && q.dkOn && q.V_dk > 1e-12)
+    add("挡块", `2×(b上+b下)/2×h挡×bc＝2×(${f(q.dkWT)}+${f(q.dkWB)})/2×${f(q.dkH)}×${f(p.capb)}（两端顶面各一个，沿 bc 全宽贯通）`, q.V_dk, "m³", mat("matCap"));
   if(isRect)
     add("墩身", `Lp×Wp×H = ${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}（实体矩形，竖直面）`, q.V_pier, "m³", mat("matPier"));
   else
@@ -1034,7 +1096,7 @@ function renderTable(p, q){
   add("基础一层", `${f(q.a1)}×${f(q.b1)}×${f(p.fh1)}（墩身尺寸+每侧襟边 ${f(p.c1)}）`, q.V_fd1, "m³", mat("matFd"));
   if(p.useFd2)
     add("基础二层", `${f(q.a2)}×${f(q.b2)}×${f(p.fh2)}（一层边长+每侧襟边 ${f(p.c2)}）`, q.V_fd2, "m³", mat("matFd"));
-  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">${p.useCap?"盖梁+":""}墩身+基础一层${p.useFd2?"+基础二层":""}</td><td>—</td>`+
+  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">${p.useCap?(q.dkOn&&q.V_dk>1e-12?"盖梁+挡块+":"盖梁+"):""}墩身+基础一层${p.useFd2?"+基础二层":""}</td><td>—</td>`+
     `<td class="num">${f(q.total,3)}</td><td>m³</td></tr>`);
   const sl = m => m>0 ? `${Number(f(m,2))}:1` : "竖直";
   rows.push(`<tr class="sep"><td colspan="5">开挖（不计入圬工）</td></tr>`);
@@ -1048,8 +1110,8 @@ function renderTable(p, q){
     `② 实体矩形桥墩：墩身四面的竖直面（无放坡），平面断面=墩身长 Lp（纵桥向）×墩身宽 Wp（横桥向），体积=断面×墩身高 H；`,
     `③ 圆柱式桥墩：n 根直径 d 的圆柱沿横桥向单排布置，相邻圆柱中心距 s；体积=n×π×d²/4×H；最外侧圆柱外缘距 Wd=(n−1)×s+d；`,
     `④ 扩大基础边长：一层平面=墩身尺寸（矩形取长宽、圆柱取最外侧圆柱外缘距 Wd）+每侧襟边 c1；设第二层时平面=一层边长+每侧襟边 c2，自上而下分层；`,
-    `⑤ 盖梁（墩帽）：等高断面，横桥向长 Lc＝墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc，坐于墩顶（墩顶即盖梁底面）；端部下角可设 45° 倒角 ch（左右对称各一处、只输一边尺寸，0=直角），倒角三棱柱沿 bc 全宽贯通，两端合计扣减体积＝2×½ch²×bc＝ch²·bc；ch 生效值≤min(hc, ec)，超出时按限值取用；`,
-    `⑥ 体积：盖梁=Lc×bc×hc−ch²·bc（设倒角时）；基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=盖梁+墩身+基础各层；`,
+    `⑤ 盖梁（墩帽）：变截面断面，横桥向总长 Lc 直接输入（宜＝墩身横桥向尺寸＋左右悬臂），顺桥向厚度 bc；跨中高 hc、两端高 he（生效值≤hc），坐于墩顶（墩顶即盖梁底面）；左右悬臂段（梁端→变高点，长 aL/aR）底面自端部斜向上抬至中部高；两端顶面可设挡块（是否设置挡块=是时）：高 h挡、断面梯形（下部宽→上部宽），沿 bc 全宽贯通，两端各一个；`,
+    `⑥ 体积：盖梁=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]（变截面）或 Lc×bc×hc（等高 he=hc 时）；挡块=2×(b上+b下)/2×h挡×bc；基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=盖梁+挡块+墩身+基础各层；`,
     `⑦ 柱中心距小于直径时按直径取值（避免柱体重叠）；根数按整数取值；`,
     `⑧ 开挖：坑底平面=最底层基础轮廓（矩形墩身取长宽、圆柱取 Wd，含襟边）+每侧工作宽度 c，坑底=基础底面（标高0.000，即坐标原点所在面）；现状地面标高=坑底标高+开挖总高度 H挖；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
     `土/石方量采用**分段拟棱台体积公式** V=∑hᵢ/6·(A下+4A中+A上)（以每级平台与石土界面为分段点，段内断面面积随高度线性外放、为高度的二次函数，故该公式解析精确）。经典棱台公式 V=h/3·(S₁+S₂+√S₁S₂) 仅当顶底面相似时精确，本坑底为不等边矩形（顶底不相似），套用会产生系统性偏小，故本表不用经典公式；三维网格体积独立测量与拟棱台公式结果一致，已相互印证。`
@@ -1066,7 +1128,7 @@ function calcCheck(p, q){
   const aB = p.useFd2 ? q.a2 : q.a1;         /* 基底纵桥向长（弯矩方向） */
   const bB = p.useFd2 ? q.b2 : q.b1;         /* 基底横桥向长 */
   c.aB = aB; c.bB = bB; c.A = aB*bB;
-  c.Gc = q.V_cap  * p.gamC;                  /* 盖梁自重（不设盖梁时为0） */
+  c.Gc = (q.V_cap + q.V_dk) * p.gamC;        /* 盖梁自重（含两端挡块；不设盖梁时为0） */
   c.Gp = q.V_pier * p.gamC;
   c.Gf = q.V_fd   * p.gamC;
   c.Nk = p.Nk;
@@ -1110,7 +1172,9 @@ function renderCheck(p, q){
   sep("一、竖向力（标准值）");
   if(p.useCap)
     row("盖梁自重 Gc",
-      `V×γc＝Lc×bc×hc×γc＝${f(q.capL,2)}×${f(p.capb,2)}×${f(p.caph,2)}×${f(p.gamC,1)}`,
+      p.dkOn && q.V_dk > 1e-12
+        ? `(V盖＋V挡)×γc＝${f(q.V_cap + q.V_dk,3)}×${f(p.gamC,1)}（盖梁 V=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]、挡块 V=2×(b上+b下)/2×h挡×bc）`
+        : `V×γc＝${f(q.V_cap,3)}×${f(p.gamC,1)}（盖梁 V=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]）`,
       c.Gc, "kN");
   if(p.type==="实体矩形桥墩")
     row("墩身自重 Gp", `Lp×Wp×H×γc＝${f(p.Lp,2)}×${f(p.Wp,2)}×${f(p.H,2)}×${f(p.gamC,1)}`, c.Gp, "kN");
@@ -1140,7 +1204,7 @@ function renderCheck(p, q){
   /* ---- 四、抗倾覆 ---- */
   sep("四、抗倾覆稳定（绕基底前趾，即纵桥向最外边缘）");
   row("水平力至基底力臂 hH",
-    `＝模型顶 ${f(c.topZ,2)}（墩高 ${f(p.H,2)}${p.useCap?"＋盖梁高 "+f(p.caph,2):""}）＋dH ${f(p.dH,2)}＋基础总厚 ${f(q.fdT,2)}`,
+    `＝模型顶 ${f(c.topZ,2)}（墩高 ${f(p.H,2)}${p.useCap?"＋盖梁中部高 "+f(p.caph,2):""}）＋dH ${f(p.dH,2)}＋基础总厚 ${f(q.fdT,2)}`,
     c.hH, "m");
   row("倾覆力矩 ΣM倾", `＝Hk×hH＝${f(c.Hk,1)}×${f(c.hH,3)}`, c.Mo, "kN·m");
   row("稳定力矩 ΣM稳", `＝ΣV×a/2＝${f(c.Vsum,1)}×${f(c.aB,2)}/2（a＝基底纵桥向长，竖向力过基底中心）`, c.Ms, "kN·m");
@@ -1175,7 +1239,6 @@ function rebuild(){
   const p = readP(), q = calcQ(p);
   try{
     $("Wdshow").value = f(q.Wd);
-    $("capLshow").value = p.useCap ? f(q.capL) : "—";
     $("f1ABshow").value = `${f(q.a1)}×${f(q.b1)}`;
     $("f2ABshow").value = p.useFd2 ? `${f(q.a2)}×${f(q.b2)}` : "—";
     $("excHr").value = f(q.excHr);
@@ -1204,19 +1267,263 @@ function rebuild(){
   }
 }
 
+/* ================= 导出 Word（.docx）：工程量表 + 稳定与承载力验算表 + 计算约定 ================= */
+const crcTab = (function(){
+  const t = new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c = n;
+    for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(u8){
+  let c = 0xFFFFFFFF;
+  for(let i=0;i<u8.length;i++) c = crcTab[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+/* 极简 ZIP 打包（仅 STORE 不压缩）：docx 允许，省掉 pako/JSZip 依赖 */
+function zipStore(files){
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  files.forEach(fl => {
+    const name = enc.encode(fl.name), data = fl.data, crc = crc32(data);
+    const lh = new Uint8Array(30 + name.length), dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true); dv.setUint16(10, 0, true); dv.setUint16(12, 0x21, true);
+    dv.setUint32(14, crc, true); dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+    dv.setUint16(26, name.length, true); dv.setUint16(28, 0, true);
+    lh.set(name, 30);
+    chunks.push(lh, data);
+    const ch = new Uint8Array(46 + name.length), dv2 = new DataView(ch.buffer);
+    dv2.setUint32(0, 0x02014b50, true); dv2.setUint16(4, 20, true); dv2.setUint16(6, 20, true);
+    dv2.setUint16(8, 0x0800, true); dv2.setUint16(10, 0, true); dv2.setUint16(12, 0, true);
+    dv2.setUint16(14, 0x21, true); dv2.setUint32(16, crc, true);
+    dv2.setUint32(20, data.length, true); dv2.setUint32(24, data.length, true);
+    dv2.setUint16(28, name.length, true); dv2.setUint16(30, 0, true); dv2.setUint16(32, 0, true);
+    dv2.setUint16(34, 0, true); dv2.setUint16(36, 0, true); dv2.setUint32(38, 0, true);
+    dv2.setUint32(42, offset, true);
+    ch.set(name, 46);
+    central.push(ch);
+    offset += lh.length + data.length;
+  });
+  let cdSize = 0; central.forEach(c => { cdSize += c.length; });
+  const eocd = new Uint8Array(22), dv3 = new DataView(eocd.buffer);
+  dv3.setUint32(0, 0x06054b50, true); dv3.setUint16(4, 0, true); dv3.setUint16(6, 0, true);
+  dv3.setUint16(8, files.length, true); dv3.setUint16(10, files.length, true);
+  dv3.setUint32(12, cdSize, true); dv3.setUint32(16, offset, true); dv3.setUint16(20, 0, true);
+  const all = chunks.concat(central, [eocd]);
+  let total = 0; all.forEach(a => { total += a.length; });
+  const out = new Uint8Array(total);
+  let p = 0; all.forEach(a => { out.set(a, p); p += a.length; });
+  return out;
+}
+const xmlEsc = s => String(s === null || s === undefined ? "" : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* 一个文本 run（可选加粗/上下标/字号） */
+function wRun(text, o){
+  if(text === null || text === undefined || text === "") return "";
+  const op = o || {};
+  let pr = "";
+  if(op.b) pr += "<w:b/>";
+  if(op.va) pr += '<w:vertAlign w:val="' + op.va + '"/>';
+  if(op.sz) pr += '<w:sz w:val="' + op.sz + '"/><w:szCs w:val="' + op.sz + '"/>';
+  return "<w:r>" + (pr ? "<w:rPr>" + pr + "</w:rPr>" : "") +
+         '<w:t xml:space="preserve">' + xmlEsc(text) + '</w:t></w:r>';
+}
+function wPara(inline, o){
+  const op = o || {};
+  let pPr = '<w:pPr><w:spacing w:before="' + (op.before || 0) + '" w:after="' + (op.after || 0) +
+            '" w:line="240" w:lineRule="auto"/>';
+  if(op.align) pPr += '<w:jc w:val="' + op.align + '"/>';
+  pPr += '</w:pPr>';
+  return "<w:p>" + pPr + (inline || wRun("")) + "</w:p>";
+}
+/* 单元格 DOM → Word 行内序列：sub/sup 转上下标，b/strong/th 加粗，其余按纯文本输出 */
+function inlineOf(nd, bold){
+  let out = "";
+  const kids = (nd && nd.childNodes) ? nd.childNodes : [];
+  for(let i=0;i<kids.length;i++){
+    const k = kids[i];
+    if(k.nodeType === 3){ out += wRun(k.nodeValue, {b:bold}); continue; }
+    if(k.nodeType !== 1) continue;
+    const tag = (k.tagName || "").toLowerCase();
+    if(tag === "sub"){ out += wRun(k.textContent, {b:bold, va:"subscript"}); continue; }
+    if(tag === "sup"){ out += wRun(k.textContent, {b:bold, va:"superscript"}); continue; }
+    if(tag === "br"){ out += wRun(" "); continue; }
+    out += inlineOf(k, bold || tag === "b" || tag === "strong" || tag === "th");
+  }
+  if(!kids.length) out += wRun(nd && nd.textContent ? nd.textContent : "", {b:bold});
+  return out;
+}
+/* 表格单元格 */
+function wCell(inline, widthTw, o){
+  const op = o || {};
+  let tcPr = '<w:tcPr><w:tcW w:w="' + widthTw + '" w:type="dxa"/>';
+  if(op.span) tcPr += '<w:gridSpan w:val="' + op.span + '"/>';
+  if(op.fill) tcPr += '<w:shd w:val="clear" w:color="auto" w:fill="' + op.fill + '"/>';
+  tcPr += '<w:tcMar><w:top w:w="28" w:type="dxa"/><w:left w:w="57" w:type="dxa"/>' +
+          '<w:bottom w:w="28" w:type="dxa"/><w:right w:w="57" w:type="dxa"/></w:tcMar>' +
+          '<w:vAlign w:val="center"/></w:tcPr>';
+  return "<w:tc>" + tcPr + wPara(inline, op.para) + "</w:tc>";
+}
+/* 一个 tbody → 一张 Word 表格（表头重复、分隔行跨列、合计行浅底） */
+function wTable(tb, colw, aligns){
+  const sum = colw.reduce((s,w)=>s+w, 0);
+  const rows = tb ? tb.rows : [];
+  const body = [];
+  let n = 0;
+  for(let i=0;i<rows.length;i++){
+    const tr = rows[i], cls = tr.className || "", tds = tr.cells || [];
+    if(!tds.length) continue;
+    if(cls.indexOf("sep") >= 0){
+      body.push('<w:tr><w:trPr><w:tblHeader/></w:trPr>' +
+        wCell(wRun(tds[0].textContent || "", {b:true, sz:19}), sum,
+              {span:colw.length, fill:"F1F5F9", para:{before:120, after:40}}) + '</w:tr>');
+      continue;
+    }
+    const isTot = cls.indexOf("total") >= 0;
+    let cells = "";
+    for(let k=0;k<tds.length && k<colw.length;k++)
+      cells += wCell(inlineOf(tds[k], isTot), colw[k],
+                     {fill: isTot ? "F8FAFC" : null, para:{align: aligns[k] || "left"}});
+    body.push('<w:tr>' + cells + '</w:tr>');
+    n++;
+  }
+  const tblPr = '<w:tblPr><w:tblW w:w="' + sum + '" w:type="dxa"/><w:tblBorders>' +
+    ['top','left','bottom','right','insideH','insideV'].map(s =>
+      '<w:' + s + ' w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>').join('') +
+    '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>' +
+    '<w:tblGrid>' + colw.map(w => '<w:gridCol w:w="' + w + '"/>').join('') + '</w:tblGrid>';
+  return {xml: '<w:tbl>' + tblPr + body.join('') + '</w:tbl>', n: n};
+}
+/* 说明块（一串 div/b）→ 段落序列 */
+function wNotes(el, size){
+  let out = "";
+  if(!el) return out;
+  const kids = el.childNodes || [];
+  for(let i=0;i<kids.length;i++){
+    const nd = kids[i];
+    if(nd.nodeType === 3){
+      const t = (nd.nodeValue || "").trim();
+      if(t) out += wPara(wRun(t, {sz:size}), {after:40});
+      continue;
+    }
+    if(nd.nodeType !== 1) continue;
+    const tag = (nd.tagName || "").toLowerCase();
+    const txt = (nd.textContent || "").trim();
+    if(!txt) continue;
+    out += wPara(wRun(txt, {b: tag === "b" || tag === "strong", sz:size}), {after:40});
+  }
+  return out;
+}
+function exportWord(){
+  const projEl = $("projName");
+  const proj = (projEl && projEl.value ? String(projEl.value) : "桥墩").trim() || "桥墩";
+  const tbQ = $("resultBody"), tbC = $("checkBody");
+  if(!tbC || !tbC.rows || !tbC.rows.length){ alert("验算表尚未生成，无法导出。"); return; }
+  const p = readP(), q = calcQ(p);
+  const now = new Date();
+  const stamp = now.getFullYear() + "-" + ("0"+(now.getMonth()+1)).slice(-2) + "-" + ("0"+now.getDate()).slice(-2) +
+                " " + ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2);
+  const isRect = p.type === "实体矩形桥墩";
+  const capTxt = p.useCap
+    ? `盖梁 Lc ${f(q.capL,2)}×bc ${f(p.capb,2)}，跨中高 hc ${f(q.capHm,2)}、端部高 he ${f(q.capHe,2)}，悬臂 aL ${f(q.cantL,2)}/aR ${f(q.cantR,2)}` +
+      (q.dkOn ? `，两端挡块 h挡 ${f(q.dkH,2)}（上部宽 ${f(q.dkWT,2)}／下部宽 ${f(q.dkWB,2)}）` : "，不设挡块")
+    : "不设盖梁";
+  const fdTxt = `基础${p.useFd2 ? "两层" : "一层"}：一层 ${f(q.a1,2)}×${f(q.b1,2)}×${f(p.fh1,2)}` +
+    (p.useFd2 ? `，二层 ${f(q.a2,2)}×${f(q.b2,2)}×${f(p.fh2,2)}` : "");
+  const pierTxt = isRect ? `墩身 Lp ${f(p.Lp,2)}×Wp ${f(p.Wp,2)}×H ${f(p.H,2)}`
+                         : `墩身 ${p.n} 根圆柱 d ${f(p.d,2)}，中心距 ${f(p.s,2)}，H ${f(p.H,2)}`;
+  const head =
+    wPara(wRun(proj + " — 桥墩工程量与稳定、承载力验算书", {b:true, sz:32}), {after:60}) +
+    wPara(wRun("一、主要参数：" + p.type + "；" + pierTxt + "；" + capTxt + "；" + fdTxt +
+               `；混凝土容重 γc ${f(p.gamC,1)} kN/m³。`, {sz:18}), {after:20}) +
+    wPara(wRun(`二、荷载与地基：上部结构竖向反力 Nk ${f(p.Nk,1)} kN；顺桥向制动力 Hk ${f(p.Hk,1)} kN（作用点=模型顶+dH ${f(p.dH,2)} m）；` +
+               `基底摩擦系数 μ ${f(p.mu,2)}；地基承载力 fa ${f(p.fa,1)} kPa（${p.fndRock ? "岩石地基" : "土地基"}）。`, {sz:18}), {after:20}) +
+    wPara(wRun("三、坐标系：原点=基础最低面（最下层基础底面）中心，标高以基础底面=0.000 计（墩底标高=基础总厚）；" +
+               "基础底面为验算截面，抗倾覆绕基底纵桥向最外边缘。", {sz:16}), {after:60}) +
+    wPara(wRun("导出时间 " + stamp, {sz:16}), {after:120});
+
+  const tQ = wTable(tbQ, [1800, 5600, 1100, 1100, 700], ["left","left","left","right","center"]);
+  const tC = wTable(tbC, [1900, 5400, 1150, 800, 1050], ["left","left","right","center","center"]);
+  const bodyXml =
+    wPara(wRun("表1  工程量计算表", {b:true, sz:22}), {before:120, after:60}) + tQ.xml +
+    wPara(wRun("")) +
+    wPara(wRun("表2  稳定与承载力验算（标准值组合）", {b:true, sz:22}), {before:160, after:60}) + tC.xml +
+    wPara(wRun("")) +
+    wPara(wRun("计算约定与说明", {b:true, sz:22}), {before:160, after:60}) +
+    wNotes($("assumpNote"), 17) +
+    wPara(wRun("")) +
+    wNotes($("checkNote"), 17);
+  const sectPr = '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>' +
+    '<w:pgMar w:top="1021" w:right="850" w:bottom="1021" w:left="850" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr>';
+  const doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>' +
+    head + bodyXml + wPara(wRun("")) + sectPr + '</w:body></w:document>';
+  const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults>' +
+    '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math" w:eastAsia="宋体" w:cs="Times New Roman"/>' +
+    '<w:sz w:val="18"/><w:szCs w:val="18"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>' +
+    '<w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
+    '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:qFormat/></w:style>' +
+    '</w:styles>';
+  const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+    '</Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>';
+  const drels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '</Relationships>';
+  const enc = new TextEncoder();
+  let bin;
+  try{
+    bin = zipStore([
+      {name: "[Content_Types].xml",       data: enc.encode(ct)},
+      {name: "_rels/.rels",               data: enc.encode(rels)},
+      {name: "word/_rels/document.xml.rels", data: enc.encode(drels)},
+      {name: "word/document.xml",         data: enc.encode(doc)},
+      {name: "word/styles.xml",           data: enc.encode(styles)}
+    ]);
+  }catch(err){
+    alert("生成 docx 失败：" + (err && err.message ? err.message : err));
+    return;
+  }
+  const blob = new Blob([bin], {type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = proj + "-验算书.docx";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
 function exportCSV(){
   const p = readP(), q = calcQ(p);
   const lines = [];
   lines.push(`${$("projName").value || "桥墩"} - 桥墩工程量计算表`);
-  lines.push(`标高以基础底面(坐标原点z=0)=0.000,墩底标高=基础总厚;绝对标高=相对标高+高程基准绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;盖梁长=墩身横向尺寸+2×悬出;盖梁端部45°倒角ch每侧对称(ch=0为直角);单位m`);
+  lines.push(`标高以基础底面(坐标原点z=0)=0.000,墩底标高=基础总厚;绝对标高=相对标高+高程基准绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;盖梁为变截面(跨中高hc、端部高he、左右悬臂aL/aR);两端顶面挡块(梯形断面 上部宽/下部宽,沿bc贯通);单位m`);
   lines.push(`项目,计算式,材料,数量,单位`);
   const qq = s => `"${String(s).replace(/"/g,'""')}"`;
   const row = (n2,fx,v,u,mt) => lines.push([qq(n2),qq(fx),qq(mt||""),f(Math.abs(v),3),qq(u)].join(","));
   const mt = id => { try{ return $(id).value || ""; }catch(_){ return ""; } };
-  if(p.useCap)
-    row("盖梁（墩帽）", q.capCh>1e-9
-      ? `${f(q.capL)}×${f(p.capb)}×${f(p.caph)}−${f(q.capCh)}^2×${f(p.capb)}(两端45°倒角ch=${f(q.capCh)},横桥向长×纵桥向宽×高−倒角扣减)`
-      : `${f(q.capL)}×${f(p.capb)}×${f(p.caph)}(横桥向长×纵桥向宽×高, +2×悬出${f(p.cape)})`, q.V_cap, "m3", mt("matCap"));
+  if(p.useCap){
+    row("盖梁（墩帽）", (q.capHe < q.capHm - 1e-9 && (q.cantL > 1e-9 || q.cantR > 1e-9))
+      ? `bc×[hc×(Lc−aL−aR)+(hc+he)/2×(aL+aR)]=${f(p.capb)}×[${f(q.capHm)}×${f(Math.max(q.capL-q.cantL-q.cantR,0))}+(${f(q.capHm)}+${f(q.capHe)})/2×(${f(q.cantL)}+${f(q.cantR)})](变截面:横桥向长Lc×厚度bc,跨中高hc/端部高he,悬臂aL/aR)`
+      : `Lc×bc×hc=${f(q.capL)}×${f(p.capb)}×${f(q.capHm)}(等高矩形断面)`, q.V_cap, "m3", mt("matCap"));
+    if(q.dkOn && q.V_dk > 1e-12)
+      row("挡块", `2×(b上+b下)/2×h挡×bc=2×(${f(q.dkWT)}+${f(q.dkWB)})/2×${f(q.dkH)}×${f(p.capb)}(两端顶面各一个,沿bc贯通)`, q.V_dk, "m3", mt("matCap"));
+  }
   if(p.type==="实体矩形桥墩")
     row("墩身", `${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}(实体矩形)`, q.V_pier, "m3", mt("matPier"));
   else
@@ -1228,7 +1535,7 @@ function exportCSV(){
     .map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+") || "0";
   row("土方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(false)}, 坑底${f(q.excLa)}×${f(q.excWb)}(基础轮廓+工作宽度每侧${f(p.excW)}), 坡比(竖:横)${sl0(p.excMs)}, 分级高度${f(p.excHst,2)}/平台宽${f(p.excB,2)}`, q.V_exSoil, "m3");
   row("石方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(true)}, 坑底同上, 坡比(竖:横)${sl0(p.excMr)}`, q.V_exRock, "m3");
-  row("圬工合计", (p.useCap?"盖梁+":"")+"墩身+基础一层"+(p.useFd2?"+基础二层":""), q.total, "m3");
+  row("圬工合计", (p.useCap?(q.dkOn&&q.V_dk>1e-12?"盖梁+挡块+":"盖梁+"):"")+"墩身+基础一层"+(p.useFd2?"+基础二层":""), q.total, "m3");
   lines.push("说明:三维参数化估算,最终以施工图工程数量表为准");
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
   const a = document.createElement("a");

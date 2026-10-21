@@ -17,7 +17,8 @@ const vals = {
   fh1:"1", c1:"0.5", fh2:"1", c2:"0.5",
   matPier:"C30砼", matFd:"C25砼",
   excMs:"1", excMr:"1", excW:"0.5", excH:"3", excHs:"1", excHr:"", excHst:"5", excB:"1",
-  caph:"1.2", capb:"2.5", cape:"0.5", capch:"0", capLshow:"",
+  capL:"7", capb:"2.5", caph:"1.2", caphe:"1.2", cantL:"0", cantR:"0",
+  dkH:"0.3", dkWT:"0.2", dkWB:"0.2",
   Nk:"3000", Hk:"300", dH:"0.25", gamC:"24", mu:"0.3", fa:"500"
 };
 const checks = {
@@ -30,6 +31,7 @@ for(const k in vals) els[k] = { value: vals[k], checked:true, innerHTML:"", styl
 for(const k in checks) els[k] = { value:"", checked:checks[k], innerHTML:"", style:{},
   addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.pierType = { value:"实体矩形桥墩", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.dkOn = { value:"否", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.fldRect = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.fldCyl  = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.projName = { value:"桥墩", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
@@ -128,9 +130,11 @@ near(q.V_pier, 120, 1e-6, "A 墩身体积 2.5×6×8=120");
 near(q.a1, 3.5, 1e-9, "A 一层边长(纵)=Lp+2c1=3.5");
 near(q.b1, 7, 1e-9, "A 一层边长(横)=Wp+2c1=7");
 near(q.V_fd, 24.5, 1e-6, "A 基础体积（1层）=24.5");
-near(q.capL, 7, 1e-9, "A 盖梁长=Wp+2×ec=7");
-near(q.capCh, 0, 1e-9, "A 默认无倒角 ch=0");
+near(q.capL, 7, 1e-9, "A 盖梁总长 Lc=7（直接输入）");
+near(q.capHm, 1.2, 1e-9, "A 盖梁中部高 hc=1.2");
+near(q.capHe, 1.2, 1e-9, "A 端部高 he=hc（等高矩形断面）");
 near(q.V_cap, 21, 1e-9, "A 盖梁体积=Lc×bc×hc=7×2.5×1.2=21");
+near(q.V_dk, 0, 1e-12, "A 挡块=否 → V_dk=0");
 near(q.total, 144.5+21, 1e-6, "A 圬工合计=盖梁21+墩身120+基础24.5=165.5");
 api.renderTable(p, q);
 let tbl = els.resultBody.innerHTML;
@@ -148,29 +152,53 @@ near(bbF.max.x - bbF.min.x, 3.5, 1e-6, "A 基础纵向边长=3.5");
 near(bbF.max.y - bbF.min.y, 7, 1e-6, "A 基础横向边长=7");
 isTrue(els.assumpNote.innerHTML.indexOf("出错")<0, "A 无错误提示");
 
-/* ===== 工况A2：盖梁端部 45° 倒角（左右对称，只输一边） ===== */
-els.capch.value = "0.3";
+/* ===== 工况A2：盖梁变截面（跨中高 hc、端部高 he、左右悬臂 aL/aR）+ 两端挡块 =====
+   取模板默认值口径：Lc=13、bc=1.8、hc=1.5、he=0.6、aL=aR=1.5、挡块 h=0.3（上宽0.2/下宽0.2）
+   V_cap = bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)] = 1.8×[1.5×10＋1.05×3] = 1.8×18.15 = 32.67
+   V_dk  = 2×(wt+wb)/2×h×bc = 2×0.2×0.3×1.8 = 0.216 */
+els.capL.value = "13"; els.capb.value = "1.8"; els.caph.value = "1.5"; els.caphe.value = "0.6";
+els.cantL.value = "1.5"; els.cantR.value = "1.5";
+els.dkOn.value = "是"; els.dkH.value = "0.3"; els.dkWT.value = "0.2"; els.dkWB.value = "0.2";
 p = api.readP(), q = api.calcQ(p);
-near(q.capCh, 0.3, 1e-9, "A2 倒角生效值 ch=0.3");
-near(q.capCut, 0.09*2.5, 1e-9, "A2 倒角扣减=ch²·bc=0.3²×2.5=0.225");
-near(q.V_cap, 21-0.225, 1e-9, "A2 盖梁体积=21−0.225=20.775");
-try{ api.buildModel(p, q); }catch(e){ console.error("FAIL: buildModel(倒角) 异常:", e.message); process.exit(1); }
+near(q.capL, 13, 1e-9, "A2 盖梁总长 Lc=13 直接输入");
+near(q.capHm, 1.5, 1e-9, "A2 中部高 hc=1.5");
+near(q.capHe, 0.6, 1e-9, "A2 端部高 he=0.6");
+near(q.cantL + q.cantR, 3, 1e-9, "A2 左右悬臂各 1.5");
+near(q.V_cap, 1.8*(1.5*10 + (1.5+0.6)/2*3), 1e-9, "A2 盖梁体积=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]=32.67");
+near(q.V_dk, 0.216, 1e-9, "A2 挡块体积=2×(0.2+0.2)/2×0.3×1.8=0.216");
+near(q.total, q.V_pier + q.V_cap + q.V_dk + q.V_fd, 1e-9, "A2 圬工合计=墩身+盖梁+挡块+基础");
+try{ api.buildModel(p, q); }catch(e){ console.error("FAIL: buildModel(变截面盖梁+挡块) 异常:", e.message); process.exit(1); }
 parts = partsOf();
-isTrue((parts.cap||[]).length===1, "A2 盖梁1块（倒角拉伸体）");
-const bbCap = bb(parts.cap[0]);
-near(bbCap.min.y, -3.5, 1e-6, "A2 盖梁横向范围不变（y=±Lc/2）");
-near(bbCap.min.z, 8, 1e-6, "A2 盖梁底 z=H=8");
-near(bbCap.max.z, 9.2, 1e-6, "A2 盖梁顶 z=H+hc=9.2");
-near(sumMeshVol(parts.cap), 20.775, 1e-4, "A2 盖梁网格体积=20.775（散度定理，含倒角扣减）");
+isTrue((parts.cap||[]).length===3, "A2 盖梁1块+两端挡块2块（均 part=cap）");
+let bbCap = bb(parts.cap[0]);
+near(bbCap.min.y, -6.5, 1e-6, "A2 盖梁横桥向范围 y=±Lc/2=±6.5");
+near(bbCap.min.z, 8, 1e-6, "A2 盖梁底 z=H=8（平段底坐墩顶）");
+near(bbCap.max.z, 9.5, 1e-6, "A2 盖梁顶 z=H+hc=9.5");
+near(bbCap.max.x - bbCap.min.x, 1.8, 1e-6, "A2 盖梁顺桥向厚度=bc=1.8");
+near(sumMeshVol(parts.cap), 32.67 + 0.216, 1e-3, "A2 网格体积=盖梁32.67+挡块0.216（散度定理，互证）");
+/* 两端梁端高度=he：端部断面 z 范围 = [H+hc−he, H+hc] */
+const capEnds = parts.cap.filter(m=>{
+  const b = bb(m); return (b.max.y - b.min.y) < 0.5;      /* 挡块：横桥向宽 0.2 */
+});
+isTrue(capEnds.length===2, "A2 两个挡块（横桥向宽 0.2）");
+near(bb(capEnds[0]).max.z, 9.5+0.3, 1e-6, "A2 挡块顶 z=盖梁顶+h挡=9.8");
+near(bb(capEnds[0]).min.z, 9.5, 1e-6, "A2 挡块底 z=盖梁顶（坐于盖梁顶面）");
 api.renderTable(p, q);
 tbl = els.resultBody.innerHTML;
-isTrue(tbl.indexOf("45°倒角")>=0 && tbl.indexOf("0.225")>=0, "A2 表格盖梁行列出倒角扣减");
-els.capch.value = "0";
-/* ch 超过 min(hc, ec) 时按限值取用 */
-els.capch.value = "2";
+isTrue(tbl.indexOf("变截面")>=0 && tbl.indexOf("挡块")>=0, "A2 表格含盖梁变截面行与挡块行");
+isTrue(tbl.indexOf("盖梁+挡块+")>=0, "A2 圬工合计标注含挡块");
+/* he > hc 时按 hc 取用（等高）；aL 超长时按 Lc 截断 */
+els.caphe.value = "3";
 p = api.readP(), q = api.calcQ(p);
-near(q.capCh, 0.5, 1e-9, "A2 ch=2 超限 → 生效值取 min(hc=1.2, ec=0.5)=0.5");
-els.capch.value = "0";
+near(q.capHe, 1.5, 1e-9, "A2 he=3 超限 → 生效值取 hc=1.5");
+near(q.V_cap, 1.8*1.5*13, 1e-9, "A2 he=hc 时退化为等高 Lc×bc×hc=35.1");
+els.cantL.value = "20";
+p = api.readP(), q = api.calcQ(p);
+isTrue(q.cantL <= 13 + 1e-9, "A2 aL=20 超限 → 按 Lc 截断（aL≤Lc）");
+isTrue(q.cantL + q.cantR <= 13 + 1e-9, "A2 aL+aR≤Lc（平段长度非负）");
+/* 复原：Lc=7、等高、无悬臂、无挡块，供后续工况沿用 */
+els.capL.value = "7"; els.capb.value = "2.5"; els.caph.value = "1.2"; els.caphe.value = "1.2";
+els.cantL.value = "0"; els.cantR.value = "0"; els.dkOn.value = "否";
 
 /* ===== 工况B：圆柱式（默认 d1.6 n3 s4.5） ===== */
 els.pierType.value = "圆柱式桥墩";
@@ -181,7 +209,7 @@ near(q.a1, 2.6, 1e-9, "B 一层边长(纵)=d+2c1=2.6");
 near(q.b1, 11.6, 1e-9, "B 一层边长(横)=Wd+2c1=11.6");
 near(q.V_fd, 30.16, 1e-6, "B 基础体积=2.6×11.6×1=30.16");
 near(q.total, q.V_pier+30.16+q.V_cap, 1e-9, "B 圬工合计=墩身+基础+盖梁");
-near(q.capL, 11.6, 1e-9, "B 盖梁长=Wd+2×ec=11.6");
+near(q.capL, 7, 1e-9, "B 盖梁长 Lc=7（独立输入，不随墩身横桥向尺寸变化）");
 api.renderTable(p, q);
 tbl = els.resultBody.innerHTML;
 isTrue(tbl.indexOf("π")>=0 && tbl.indexOf("圆柱")>=0, "B 表格含圆柱公式");
@@ -279,12 +307,14 @@ els.excH.value = "3"; els.excHs.value = "1"; els.excB.value = "1";
    模型顶=8+1.2=9.2、hH=9.2+0.25+1=10.45；M倾=300×10.45=3135；M稳=6972×3.5/2=12201 */
 els.pierType.value = "实体矩形桥墩";
 els.useFd2.checked = false; els.useCap.checked = true;
-els.caph.value = "1.2"; els.capb.value = "2.5"; els.cape.value = "0.5";
+els.capL.value = "7"; els.capb.value = "2.5"; els.caph.value = "1.2"; els.caphe.value = "1.2";
+els.cantL.value = "0"; els.cantR.value = "0"; els.dkOn.value = "否";
 els.Nk.value = "3000"; els.Hk.value = "300"; els.dH.value = "0.25"; els.gamC.value = "24";
 els.mu.value = "0.3"; els.fa.value = "500"; els.fndType.value = "土基";
 p = api.readP(), q = api.calcQ(p);
 api.rebuild();
-isTrue(els.capLshow.value === "7.00", "H 盖梁长自动填入 7.00");
+isTrue(els.resultBody.innerHTML.indexOf("Lc=7.00")>=0 || els.resultBody.innerHTML.indexOf("7.00×2.50×1.20")>=0,
+  "H 工程量表盖梁行列出 Lc=7.00（总长直接输入）");
 try{ api.buildModel(p, q); }catch(e){ console.error("FAIL: buildModel(H 盖梁) 异常:", e.message); process.exit(1); }
 parts = partsOf();
 isTrue((parts.cap||[]).length===1, "H 盖梁构件 1 块");
@@ -342,5 +372,21 @@ isTrue(els.checkBody.innerHTML.indexOf("盖梁自重")<0 &&
   "I 不设盖梁时验算表无盖梁行、基底取二层 4.50×8.00");
 els.fndType.value = "土基";
 els.useCap.checked = true; els.useFd2.checked = false;
+
+/* ===== 工况J：导出 .docx 验算书（按钮 + 打包链路） ===== */
+isTrue(tpl.indexOf('稳定与承载力验算（标准值组合）<button class="btnHd no-print" onclick="exportWord()"') >= 0,
+  "J 「稳定与承载力验算」标题内嵌导出按钮（margin-left:auto → 最右）");
+isTrue(tpl.indexOf("导出.docx验算书") >= 0 && tpl.indexOf('title="导出 .docx 验算书') >= 0,
+  "J 按钮文案=导出.docx验算书");
+isTrue(/\.card h2 \.btnHd\{[\s\S]{0,320}background:var\(--accent\);\s*color:#fff/.test(tpl),
+  "J 按钮默认蓝底白字（醒目入口）");
+isTrue(tpl.indexOf('a.download = proj + "-验算书.docx"') >= 0, "J 下载文件名=项目名-验算书.docx");
+isTrue(tpl.indexOf("function crc32(") >= 0 && tpl.indexOf("function zipStore(") >= 0 &&
+       tpl.indexOf("word/document.xml") >= 0 && tpl.indexOf("word/styles.xml") >= 0,
+  "J docx 打包链路齐备（crc32/zipStore/[Content_Types]/document/styles）");
+isTrue(tpl.indexOf("表1  工程量计算表") >= 0 && tpl.indexOf("表2  稳定与承载力验算") >= 0 &&
+       tpl.indexOf('wNotes($("assumpNote")') >= 0 && tpl.indexOf('wNotes($("checkNote")') >= 0,
+  "J 验算书含工程量表、验算表与两段计算约定说明");
+
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail ? 1 : 0);
