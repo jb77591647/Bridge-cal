@@ -903,6 +903,11 @@ isTrue(/color:\s*var\(--ink\)/.test(cssMJ), "行内公式改用正文色 --ink�
 isTrue(/td\.fx\{color:#334155/.test(tpl), "计算式列灰字由 #64748b 加深到 #334155，与公式对比度接近");
 const cssBtnHd = (tpl.match(/\.card h2 \.btnHd\{[^}]*\}/) || [""])[0];
 isTrue(/margin-left:auto/.test(cssBtnHd), "标题栏按钮靠右（margin-left:auto，位于标题最右侧）");
+isTrue(/border:1px solid var\(--line\)/.test(cssBtnHd) && /color:var\(--ink\)/.test(cssBtnHd) &&
+       !/border:1px solid var\(--accent\)/.test(cssBtnHd),
+       "标题栏按钮默认不用蓝色（白底 + 浅灰边 + 正文色，与页头按钮同款）");
+isTrue(/\.card h2 \.btnHd:hover[\s\S]{0,120}?background:var\(--accent\)/.test(tpl),
+       "标题栏按钮仅悬停/聚焦时变蓝（蓝底白字）");
 const hdChk = (tpl.match(/<h2>稳定与承载力验算（标准值组合）[\s\S]{0,400}?<\/h2>/) || [""])[0];
 isTrue(hdChk.indexOf("导出.docx验算书") >= 0, "导出按钮文案为「导出.docx验算书」且位于验算表标题内");
 isTrue(/onclick="exportWord\(\)"/.test(hdChk), "标题栏导出按钮仍调用 exportWord()");

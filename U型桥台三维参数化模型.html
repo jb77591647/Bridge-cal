@@ -25,14 +25,17 @@
     padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;
   }
   .btn:hover{border-color:var(--accent); color:var(--accent);}
-  /* 卡片标题栏最右侧的小按钮（如"导出.docx验算书"），与 h2 同一行、靠右对齐 */
+  /* 卡片标题栏最右侧的小按钮（如"导出.docx验算书"），与 h2 同一行、靠右对齐；
+     默认与页头普通按钮同款（白底 + 浅灰边 + 正文色），只有悬停/聚焦时才变蓝，
+     避免标题栏里常驻一块蓝色抢走表格的视觉重心 */
   .card h2 .btnHd{
     margin-left:auto; flex:0 0 auto; font-family:inherit; font-size:12px; font-weight:600;
-    padding:2px 10px; border:1px solid var(--accent); border-radius:5px;
-    background:#fff; color:var(--accent); cursor:pointer; line-height:1.6;
-    letter-spacing:0; transition:background .12s, color .12s;
+    padding:2px 10px; border:1px solid var(--line); border-radius:5px;
+    background:#fff; color:var(--ink); cursor:pointer; line-height:1.6;
+    letter-spacing:0; transition:background .12s, color .12s, border-color .12s;
   }
-  .card h2 .btnHd:hover{background:var(--accent); color:#fff;}
+  .card h2 .btnHd:hover,
+  .card h2 .btnHd:focus-visible{border-color:var(--accent); background:var(--accent); color:#fff;}
   .layout{display:grid; grid-template-columns:370px 1fr; gap:14px; align-items:start;}
   /* 左侧参数栏：完整展开，不产生内部滚动条/不被裁剪 */
   /* 左侧参数栏：贴顶固定 + 独立滚动（输入下方参数时仍能看到模型） */
