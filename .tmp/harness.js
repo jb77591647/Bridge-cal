@@ -701,11 +701,39 @@ isTrue(ckTbl3.indexOf(`＋${s6All.toFixed(4)}`)>=0 && ckTbl3.indexOf(`−${s6All
 isTrue(ckTbl3.indexOf(`${d1(cAll.Vsum)}/${d2(cAll.A)}`)>=0, "p均行把 A 展开为 14.00×8.00＝112.00 后再代入");
 near(cAll.pMean + s6All, cAll.pMax, 1e-9, "所显示的 6|M|/(B·L²) 与 p最值之差一致（±" + s6All.toFixed(4) + "）");
 isTrue(ckTbl3.indexOf("N/A，")<0, "承载力段不再出现 N/A 占位符");
+/* 两个「合力作用点」的口径：竖向合力点 vs 基底反力合力点 */
+const SxAll = cAll.items.reduce((a,it)=>a + it.W*it.z, 0) + Number(els.Nk.value)*cAll.zN
+            + cAll.EaV1*cAll.xEa1 + cAll.EaV2*cAll.xEa2;
+near(cAll.zbar, SxAll/cAll.Vsum, 1e-9, "竖向合力作用点 = ΣWi·xi/ΣV（含 Nk 与 EaV 各按自身作用点）");
+isTrue(ckTbl3.indexOf(`ΣWi·xi/ΣV＝${d1(SxAll)}/${d1(cAll.Vsum)}`)>=0,
+       "表内给出竖向合力作用点的加权平均代入值（非只列结果）");
+isTrue(ckTbl3.indexOf(`距基底前趾 ${d3(cAll.zbar - cAll.zF)}`)>=0 &&
+       ckTbl3.indexOf(`距后趾 ${d3(cAll.zB - cAll.zbar)}`)>=0,
+       "表内同时给出距前趾 3.699 / 距后趾 4.301，与 x=2.699 自洽（差值与 L=8 吻合）");
+isTrue(ckTbl3.indexOf("(x前趾＋x后趾)/2")>=0 && ckTbl3.indexOf(`(${d3(cAll.zF)}＋${d3(cAll.zB)})/2`)>=0,
+       "表内给出基底形心 = (前趾 x ＋ 后趾 x)/2 的代入值");
+near(cAll.zc, (cAll.zF + cAll.zB)/2, 1e-12, "基底形心 x = (−1.000＋7.000)/2 = 3.000");
+isTrue(ckTbl3.indexOf(`x形心−e＝${d3(cAll.zc)}−${d3(Math.abs(cAll.e))}`)>=0,
+       "表内给出基底反力合力作用点 = x形心−e");
+near(cAll.zc - cAll.e - cAll.zF, cAll.Lb/2 - cAll.e, 1e-12,
+     "基底反力合力点距前趾 = L/2 − e = 4.000 − 0.549 = 3.451（与竖向合力点 3.699 不是同一个点）");
 els.autoHk.checked = false; els.Hk.value = "100";
 
 if(process.env.DUMP){
   const k = ["Vsum","zbar","zc","Wb","Lb","A","Mc","Mh","M","e","eLim","pMean","pMax","pMin","MsF","K0","Kc"];
   console.log("DUMP " + k.map(x => x + "=" + (v => isFinite(v) ? v.toFixed(8) : "?") (cAll[x])).join(" "));
+  if(process.env.DUMP === "items"){
+    console.log("ITEMS  zc=" + cAll.zc.toFixed(4) + "  zF=" + cAll.zF.toFixed(4) + "  zB=" + cAll.zB.toFixed(4));
+    cAll.items.forEach(it => console.log(
+      "  " + String(it.n || it.name || "?").padEnd(10) +
+      " W=" + it.W.toFixed(3).padStart(10) +
+      " x=" + it.z.toFixed(4).padStart(8) +
+      " W*x=" + (it.W*it.z).toFixed(1).padStart(11) +
+      " arm=" + (it.z - cAll.zF).toFixed(4).padStart(8) +
+      " M稳=" + (it.W*(it.z - cAll.zF)).toFixed(1).padStart(11)));
+    console.log("  Nk        W=" + els.Nk.value + " x=" + cAll.zN.toFixed(4) +
+      "  EaV1 x=" + cAll.xEa1.toFixed(4) + " EaV2 x=" + cAll.xEa2.toFixed(4));
+  }
 }
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail?1:0);
