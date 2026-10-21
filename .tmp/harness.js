@@ -896,6 +896,21 @@ isTrue(zipProbe[0] === 0x50 && zipProbe[1] === 0x4B && zipProbe[2] === 0x03 && z
 isTrue(tpl.indexOf('id="xslMml2Omml"') > 0 && tpl.indexOf("/*__MATHJAX__*/") > 0 &&
        tpl.indexOf("/*__MML2OMML__*/") > 0, "模板保留 MathJax 与 MML2OMML 注入点");
 
+/* ===== 可读性：公式字号 +1px、颜色转为正文色；导出按钮移到验算表标题最右侧 ===== */
+const cssMJ = (tpl.match(/\.mj\{[^}]*\}/) || [""])[0];
+isTrue(/font-size:\s*calc\(1em \+ 1px\)/.test(cssMJ), "行内公式字号比所在单元格大 1px（calc(1em + 1px)）");
+isTrue(/color:\s*var\(--ink\)/.test(cssMJ), "行内公式改用正文色 --ink（不再继承次级灰而发虚）");
+isTrue(/td\.fx\{color:#334155/.test(tpl), "计算式列灰字由 #64748b 加深到 #334155，与公式对比度接近");
+const cssBtnHd = (tpl.match(/\.card h2 \.btnHd\{[^}]*\}/) || [""])[0];
+isTrue(/margin-left:auto/.test(cssBtnHd), "标题栏按钮靠右（margin-left:auto，位于标题最右侧）");
+const hdChk = (tpl.match(/<h2>稳定与承载力验算（标准值组合）[\s\S]{0,400}?<\/h2>/) || [""])[0];
+isTrue(hdChk.indexOf("导出.docx验算书") >= 0, "导出按钮文案为「导出.docx验算书」且位于验算表标题内");
+isTrue(/onclick="exportWord\(\)"/.test(hdChk), "标题栏导出按钮仍调用 exportWord()");
+isTrue(hdChk.indexOf('class="btnHd no-print"') >= 0 && /\.btn,\.no-print\{display:none;\}/.test(tpl),
+       "标题栏按钮带 no-print：打印时不输出按钮");
+isTrue(tpl.slice(0, tpl.indexOf('id="view3d"')).indexOf("exportWord") < 0, "页头不再保留「导出Word（公式可编辑）」按钮");
+isTrue(tpl.indexOf('a.download = proj + "-验算书.docx"') > 0, "下载文件名为「项目名-验算书.docx」，与按钮文案一致");
+
 /* ===== 标高基准：与坐标原点同面（基础底面 = 0.000） ===== */
 isTrue(tpl.indexOf("基础底面(标高0.000") > 0, "高程基准输入框说明：基础底面(标高0.000)，与坐标原点同面");
 isTrue(tpl.indexOf("const zB = q.fdT || 0") > 0, "标高标注以基础总厚 zB 折算（场景竖坐标 → 基底基准）");

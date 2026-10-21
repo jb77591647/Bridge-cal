@@ -25,6 +25,14 @@
     padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;
   }
   .btn:hover{border-color:var(--accent); color:var(--accent);}
+  /* 卡片标题栏最右侧的小按钮（如"导出.docx验算书"），与 h2 同一行、靠右对齐 */
+  .card h2 .btnHd{
+    margin-left:auto; flex:0 0 auto; font-family:inherit; font-size:12px; font-weight:600;
+    padding:2px 10px; border:1px solid var(--accent); border-radius:5px;
+    background:#fff; color:var(--accent); cursor:pointer; line-height:1.6;
+    letter-spacing:0; transition:background .12s, color .12s;
+  }
+  .card h2 .btnHd:hover{background:var(--accent); color:#fff;}
   .layout{display:grid; grid-template-columns:370px 1fr; gap:14px; align-items:start;}
   /* 左侧参数栏：完整展开，不产生内部滚动条/不被裁剪 */
   /* 左侧参数栏：贴顶固定 + 独立滚动（输入下方参数时仍能看到模型） */
@@ -83,7 +91,7 @@
   th,td{border:1px solid var(--line); padding:5px 7px; text-align:left;}
   th{background:#f1f5f9; font-weight:600; white-space:nowrap;}
   td.num{text-align:right; font-variant-numeric:tabular-nums;}
-  td.fx{color:var(--sub); font-size:11.5px;}
+  td.fx{color:#334155; font-size:11.5px;}
   tr.total td{background:var(--accent-soft); font-weight:700;}
   tr.sep td{background:#f8fafc; font-weight:600; color:var(--sub); font-size:11.5px;}
   /* 验算表分节行：带 1、2、3 序号，加粗，字号较常规分节行大 1px */
@@ -102,7 +110,10 @@
         border:1px solid #1d4ed8; border-radius:50%; color:#1d4ed8; font-size:9px; font-weight:700;
         margin-right:5px; vertical-align:1px;}
   /* ===== 行内公式（MathJax SVG） ===== */
-  .mj{display:inline-block; vertical-align:baseline; margin:0 1.5px;}
+  /* 字号比所在单元格大 1px（calc(1em + 1px)），并用正文色 --ink：MathJax 的 SVG 根节点
+     带 fill="currentColor"，颜色随这里走，避免继承 td.fx 的次级灰而显得发虚 */
+  .mj{display:inline-block; vertical-align:baseline; margin:0 1.5px;
+      font-size:calc(1em + 1px); color:var(--ink);}
   .mj mjx-container[jax="SVG"]{display:inline-block; direction:ltr;}
   .mj mjx-container[jax="SVG"] > svg{vertical-align:-0.25em; overflow:visible; max-width:none;}
   mjx-assistive-mml{display:none !important;}   /* 无障碍副本不参与排版 */
@@ -132,7 +143,6 @@
       <label>项目名称</label>
       <input type="text" id="projName" value="U型桥台">
       <button class="btn" onclick="exportCSV()">导出CSV</button>
-      <button class="btn" onclick="exportWord()">导出Word（公式可编辑）</button>
       <button class="btn" onclick="window.print()">打印</button>
     </div>
   </header>
@@ -348,7 +358,7 @@
       </div>
 
       <div class="card">
-        <h2>稳定与承载力验算（标准值组合）</h2>
+        <h2>稳定与承载力验算（标准值组合）<button class="btnHd no-print" onclick="exportWord()" title="导出 .docx（公式为 Word 原生对象，双击可编辑）">导出.docx验算书</button></h2>
         <table>
           <thead><tr><th style="width:22%">项目</th><th>计算式</th><th style="width:13%; text-align:right;">数值</th><th style="width:8%;">单位</th><th style="width:10%; text-align:center;">判定</th></tr></thead>
           <tbody id="checkBody"></tbody>
@@ -5894,7 +5904,7 @@ function exportWord(){
   const blob = new Blob([bin], {type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = proj + "稳定与承载力验算.docx";
+  a.download = proj + "-验算书.docx";
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
