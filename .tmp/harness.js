@@ -25,7 +25,7 @@ const vals = {
   Nk:"1000", Hk:"165", dBear:"0.40", dH:"0.10", gamC:"24", gamS:"18", fric:"0.30", fa:"400",
   fndType:"soil",
   brkL:"20", brkGrade:"I", brkN:"1",
-  chkHf:"", chkPhi:"30", chkDelta:"20", chkKaShow:"", chkEaShow:""
+  chkHf:"", chkPhi:"30", chkDelta:"20", chkKaShow:"", chkKaShow2:"", chkEaShow:""
 };
 const checks = {
   useFd2:false, showLabels:false, showAxes:false, showEL:false, showELa:false, wireOnly:false,
@@ -475,23 +475,27 @@ isTrue(ckTbl.indexOf("ΣM稳 合计")>=0 && ckTbl.indexOf("支座竖向反力 Nk
 isTrue(ckTbl.indexOf("K0(后趾)")<0 && ckTbl.indexOf("控制值 K0")<0, "验算表不再出现后趾验算（合力位置仍标注距后趾距离）");
 isTrue(ckTbl.indexOf("ΣM倾 合计")>=0, "验算表列出 ΣM倾 合计");
 /* ΣM倾 计算式明细：力臂分列 + 数值代入可逐步复核 */
-isTrue(ckTbl.indexOf("制动力力臂 hH")>=0 && ckTbl.indexOf("土压力力臂 yEa")>=0,
-       "ΣM倾 分列两根力臂（制动力 hH / 土压力 yEa）");
+isTrue(ckTbl.indexOf("制动力力臂 hH")>=0 && ckTbl.indexOf("土压力力臂 yEa1")>=0 &&
+       ckTbl.indexOf("土压力力臂 yEa2")>=0,
+       "ΣM倾 分列三根力臂（制动力 hH / 下段 yEa1 / 上段 yEa2）");
 isTrue(ckTbl.indexOf("前墙高 "+pChk.H1.toFixed(2)+"＋帽梁高 "+pChk.capH.toFixed(2)+"＋dH "+pChk.dH.toFixed(2))>=0,
        "制动力力臂行逐段列出 前墙高＋帽梁高＋dH");
 isTrue(ckTbl.indexOf(qChk.fdT.toFixed(3))>=0, "力臂行列出基础总厚（前墙底至基底）");
-isTrue(ckTbl.indexOf("h填/3＝"+cChk.hf.toFixed(2)+"/3＝"+(cChk.hf/3).toFixed(3))>=0,
-       "土压力力臂行展开为 基础厚＋h填/3，并给出 h填/3 的数值");
+isTrue(ckTbl.indexOf("h2/3＝"+cChk.h2.toFixed(2)+"/3＝"+(cChk.h2/3).toFixed(3))>=0,
+       "上段土压力力臂行展开为 基础厚＋h1＋h2/3，并给出 h2/3 的数值");
 isTrue(ckTbl.indexOf(cChk.Hk.toFixed(1)+"×"+cChk.hH.toFixed(3))>=0,
        "ΣM倾 合计行代入 Hk×hH 的数值");
-isTrue(ckTbl.indexOf(cChk.EaH.toFixed(1)+"×"+cChk.yEa.toFixed(3))>=0,
-       "ΣM倾 合计行代入 EaH×yEa 的数值");
-isTrue(ckTbl.indexOf(cChk.MhB.toFixed(1)+"＋"+cChk.MhE.toFixed(1))>=0,
-       "ΣM倾 合计行给出两项分力矩之和");
+isTrue(ckTbl.indexOf(cChk.EaH1.toFixed(1)+"×"+cChk.yEa1.toFixed(3))>=0 &&
+       ckTbl.indexOf(cChk.EaH2.toFixed(1)+"×"+cChk.yEa2.toFixed(3))>=0,
+       "ΣM倾 合计行分段代入 EaH1×yEa1、EaH2×yEa2 的数值");
+isTrue(ckTbl.indexOf(cChk.MhB.toFixed(1)+"＋"+cChk.MhE1.toFixed(1)+"＋"+cChk.MhE2.toFixed(1))>=0,
+       "ΣM倾 合计行给出三项分力矩之和");
 near(cChk.hH, pChk.H1 + pChk.capH + pChk.dH + qChk.fdT, 1e-9,
      "hH ＝ 前墙高＋帽梁高＋dH＋基础总厚（表中所列算式与计算值一致）");
-near(cChk.yEa, qChk.fdT + cChk.hf/3, 1e-9,
-     "yEa ＝ 基础总厚＋h填/3（表中所列算式与计算值一致）");
+near(cChk.yEa2, qChk.fdT + cChk.h1 + cChk.h2/3, 1e-9,
+     "yEa2 ＝ 基础总厚＋h1＋h2/3（表中所列算式与计算值一致）");
+isTrue(cChk.yEa1 - qChk.fdT > cChk.h1/3 - 1e-9 && cChk.yEa1 - qChk.fdT < cChk.h1/2 + 1e-9,
+       "下段合力点介于 h1/3（纯三角形）与 h1/2（纯均布超载）之间");
 /* 坐标符号与原点口径：顺桥向一律记作 x，竖向才是 z；表中 x 以「前墙前缘=0」为原点 */
 isTrue(ckTbl.indexOf("前趾 x=")>=0 && ckTbl.indexOf("作用点 x=")>=0,
        "结果表把顺桥向坐标标为 x（作用点 x= / 前趾 x=）");
@@ -560,24 +564,49 @@ const thD = Math.atan(1/3)*180/Math.PI;          // 18.435°
 const angD = thD + 20;                            // θ+δ = 38.435°
 /* 竖直墙基准值（旧口径），用于对比折减 */
 const KaVert = Math.pow(Math.cos(r30),2) / (Math.cos(r20)*Math.pow(1+Math.sqrt(Math.sin(r20+r30)*Math.sin(r30)/Math.cos(r20)),2));
-near(cE.thDeg, thD, 1e-9, "墙背倾角 θ = atan(1/m1) = atan(1/3) = 18.435°（坡比不取 0）");
-near(cE.alDeg, 90 + thD, 1e-9, "墙背与水平面夹角 α = 90°+θ = 108.435°");
-near(cE.angDeg, angD, 1e-9, "合力与水平方向夹角 = θ+δ = 38.435°");
+near(cE.thDeg, thD, 1e-9, "下段墙背倾角 θ = atan(1/m1) = atan(1/3) = 18.435°（坡比不取 0）");
+near(cE.alDeg, 90 + thD, 1e-9, "下段墙背与水平面夹角 α1 = 90°+θ = 108.435°");
+near(cE.angDeg, angD, 1e-9, "下段合力与水平方向夹角 = θ+δ = 38.435°");
 const KaGenExp = kaGen(90 + thD, 30, 20);
-near(cE.Ka, KaGenExp, 1e-12, "库仑通式 Ka(α=108.44°、φ=30°、δ=20°) = 0.1829");
-isTrue(cE.Ka < 0.7*KaVert, "计入 1:3 背坡后 Ka 由 0.2973 折减到 0.1829（−38%）");
+near(cE.Ka1, KaGenExp, 1e-12, "下段 库仑通式 Ka1(α=108.44°、φ=30°、δ=20°) = 0.1829");
+near(cE.Ka2, KaVert, 1e-12, "上段 竖直墙 Ka2(α=90°) = 0.2973");
+isTrue(cE.Ka1 < 0.7*cE.Ka2, "斜墙 Ka1 比竖直墙 Ka2 小 38%（θ 改变墙背与滑裂面的夹角）");
 near(cE.hf, 6.5, 1e-9, "填土高度留空自动取侧墙总高 = 5+0.6+0.9 = 6.5");
-near(cE.Ea, 0.5*18*6.5*6.5*KaGenExp*12, 1e-6, "Ea = 0.5γs·h填²·Ka·B = 834.6kN");
-near(cE.EaH, cE.Ea*Math.cos(angD*Math.PI/180), 1e-9, "EaH = Ea·cos(θ+δ) = 653.8kN");
-near(cE.EaV, cE.Ea*Math.sin(angD*Math.PI/180), 1e-9, "EaV = Ea·sin(θ+δ) = 518.8kN");
-near(cE.yEa, 1+6.5/3, 1e-9, "土压力合力点距基底 = 基础厚 + h填/3");
-near(cE.xEa, 1.2 + (5 - 6.5/3)/3, 1e-9,
-     "EaV 作用点 x = t1+(H1−h填/3)/m1 = 2.144（墙背面在 h填/3 高度处）");
-near(cE.Htot, 100 + cE.EaH, 1e-9, "ΣH = 制动力 + 土压力水平分量");
-near(cE.Mh, 100*cE.hH + cE.EaH*cE.yEa, 1e-9, "ΣM倾 = 制动力 + 土压力水平分量");
+/* 分段：下段=前墙背坡段，上段=帽梁/背墙竖直段 */
+near(cE.h1, 5, 1e-9, "下段（斜墙）高 h1 = min(h填, H1) = 5.00（前墙全高）");
+near(cE.h2, 1.5, 1e-9, "上段（竖直墙）高 h2 = h填 − h1 = 1.50（帽梁 0.6＋背墙 0.9）");
+near(cE.qOv, 27, 1e-9, "上段土柱等效超载 q = γs·h2 = 18×1.5 = 27.0 kPa");
+/* 下段：梯形分布（超载均布项 ＋ 深度三角形项） */
+const k1u = KaGenExp*(27*5 + 0.5*18*25);
+near(cE.Ea1, k1u*12, 1e-6, "下段 Ea1 = Ka1(q·h1＋½γs·h1²)·B = " + (k1u*12).toFixed(1) + " kN");
+near(cE.EaH1, cE.Ea1*Math.cos(angD*Math.PI/180), 1e-9, "下段 EaH1 = Ea1·cos(θ+δ)");
+near(cE.EaV1, cE.Ea1*Math.sin(angD*Math.PI/180), 1e-9, "下段 EaV1 = Ea1·sin(θ+δ)");
+near(cE.yEa1 - qChk.fdT, (KaGenExp*(27*25/2 + 0.5*18*125/3))/k1u, 1e-9,
+     "下段合力点 y1 = ΣM/ΣF = 1.979（梯形分布，介于 h1/3 与 h1/2 之间）");
+near(cE.xEa1, 1.2 + (5 - (cE.yEa1 - qChk.fdT))/3, 1e-9,
+     "下段作用点 x = t1+(H1−y1)/m1（墙背面在该高度处）");
+/* 上段：三角形分布（顶面无超载） */
+const k2u = 0.5*KaVert*18*2.25;
+near(cE.Ea2, k2u*12, 1e-6, "上段 Ea2 = ½Ka2·γs·h2²·B = " + (k2u*12).toFixed(1) + " kN");
+near(cE.EaH2, cE.Ea2*Math.cos(r20), 1e-9, "上段 EaH2 = Ea2·cosδ（θ2=0）");
+near(cE.EaV2, cE.Ea2*Math.sin(r20), 1e-9, "上段 EaV2 = Ea2·sinδ");
+near(cE.yEa2, qChk.fdT + 5 + 1.5/3, 1e-9, "上段合力点距基底 = 基础厚＋h1＋h2/3 = 6.500");
+near(cE.xEa2, 1.2, 1e-9, "上段作用点 x = t1 = 1.200（帽梁后缘、背墙背面与之同面）");
+/* 合计与分段叠加口径 */
+near(cE.EaH, cE.EaH1 + cE.EaH2, 1e-12, "EaH 合计 = 下段＋上段水平分量");
+near(cE.EaV, cE.EaV1 + cE.EaV2, 1e-12, "EaV 合计 = 下段＋上段竖向分量");
+near(cE.Htot, 100 + cE.EaH, 1e-9, "ΣH = 制动力 + 土压力水平分量合计");
+near(cE.Mh, 100*cE.hH + cE.EaH1*cE.yEa1 + cE.EaH2*cE.yEa2, 1e-9,
+     "ΣM倾 = 制动力 + 下段/上段土压力各自力矩");
 near(cE.Kc, 0.3*cE.Vsum/cE.Htot, 1e-9, "Kc = μΣV/ΣH（ΣV 已含 EaV）");
-isTrue(cE.Kc < cChk.Kc*0.25, "计入土压力后 Kc 由 39.6 降至约 5.5（富余收窄近一个数量级）");
+isTrue(cE.Kc < cChk.Kc*0.25, "计入土压力后 Kc 由 39.6 降至约 4.8（富余收窄近一个数量级）");
 isTrue(cE.okAll, "计入台后土压力后三项验算仍全部通过");
+/* 分段结果必须比"全高统一按斜墙"更不利（上段竖直墙 Ka2 更大） */
+{
+  const EaOne = 0.5*18*6.5*6.5*KaGenExp*12;
+  isTrue(cE.EaH > EaOne*Math.cos(angD*Math.PI/180),
+         "分段后 EaH 大于全高统一斜墙口径（上段竖直墙 Ka2 > Ka1，修正原口径偏不保守处）");
+}
 /* 土压力计入后仍满足绕前趾力矩平衡（独立互证，防 ΣV 与 ΣM稳 口径不一致） */
 {
   const zR = cE.zF + (cE.MsF - cE.Mh)/cE.Vsum;
@@ -592,24 +621,30 @@ near(cNoE.EaV, 0, 1e-12, "取消土压力后 EaV = 0");
 near(cNoE.Htot, 100, 1e-9, "取消土压力后 ΣH 仅剩制动力");
 els.incEa.checked = true;
 near(cE.Vsum - cNoE.Vsum, cE.EaV, 1e-6, "ΣV 计入土压力竖向分量 EaV（向下）");
-near(cE.MsF - cNoE.MsF, cE.EaV*(cE.xEa - cE.zF), 1e-6,
-     "ΣM稳 计入 EaV（力臂 = 作用点 x − 前趾 x）");
+near(cE.MsF - cNoE.MsF, cE.EaV1*(cE.xEa1 - cE.zF) + cE.EaV2*(cE.xEa2 - cE.zF), 1e-6,
+     "ΣM稳 计入 EaV（下段/上段各按其作用点 x 至前趾的力臂）");
 isTrue(cE.MsF > cNoE.MsF, "EaV 使 ΣM稳 增大（δ>0、向下，起稳定作用）");
 /* 敏感性 */
 els.chkHf.value = "3";
 const cHf = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cHf.hf, 3, 1e-9, "手填填土高度 3m 生效");
-near(cHf.Ea, 0.5*18*9*KaGenExp*12, 1e-6, "Ea 随 h填² 折减（3m 时约 178kN）");
+near(cHf.h2, 0, 1e-9, "h填 ≤ 前墙高时上段高 h2 = 0（无竖直墙段）");
+near(cHf.qOv, 0, 1e-9, "h2 = 0 时上段超载 q = 0");
+near(cHf.Ea2, 0, 1e-12, "h2 = 0 时上段土压力 Ea2 = 0，退化为单段斜墙");
+near(cHf.Ea, 0.5*18*9*KaGenExp*12, 1e-6, "退化单段斜墙：Ea = ½γs·h填²·Ka1·B = 177.7kN");
 near(cHf.xEa, 1.2 + (5 - 1)/3, 1e-9, "h填 减小时 EaV 作用点随墙面下移（x=2.533）");
 els.chkHf.value = "";
 els.chkPhi.value = "40";
 const cPhi = api.calcCheck(api.readP(), api.calcQ(api.readP()));
-isTrue(cPhi.Ka < cE.Ka && cPhi.Ea < cE.Ea, "φ 增至 40° 时 Ka、Ea 下降");
+isTrue(cPhi.Ka1 < cE.Ka1 && cPhi.Ka2 < cE.Ka2 && cPhi.Ea < cE.Ea, "φ 增至 40° 时两段 Ka、合力均下降");
 /* 坡比 m1=0（竖直墙）退化为旧口径；δ=0 再退化为朗肯 */
 els.chkPhi.value = "30"; els.chkDelta.value = "0"; els.m1.value = "0";
 const cD0 = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cD0.thDeg, 0, 1e-12, "m1=0 时 θ=0（竖直墙）");
-near(cD0.Ka, Math.pow(Math.tan(Math.PI/4 - r30/2),2), 1e-9, "m1=0、δ=0 退化为朗肯 Ka=tan²(45°−φ/2)=0.3333");
+near(cD0.Ka1, Math.pow(Math.tan(Math.PI/4 - r30/2),2), 1e-9, "m1=0、δ=0 退化为朗肯 Ka1=tan²(45°−φ/2)=0.3333");
+near(cD0.Ka2, cD0.Ka1, 1e-12, "m1=0 时上下两段同为竖直墙，Ka1＝Ka2");
+near(cD0.Ea, 0.5*18*6.5*6.5*cD0.Ka1*12, 1e-9,
+     "m1=0 时分段结果与单段公式 Σ=½γs·h填²·Ka·B 严格相等（分段算法等价性校验）");
 els.m1.value = "3";
 const cD0b = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cD0b.Ka, kaGen(90 + thD, 30, 0), 1e-12, "δ=0 但保留背坡时 Ka=0.2211（≠朗肯，因墙背倾斜）");
@@ -626,10 +661,15 @@ els.chkDelta.value = "20";
 /* 结果表列出 EaV 及其力臂、ΣV 合计口径 */
 api.renderCheck(api.readP(), api.calcQ(api.readP()));
 const ckTbl2 = els.checkBody.innerHTML;
-isTrue(ckTbl2.indexOf("土压力竖向分量 EaV")>=0, "竖向力段列出 EaV 分项");
-isTrue(ckTbl2.indexOf("Ea·cos(θ+δ)")>=0 && ckTbl2.indexOf("Ea·sin(θ+δ)")>=0,
-       "表中 EaH/EaV 分别标注 cos(θ+δ)、sin(θ+δ)");
-isTrue(ckTbl2.indexOf("α＝90°+θ")>=0, "Ea 行标注 Ka 的墙背倾角 α＝90°+θ");
+isTrue(ckTbl2.indexOf("土压力竖向分量 EaV")>=0, "竖向力段列出 EaV 分项（下段/上段分列）");
+isTrue(ckTbl2.indexOf("EaV1")>=0 && ckTbl2.indexOf("EaV2")>=0, "竖向力段把 EaV 拆成下段 EaV1 与上段 EaV2");
+isTrue(ckTbl2.indexOf("Ea1·cos(θ+δ)")>=0 && ckTbl2.indexOf("Ea1·sin(θ+δ)")>=0,
+       "下段 EaH1/EaV1 分别标注 cos(θ+δ)、sin(θ+δ)");
+isTrue(ckTbl2.indexOf("Ea2·cosδ")>=0 && ckTbl2.indexOf("Ea2·sinδ")>=0,
+       "上段 EaH2/EaV2 分别标注 cosδ、sinδ（θ2=0）");
+isTrue(ckTbl2.indexOf("α＝90°+θ")>=0, "下段行标注 Ka1 的墙背倾角 α＝90°+θ");
+isTrue(ckTbl2.indexOf("Ka2＝")>=0 && ckTbl2.indexOf("α＝90°")>=0, "上段行标注 Ka2 与竖直墙 α＝90°");
+isTrue(ckTbl2.indexOf("超载 q＝γs·h2")>=0, "下段行注明顶部等效超载 q＝γs·h2");
 isTrue(ckTbl2.indexOf("已计入 ΣM稳")>=0, "K0 行注明 EaV 已计入 ΣM稳");
 /* 参数标签：δ 须 ≤ φ，并给出常用取值区间 */
 isTrue(tpl.indexOf("须 ≤ φ")>=0 && tpl.indexOf("常取 δ=(1/2~2/3)φ")>=0,
@@ -640,7 +680,7 @@ els.chkDelta.value = "20";
 /* 默认工况：自动制动力 165kN + 土压力 */
 els.autoHk.checked = true;
 const cAll = api.calcCheck(api.readP(), api.calcQ(api.readP()));
-isTrue(cAll.Htot > 800 && cAll.Htot < 850, "默认工况 ΣH ≈ 165+654 = 819kN");
+isTrue(cAll.Htot > 820 && cAll.Htot < 890, "默认工况 ΣH ≈ 165＋687 = 852kN（分段后比全高斜墙口径大 5%）");
 isTrue(cAll.EaH > 3*cAll.Hk, "土压力水平分量约为制动力的 4 倍（默认工况）");
 isTrue(cAll.okAll, "默认工况（自动制动力＋台后土压力）三项验算全部通过");
 els.autoHk.checked = false; els.Hk.value = "100";

@@ -10,8 +10,10 @@ desktop.ini
 .tmp/backup_before_rebuild.html
 .tmp/three.min.js
 .tmp/hl_*.txt
-.tmp/_h[0-9].txt
+.tmp/_h*.txt
 .tmp/_r[0-9].txt
+.tmp/_shot*.png
+.tmp/_c[0-9].png
 .tmp/_check.html
 .tmp/_tmp_run.js
 .tmp/probe*.js
