@@ -21,11 +21,14 @@ const vals = {
   capLshow:"", bwLshow:"", t1bshow:"", swUpHshow:"", swTopWshow:"", swBotWshow:"", swLowTopWshow:"", swLowTopTshow:"", swLowHshow:"", swBotTshow:"", swLowBotWshow:"", nbTopShow:"",
   matCap:"C30砼", matFw:"C30砼", matSw:"C30砼", matFd:"C25砼", matFill:"砂砾石",
   excMs:"1", excMr:"1", excW:"0.5", excH:"3", excHs:"1", excHr:"",
-  excHst:"5", excB:"1"
+  excHst:"5", excB:"1",
+  Nk:"1000", Hk:"100", dBear:"0.40", dH:"0.10", gamC:"24", gamS:"18", fric:"0.30", fa:"400",
+  fndType:"soil"
 };
 const checks = {
   useFd2:false, showLabels:false, showAxes:false, showEL:false, showELa:false, wireOnly:false,
   pFw:true, pSw:true, pCap:true, pNb:true, pBw:true, pFd:true, pFill:true,
+  incFill:true,
   exGround:false, exSoil:false, exRock:false
 };
 const els = {};
@@ -38,6 +41,8 @@ els.view3d = { value:"", checked:false, innerHTML:"", style:{}, addEventListener
   appendChild(){}, clientWidth:800, clientHeight:560 };
 els.resultBody = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.assumpNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.checkBody = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.checkNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 
 global.document = {
   getElementById(id){
@@ -53,7 +58,7 @@ global.requestAnimationFrame = ()=>{};
 global.Blob = class {};
 
 /* 提取 api 探针 */
-app += "\n;global.__api={readP,calcQ,buildModel,renderTable,rebuild,applyPartVisibility,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup};";
+app += "\n;global.__api={readP,calcQ,calcCheck,buildModel,renderTable,renderCheck,rebuild,applyPartVisibility,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup};";
 global.THREE = require(LIB);
 
 let pass=0, fail=0;
@@ -345,6 +350,97 @@ stagedCase("C 平台@4位于土层", 6, 4, 4, 1.5, 1, 1, 376.6667, 632.6667+432+
 stagedCase("D 石方竖直m石=0", 4, 2, 3, 1, 0, 1, 270, 160.3333+280.3333);
 /* 恢复默认 */
 els.excH.value="3"; els.excHs.value="1"; els.excHst.value="5"; els.excB.value="1"; els.excMr.value="1"; els.excMs.value="1";
+
+/* ===== 稳定与承载力验算 =====
+   形心独立校核：用网格四面体分解求体积形心，与 calcCheck 的解析/积分形心对比 */
+function meshStat(m){
+  const pos = m.geometry.attributes.position, vs = [];
+  for(let i=0;i<pos.count;i++) vs.push(new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)));
+  let C = new THREE.Vector3(); vs.forEach(v=>C.add(v)); C.multiplyScalar(1/vs.length);
+  let V=0, sx=0, sy=0, sz=0;
+  for(let f=0; f<vs.length/6; f++){
+    let qd = [vs[f*6], vs[f*6+1], vs[f*6+2], vs[f*6+5]];
+    const fc = qd[0].clone().add(qd[1]).add(qd[2]).add(qd[3]).multiplyScalar(0.25);
+    const n = new THREE.Vector3().subVectors(qd[1],qd[0]).cross(new THREE.Vector3().subVectors(qd[2],qd[0]));
+    if(n.dot(fc.clone().sub(C)) < 0) qd = [qd[3],qd[2],qd[1],qd[0]];
+    for(const t of [[qd[0],qd[1],qd[2]],[qd[0],qd[2],qd[3]]]){
+      const v = t[0].dot(new THREE.Vector3().crossVectors(t[1],t[2]))/6;
+      V += v;
+      sx += v*(t[0].x+t[1].x+t[2].x)/4;
+      sy += v*(t[0].y+t[1].y+t[2].y)/4;
+      sz += v*(t[0].z+t[1].z+t[2].z)/4;
+    }
+  }
+  return {V: Math.abs(V), c: new THREE.Vector3(sx/V, sy/V, sz/V)};
+}
+const pChk = api.readP(), qChk = api.calcQ(pChk), cChk = api.calcCheck(pChk, qChk);
+const ec0 = pChk.capCant;
+const statOf = part => {
+  let V = 0, sx = 0;
+  (parts[part]||[]).forEach(m=>{ const r = meshStat(m); V += r.V; sx += r.V*r.c.x; });
+  return { V, z: V > 1e-9 ? sx/V + ec0 : NaN };
+};
+let SV = 0, SZ = 0, SZF = 0, SZB = 0, SZc = 0;
+[["台身（前墙）","fw",pChk.gamC], ["侧墙（两道）","sw",pChk.gamC], ["帽梁","cap",pChk.gamC],
+ ["背墙","bw",pChk.gamC], ["牛腿","nb",pChk.gamC], ["基础","fd",pChk.gamC],
+ ["台腔回填","fill",pChk.gamS]].forEach(([n,part,gm])=>{
+  const st = statOf(part), it = cChk.items.find(o=>o.n===n);
+  if(it) near(it.z, st.z, 0.02, "验算形心 z：" + n + "（网格 vs 公式）");
+  const W = st.V*gm;
+  SV += W; SZ += W*st.z;
+  SZF += W*(st.z - cChk.zF); SZB += W*(cChk.zB - st.z); SZc += W*(st.z - cChk.zc);
+});
+SV += pChk.Nk; SZ += pChk.Nk*cChk.zN;
+SZF += pChk.Nk*(cChk.zN - cChk.zF);
+SZB += pChk.Nk*(cChk.zB - cChk.zN);
+SZc += pChk.Nk*(cChk.zN - cChk.zc);
+near(cChk.Vsum, SV, 2.0, "验算 ΣV（网格体积×容重，侧墙含0.002显示偏移）");
+near(cChk.zbar, SZ/SV, 0.01, "验算 合力作用点（网格形心加权）");
+near(cChk.MsF, SZF, 10.0, "验算 前趾稳定力矩 ΣM稳");
+near(cChk.MsB, SZB, 10.0, "验算 后趾稳定力矩 ΣM稳");
+near(cChk.M, SZc + cChk.Mh, 10.0, "验算 基底弯矩（竖向偏心＋水平力）");
+/* 几何基准与代数关系 */
+near(cChk.zF, -0.9, 1e-9, "基底前趾 z=ec−fd1Zf=−0.9");
+near(cChk.zB, 7.1, 1e-9, "基底后趾 z=ec+L2+fd1Zb=7.1");
+near(cChk.A, 112, 1e-9, "基底面积 A=(W+2×1)×(L2+1+1)=14×8=112");
+near(cChk.zc, 3.1, 1e-9, "基底形心 z=3.1");
+near(cChk.zN, 0.4, 1e-9, "支座作用点 z=背墙前缘0.8−d支0.4=0.4");
+near(cChk.yH, 5.7, 1e-9, "水平力作用点标高=H1+capH+dH=5.7");
+near(cChk.hH, 6.7, 1e-9, "水平力对基底的力臂=5.7+fdT1.0=6.7");
+near(cChk.Mh, 670, 1e-6, "水平力力矩 Hk×h=100×6.7=670");
+near(cChk.Kc, 0.3*cChk.Vsum/100, 1e-9, "Kc=μΣV/Hk");
+near(cChk.pMean, cChk.Vsum/112, 1e-9, "p均=N/A");
+near(cChk.eLim, 8/6, 1e-9, "土基偏心距限值=Lb/6=1.333");
+near(cChk.pMax, cChk.pMean + 6*Math.abs(cChk.M)/(14*64), 1e-9, "p最大=N/A+6|M|/(B·L²)");
+isTrue(cChk.okAll, "默认工况（Nk=1000、Hk=100、μ=0.3、fa=400）三项验算全部通过");
+/* 参数敏感性 */
+els.Hk.value = "5000";
+const cH = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+isTrue(cH.Kc < cChk.Kc && !cH.okKc, "Hk=5000 时 Kc 下降且抗滑移不通过");
+els.Hk.value = "100";
+els.fa.value = "50";
+const cF = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+isTrue(!cF.okB && cF.okKc && cF.okK0, "fa=50kPa 时仅承载力不通过");
+els.fa.value = "400";
+els.fndType.value = "rock";
+const cR = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cR.eLim, 8/4, 1e-9, "岩石地基偏心距限值=Lb/4=2.0");
+els.fndType.value = "soil";
+els.incFill.checked = false;
+const cN = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cChk.Vsum - cN.Vsum, qChk.V_fill*pChk.gamS, 1e-6, "不勾选台腔回填时 ΣV 减少回填土重");
+els.incFill.checked = true;
+els.dBear.value = "5";
+const cD = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cD.dBear, pChk.capWid - pChk.bwT, 1e-9, "d支超限时按背墙前缘距离截断(0.8)");
+near(cD.zN, 0, 1e-9, "d支超限后支座落在帽梁前缘 z=0");
+els.dBear.value = "0.40";
+/* 验算表渲染 */
+api.renderCheck(pChk, qChk);
+const ckTbl = els.checkBody.innerHTML;
+isTrue(ckTbl.indexOf("抗滑移")>=0 && ckTbl.indexOf("抗倾覆")>=0 && ckTbl.indexOf("偏心距")>=0 &&
+       ckTbl.indexOf("p最大")>=0 && ckTbl.indexOf("验算结论")>=0, "验算表含抗滑移/抗倾覆/承载力/结论");
+isTrue(els.checkNote.innerHTML.indexOf("标准值")>=0 && els.checkNote.innerHTML.indexOf("3363")>=0, "验算说明含荷载标准值与规范依据");
 
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail?1:0);

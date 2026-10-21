@@ -229,6 +229,26 @@
       </div>
 
       <div class="card">
+        <h2>稳定与承载力验算</h2>
+        <div class="fields">
+          <div class="field"><label>支座竖向荷载 Nk <small>标准值，支座传来</small></label><input type="number" id="Nk" value="1000" step="10"></div>
+          <div class="field"><label>水平荷载 Hk <small>制动力+温度等，标准值</small></label><input type="number" id="Hk" value="100" step="10"></div>
+          <div class="field"><label>支座中心至背墙前缘 d支 <small>往河心侧量</small></label><input type="number" id="dBear" value="0.40" step="0.05"></div>
+          <div class="field"><label>水平力作用点距帽梁顶 dH <small>支座高+梁底至合力点</small></label><input type="number" id="dH" value="0.10" step="0.05"></div>
+          <div class="field"><label>混凝土容重 γc <small>kN/m³</small></label><input type="number" id="gamC" value="24" step="0.5"></div>
+          <div class="field"><label>回填土容重 γs <small>kN/m³</small></label><input type="number" id="gamS" value="18" step="0.5"></div>
+          <div class="field"><label>基底摩擦系数 μ</label><input type="number" id="fric" value="0.30" step="0.05"></div>
+          <div class="field"><label>持力层承载力 fa <small>kPa，基本容许值</small></label><input type="number" id="fa" value="400" step="10"></div>
+          <div class="field"><label>持力层类型 <small>决定偏心距限值</small></label><select id="fndType"><option value="soil" selected>土基 b/6</option><option value="rock">岩石 b/4</option></select></div>
+        </div>
+        <div class="chk" style="margin:6px 0 2px;"><input type="checkbox" id="incFill" checked>
+          <label for="incFill">竖向力计入台腔回填土重</label></div>
+        <div class="tblnote" style="font-size:11.5px;color:var(--sub);margin-top:4px;">
+          稳定系数要求：抗滑移≥1.3、抗倾覆≥1.5；基底应力：p均≤fa、p最大≤1.2fa。
+        </div>
+      </div>
+
+      <div class="card">
         <h2>说明</h2>
         <div class="note" style="margin-top:0;">
           坐标系：原点位于前墙底前缘中点（前墙底边中点，同剖面图），x=纵桥向（指向台后，前墙前缘竖直面 x=0，帽梁前缘 x=−ec）、y=横桥向（桥台宽度方向）、z=竖向；标高以前墙底=0.000 计，绝对标高=相对标高+原点绝对标高。
@@ -284,6 +304,15 @@
         </table>
         <div class="note" id="assumpNote"></div>
       </div>
+
+      <div class="card">
+        <h2>稳定与承载力验算（标准值组合）</h2>
+        <table>
+          <thead><tr><th style="width:22%">项目</th><th>计算式</th><th style="width:13%; text-align:right;">数值</th><th style="width:8%;">单位</th><th style="width:10%; text-align:center;">判定</th></tr></thead>
+          <tbody id="checkBody"></tbody>
+        </table>
+        <div class="note" id="checkNote"></div>
+      </div>
     </div>
   </div>
   <footer>三维模型按参数联动生成 · 坡比约定 竖:横=m:1（0=竖直） · 使用前请复核参数</footer>
@@ -318,6 +347,7 @@ function readP(){
   $("t1").value = (g0("capWid") - g0("capCant")).toFixed(2); /* 前墙顶宽自动 = 帽梁宽度−帽梁悬出长度 */
   $("Hs").value = (g0("bwH") + g0("capH") + g0("H1")).toFixed(2); /* 侧墙总高自动 = 背墙高+帽梁高+前墙高 H1 */
   const g = id => { const v = parseFloat($(id).value); return isFinite(v) && v>0 ? v : 0; };
+  const gn = id => { const v = parseFloat($(id).value); return isFinite(v) && v>=0 ? v : 0; };
   return {
     Wf:g("Wf"), H1:g("H1"), t1:g("t1"), m1:g("m1"),
     W:g("W"), Hs:g("Hs"), t2:g("t2"), L2:g("L2"), m2:g("m2"), m3:g("m3"), elAbs:g("elAbs"),
@@ -326,7 +356,11 @@ function readP(){
     capH:g("capH"), capCant:g("capCant"), capWid:g("capWid"), bwT:g("bwT"), bwH:g("bwH"),
     nbL:g("nbL"), nbB:g("nbB"), nbG:g("nbG"), nbHt:g("nbHt"), nbA:g("nbA"),
     fd1H:g("fd1H"), fd1X:g("fd1X"), fd1Zf:g("fd1Zf"), fd1Zb:g("fd1Zb"),
-    useFd2:$("useFd2").checked, fd2H:g("fd2H"), fd2X:g("fd2X"), fd2Zf:g("fd2Zf"), fd2Zb:g("fd2Zb")
+    useFd2:$("useFd2").checked, fd2H:g("fd2H"), fd2X:g("fd2X"), fd2Zf:g("fd2Zf"), fd2Zb:g("fd2Zb"),
+    /* 验算参数 */
+    Nk:gn("Nk"), Hk:gn("Hk"), dBear:gn("dBear"), dH:gn("dH"),
+    gamC:gn("gamC"), gamS:gn("gamS"), fric:gn("fric"), fa:gn("fa"),
+    fndRock:$("fndType").value === "rock", incFill:$("incFill").checked
   };
 }
 
@@ -454,9 +488,110 @@ function calcQ(p){
     fillV += V;
   }
   q.V_fill = fillV;
+  /* 顺桥向形心（供稳定验算取矩）：断面沿 z 为矩形，形心 z=（前缘+后缘）/2；按 Simpson 求 ∫A·z̄/∫A */
+  {
+    const zcSw = y => (xF(y) + p.L2 + p.capCant)/2;
+    const zcFl = y => (zf(y) + p.L2 + p.capCant)/2;
+    const sim = fn => {
+      const n = 200, hh = p.Hs/n; let s = 0;
+      for(let i=0;i<=n;i++){ const w = (i===0||i===n) ? 1 : (i%2 ? 4 : 2); s += w*fn(i*hh); }
+      return s*hh/3;
+    };
+    const m0s = sim(y=>Az(y)), m1s = sim(y=>Az(y)*zcSw(y));
+    q.zbar_sw = m0s > 1e-12 ? m1s/m0s : 0;
+    const m0f = sim(y=>Ay(y)), m1f = sim(y=>Ay(y)*zcFl(y));
+    q.zbar_fill = m0f > 1e-12 ? m1f/m0f : 0;
+  }
   /* 圬工合计 */
   q.total = q.V_fw + q.V_sw + q.V_cap + q.V_bw + q.V_nb + q.V_fd;
   return q;
+}
+
+/* ================= 稳定与承载力验算 =================
+   坐标系同 calcQ：z=顺桥向（前墙前缘=ec、帽梁前缘=0、帽梁后缘=背墙背面=capWid），y=竖向（前墙底=0.000）；
+   基底=最底层基础底面（y=−fdT），竖向力、水平力均取标准值。
+   取矩轴：抗倾覆分别绕基底前趾 zF／后趾 zB，取不利值；基底应力按直线分布假定（p=N/A±6M/(W·L²)）。
+   未计入台后土压力、水浮力、地震作用与横桥向偏心。 */
+const K_SLIDE = 1.3, K_OVER = 1.5, P_MAX_RATIO = 1.2;
+
+function calcCheck(p, q){
+  const c = {};
+  const ec = p.capCant, fdT = q.fdT;
+  const use2 = p.useFd2 && p.fd2H > 1e-9;
+  /* 基底轮廓（顺桥向） */
+  c.zF = ec - p.fd1Zf - (use2 ? p.fd2Zf : 0);          // 前趾（河心侧）
+  c.zB = ec + p.L2 + p.fd1Zb + (use2 ? p.fd2Zb : 0);   // 后趾（台后侧）
+  c.Lb = Math.max(c.zB - c.zF, 1e-9);
+  c.Wb = Math.max(use2 ? q.fdW2 : q.fdW1, 1e-9);
+  c.A  = c.Lb * c.Wb;
+  c.zc = (c.zF + c.zB)/2;
+  /* 支座反力作用点：背墙前缘（迎梁面）向河心侧量 d支 */
+  const zFace = Math.max(q.capWid - p.bwT, 0);
+  c.dBear = Math.min(Math.max(p.dBear, 0), zFace);
+  c.zN = Math.max(zFace - c.dBear, 0);
+  /* 竖向力分项（V=体积，z=顺桥向形心，kind: c=圬工 / s=回填） */
+  const items = [];
+  const tb = q.t1b, tt = p.t1;
+  items.push({n:"台身（前墙）", V:q.V_fw,  z:ec + (tb*tb + tb*tt + tt*tt)/(3*(tb + tt + 1e-12)), kind:"c"});
+  items.push({n:"侧墙（两道）", V:q.V_sw,  z:q.zbar_sw, kind:"c"});
+  items.push({n:"帽梁",         V:q.V_cap, z:q.capWid/2, kind:"c"});
+  items.push({n:"背墙",         V:q.V_bw,  z:q.capWid - p.bwT/2, kind:"c"});
+  if(q.V_nb > 1e-9){
+    const hs = q.nbH + q.nbAx/2;
+    const un = hs > 1e-9 ? p.nbB*(3*q.nbH + q.nbAx)/(6*hs) : p.nbB/2;   // 直角梯形断面形心（自根部起算）
+    items.push({n:"牛腿", V:q.V_nb, z:q.capWid + un, kind:"c"});
+  }
+  if(q.V_fd > 1e-9){
+    const z1 = ec - p.fd1Zf + q.fdL1/2;
+    const z2 = use2 ? (ec - p.fd1Zf - p.fd2Zf + q.fdL2/2) : z1;
+    const zFd = (q.V_fd1*z1 + q.V_fd2*z2)/(q.V_fd1 + q.V_fd2 + 1e-12);
+    items.push({n:"基础", V:q.V_fd, z:zFd, kind:"c"});
+  }
+  if(p.incFill && q.V_fill > 1e-9) items.push({n:"台腔回填", V:q.V_fill, z:q.zbar_fill, kind:"s"});
+  let Gc = 0, Gs = 0, Mz = 0;
+  items.forEach(it=>{
+    it.W = it.V * (it.kind === "s" ? p.gamS : p.gamC);
+    if(it.kind === "s") Gs += it.W; else Gc += it.W;
+    Mz += it.W * it.z;
+  });
+  c.items = items; c.Gc = Gc; c.Gs = Gs; c.Nk = p.Nk;
+  c.Vsum = Gc + Gs + p.Nk;
+  c.zbar = c.Vsum > 1e-9 ? (Mz + p.Nk*c.zN)/c.Vsum : c.zc;
+  /* 水平力 */
+  c.yH = p.H1 + p.capH + p.dH;     // 作用点标高（相对前墙底）
+  c.hH = c.yH + fdT;               // 对基底的力臂
+  c.Hk = p.Hk;
+  c.Mh = p.Hk * c.hH;
+  /* 抗滑移 */
+  c.Kc = c.Hk > 1e-9 ? p.fric*c.Vsum/c.Hk : Infinity;
+  /* 抗倾覆：绕前趾 / 后趾 */
+  let MsF = 0, MsB = 0;
+  items.forEach(it=>{ MsF += it.W*(it.z - c.zF); MsB += it.W*(c.zB - it.z); });
+  MsF += p.Nk*(c.zN - c.zF); MsB += p.Nk*(c.zB - c.zN);
+  c.MsF = MsF; c.MsB = MsB;
+  c.K0F = c.Mh > 1e-9 ? MsF/c.Mh : Infinity;
+  c.K0B = c.Mh > 1e-9 ? MsB/c.Mh : Infinity;
+  c.K0  = Math.min(c.K0F, c.K0B);
+  c.gov = c.K0F <= c.K0B ? "前趾" : "后趾";
+  /* 基底应力（直线分布） */
+  let Mm = 0;
+  items.forEach(it=>{ Mm += it.W*(it.z - c.zc); });
+  Mm += p.Nk*(c.zN - c.zc);
+  c.M = Mm + c.Mh;
+  c.e = c.Vsum > 1e-9 ? c.M/c.Vsum : 0;
+  c.pMean = c.Vsum/c.A;
+  c.pMax = c.pMean + 6*Math.abs(c.M)/(c.Wb*c.Lb*c.Lb);
+  c.pMin = c.pMean - 6*Math.abs(c.M)/(c.Wb*c.Lb*c.Lb);
+  c.eLim = c.Lb/(p.fndRock ? 4 : 6);
+  /* 判定 */
+  c.okKc  = c.Kc >= K_SLIDE;
+  c.okK0  = c.K0 >= K_OVER;
+  c.okE   = Math.abs(c.e) <= c.eLim + 1e-9;
+  c.okPm  = c.pMean <= p.fa + 1e-9;
+  c.okPx  = c.pMax <= P_MAX_RATIO*p.fa + 1e-9;
+  c.okB   = c.okE && c.okPm && c.okPx;
+  c.okAll = c.okKc && c.okK0 && c.okB;
+  return c;
 }
 
 /* ================= three.js 场景 ================= */
@@ -1282,6 +1417,59 @@ function renderTable(p, q){
   ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
 }
 
+function renderCheck(p, q){
+  const rows = [];
+  const c = calcCheck(p, q);
+  const okT = '<span style="color:#15803d;font-weight:700;">通过</span>';
+  const noT = '<span style="color:#b91c1c;font-weight:700;">不通过</span>';
+  const mk  = ok => (ok === undefined || ok === null) ? "—" : (ok ? okT : noT);
+  const num = v => v === Infinity ? "∞" : f(v, 3);
+  const row = (n, fx, v, u, ok) => rows.push(
+    `<tr><td>${n}</td><td class="fx">${fx}</td><td class="num">${num(v)}</td><td>${u}</td>`+
+    `<td style="text-align:center;">${mk(ok)}</td></tr>`);
+  const sep = t => rows.push(`<tr class="sep"><td colspan="5">${t}</td></tr>`);
+
+  sep("竖向力（标准值，基底以上全部竖向力）");
+  row("支座竖向荷载 Nk", `支座中心 z=${f(c.zN,2)}（自背墙前缘向内 ${f(c.dBear,2)}）`, p.Nk, "kN");
+  row("桥台圬工自重", `ΣVi×γc = ${f(q.total,3)}×${f(p.gamC,1)}`, c.Gc, "kN");
+  row("台腔回填土重", p.incFill ? `V填×γs = ${f(q.V_fill,2)}×${f(p.gamS,1)}` : "按偏安全不计入", c.Gs, "kN");
+  rows.push(`<tr class="total"><td>ΣV 合计</td><td class="fx">支座反力＋自重＋回填</td>`+
+    `<td class="num">${f(c.Vsum,3)}</td><td>kN</td><td></td></tr>`);
+  row("合力作用点 z", `距基底前趾 ${f(c.zbar - c.zF,2)}，距后趾 ${f(c.zB - c.zbar,2)}`, c.zbar, "m");
+
+  sep("抗滑移稳定");
+  row("Kc = μ·ΣV / Hk", `= ${f(p.fric,2)}×${f(c.Vsum,1)} / ${f(c.Hk,1)}，要求 ≥ ${f(K_SLIDE,1)}`,
+      c.Kc, "—", c.okKc);
+
+  sep("抗倾覆稳定（水平力取不利方向，绕基底边缘取矩）");
+  row("K0(前趾) = ΣM稳 /(Hk·h)", `ΣM稳=${f(c.MsF,1)} kN·m，力臂 h=${f(c.hH,2)}（作用点标高 ${f(c.yH,2)}），要求 ≥ ${f(K_OVER,1)}`,
+      c.K0F, "—", c.okK0);
+  row("K0(后趾) = ΣM稳 /(Hk·h)", `ΣM稳=${f(c.MsB,1)} kN·m`, c.K0B, "—", c.okK0);
+  rows.push(`<tr class="total"><td>控制值 K0</td><td class="fx">取前趾/后趾不利者（本例${c.gov}控制）</td>`+
+    `<td class="num">${num(c.K0)}</td><td>—</td><td style="text-align:center;">${mk(c.okK0)}</td></tr>`);
+
+  sep("基底承载力（直线分布假定）");
+  row("基底面积 A", `B×L = ${f(c.Wb,2)}×${f(c.Lb,2)}`, c.A, "m²");
+  row("竖向力 N", `= ΣV`, c.Vsum, "kN");
+  row("对基底形心弯矩 M", `竖向力偏心＋水平力 Hk×${f(c.hH,2)}`, c.M, "kN·m");
+  row("偏心距 e", `|M|/N，限值 ${f(c.eLim,3)}（${p.fndRock ? "岩石 b/4" : "土基 b/6"}）`,
+      Math.abs(c.e), "m", c.okE);
+  row("平均应力 p均", `N/A，要求 ≤ fa = ${f(p.fa,0)}`, c.pMean, "kPa", c.okPm);
+  row("最大应力 p最大", `N/A＋6|M|/(B·L²)，要求 ≤ 1.2fa = ${f(P_MAX_RATIO*p.fa,0)}`, c.pMax, "kPa", c.okPx);
+  row("最小应力 p最小", `N/A−6|M|/(B·L²)，要求 ≥ 0`, c.pMin, "kPa", c.pMin >= -1e-9);
+
+  rows.push(`<tr class="total"><td>验算结论</td><td class="fx">抗滑移 / 抗倾覆 / 承载力</td>`+
+    `<td class="num">—</td><td>—</td><td style="text-align:center;">${mk(c.okAll)}</td></tr>`);
+  $("checkBody").innerHTML = rows.join("");
+
+  $("checkNote").innerHTML = `<b>验算依据与假定</b>` + [
+    `① 荷载均取<strong>标准值</strong>（桥台自重＋台腔回填＋支座反力＋水平力），未计入台后主动土压力、水浮力、地震作用及横桥向偏心；<strong>水平荷载 Hk 应自行计入制动力、温度力与台后主动土压力</strong>，否则抗滑移结果偏乐观。承载能力极限状态应另按 JTG 3362 / JTG D60 组合复核。`,
+    `② 抗滑移 Kc = μ·ΣV/Hk ≥ 1.3；抗倾覆分别绕基底前趾（河心侧）与后趾（台后侧）取矩，K0 = ΣM稳/(Hk·h) ≥ 1.5，取不利者控制；基底应力按直线分布，p均 ≤ fa、p最大 ≤ 1.2fa，偏心距 e ≤ L/6（土基）或 L/4（岩石）。限值取自《公路桥涵地基与基础设计规范》JTG 3363—2019 的常规规定，项目另有规定或持力层软弱时应按实际调整。`,
+    `③ 各构件自重按几何形心取矩（前墙梯形按解析形心，侧墙、回填按断面面积加权数值积分，牛腿按直角梯形断面形心），与三维模型同源；竖向力作用点、基底轮廓均随参数联动。`,
+    `④ 本表用于方案比较与初判；施工图阶段应按实际荷载组合、地基容许承载力深宽修正、下卧层验算及沉降验算另行复核。`
+  ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
+}
+
 function rebuild(){
   const p = readP(), q = calcQ(p);
   try{
@@ -1305,6 +1493,11 @@ function rebuild(){
     renderTable(p, q);
   }catch(err){
     $("resultBody").innerHTML = '<tr><td colspan="5" class="neg">计算表渲染出错：'+(err && err.message ? err.message : err)+'</td></tr>';
+  }
+  try{
+    renderCheck(p, q);
+  }catch(err){
+    $("checkBody").innerHTML = '<tr><td colspan="5" class="neg">验算表渲染出错：'+(err && err.message ? err.message : err)+'</td></tr>';
   }
   if(scene){
     try{
