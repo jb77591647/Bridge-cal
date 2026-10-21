@@ -14,6 +14,8 @@ desktop.ini
 .tmp/_r[0-9].txt
 .tmp/_shot*.png
 .tmp/_c[0-9].png
+.tmp/_s[0-9].png
+.tmp/_d[0-9].png
 .tmp/_check.html
 .tmp/_tmp_run.js
 .tmp/probe*.js
