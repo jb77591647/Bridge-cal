@@ -137,6 +137,19 @@
       </div>
 
       <div class="card">
+        <h2>盖梁（墩帽）</h2>
+        <div class="chk" style="margin:0 0 4px;"><input type="checkbox" id="useCap" checked>
+          <label for="useCap">设置盖梁</label></div>
+        <div class="fields">
+          <div class="field"><label>盖梁高 hc</label><input type="number" id="caph" value="1.20" step="0.01"></div>
+          <div class="field"><label>盖梁宽 bc <small>顺桥向</small></label><input type="number" id="capb" value="2.50" step="0.01"></div>
+          <div class="field"><label>横桥向悬出 ec <small>每侧，自墩身外缘</small></label><input type="number" id="cape" value="0.50" step="0.01"></div>
+          <div class="field"><label>盖梁长 Lc <small>=墩身横桥向尺寸+2×ec，自动</small></label><input type="text" id="capLshow" value="" disabled style="background:#eef2f6; width:78px; text-align:right;"></div>
+        </div>
+        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），等高矩形断面；横桥向两端自墩身外缘各悬出 ec。</div>
+      </div>
+
+      <div class="card">
         <h2>扩大基础（1～2层）</h2>
         <div class="fields">
           <div class="field"><label>一层高度 fh1</label><input type="number" id="fh1" value="1.00" step="0.01"></div>
@@ -155,6 +168,9 @@
       <div class="card">
         <h2>材料</h2>
         <div class="fields">
+          <div class="field"><label>盖梁</label><select id="matCap">
+            <option>C25砼</option><option selected>C30砼</option><option>C35砼</option><option>C40砼</option>
+            <option>C30片石砼</option><option>C35片石砼</option></select></div>
           <div class="field"><label>墩身</label><select id="matPier">
             <option>C15砼</option><option>C20砼</option><option>C25砼</option><option selected>C30砼</option><option>C35砼</option>
             <option>C15片石砼</option><option>C20片石砼</option><option>C25片石砼</option><option>C30片石砼</option><option>C35片石砼</option>
@@ -181,10 +197,25 @@
       </div>
 
       <div class="card">
+        <h2>验算参数（标准值）</h2>
+        <div class="fields">
+          <div class="field"><label>上部结构竖向反力 Nk <small>支座反力合计</small></label><input type="number" id="Nk" value="3000" step="10"></div>
+          <div class="field"><label>制动力 Hk <small>顺桥向，作用点见图</small></label><input type="number" id="Hk" value="300" step="10"></div>
+          <div class="field"><label>水平力作用点距盖梁顶 dH</label><input type="number" id="dH" value="0.25" step="0.01"></div>
+          <div class="field"><label>混凝土容重 γc <small>kN/m³</small></label><input type="number" id="gamC" value="24" step="0.5" min="0"></div>
+          <div class="field"><label>基底摩擦系数 μ</label><input type="number" id="mu" value="0.30" step="0.05" min="0"></div>
+          <div class="field"><label>持力层承载力 fa <small>kPa 基本容许值</small></label><input type="number" id="fa" value="500" step="10"></div>
+          <div class="field"><label>持力层类型</label><select id="fndType"><option selected>土基</option><option>岩石</option></select></div>
+        </div>
+        <div class="note" style="margin-top:6px;">限值：抗滑移 Kc≥1.3、抗倾覆 K0≥1.5；偏心距 e≤a/6（岩石 a/4）；p最大≤1.2fa、p最小≥0。竖向反力按作用于墩中心计。</div>
+      </div>
+
+      <div class="card">
         <h2>说明</h2>
         <div class="note" style="margin-top:0;">
           坐标系：原点=墩身底面中心（基础顶面中心），x=纵桥向、y=横桥向、z=竖向；标高以墩底=0.000 计，绝对标高=相对标高+原点绝对标高。<br>
-          基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。
+          基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。<br>
+          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），等高矩形断面：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；勾掉「设置盖梁」即不计盖梁。
         </div>
       </div>
     </div>
@@ -198,6 +229,7 @@
         <label><input type="checkbox" id="showELa"> 显示绝对标高</label>
         <label><input type="checkbox" id="showAxes"> 显示坐标轴</label>
         <label><input type="checkbox" id="wireOnly"> 仅显示轮廓</label>
+        <label><input type="checkbox" id="pCap" checked> 盖梁</label>
         <label><input type="checkbox" id="pPier" checked> 墩身</label>
         <label><input type="checkbox" id="pFd" checked> 基础</label>
         <label><input type="checkbox" id="exGround"> 现状地平面</label>
@@ -213,6 +245,7 @@
         <span style="color:var(--sub); font-size:11.5px;">左键旋转 · 右键/中键平移 · 滚轮缩放</span>
       </div>
       <div class="legend">
+        <span><i class="sw" style="background:#86c28b"></i>盖梁</span>
         <span><i class="sw" style="background:#c8a27c"></i>墩身</span>
         <span><i class="sw" style="background:#c9d4de"></i>基础一层</span>
         <span><i class="sw" style="background:#aab8c9"></i>基础二层</span>
@@ -227,6 +260,14 @@
           <tbody id="resultBody"></tbody>
         </table>
         <div class="note" id="assumpNote"></div>
+      </div>
+      <div class="card">
+        <h2>稳定与承载力验算（标准值组合）</h2>
+        <table>
+          <thead><tr><th style="width:23%">项目</th><th>计算式</th><th style="width:13%; text-align:right;">数值</th><th style="width:8%;">单位</th><th style="width:10%; text-align:center;">判定</th></tr></thead>
+          <tbody id="checkBody"></tbody>
+        </table>
+        <div class="note" id="checkNote"></div>
       </div>
     </div>
   </div>
@@ -259,6 +300,9 @@ function readP(){
     Lp:g("Lp"), Wp:g("Wp"),
     d:g("d"), n, s:Math.max(g("d"), g("s")),  // 中心距小于直径时按直径取值，避免柱体重叠
     useFd2:$("useFd2").checked, fh1:g("fh1"), c1:g("c1"), fh2:g("fh2"), c2:g("c2"),
+    useCap:$("useCap").checked, caph:g("caph"), capb:g("capb"), cape:g0("cape"),
+    Nk:g0("Nk"), Hk:g0("Hk"), dH:g0("dH"), gamC:g0("gamC"), mu:g0("mu"), fa:g("fa"),
+    fndRock:$("fndType").value==="岩石",
     excMs:g("excMs"), excMr:g("excMr"), excW:g("excW"), excH:g("excH"), excHs:g("excHs"),
     excHst:g("excHst"), excB:g("excB")
   };
@@ -281,7 +325,13 @@ function calcQ(p){
   q.V_fd1  = q.a1*q.b1*p.fh1;
   q.V_fd2  = p.useFd2 ? q.a2*q.b2*p.fh2 : 0;
   q.V_fd   = q.V_fd1 + q.V_fd2;
-  q.total  = q.V_pier + q.V_fd;
+  /* 盖梁（墩帽）：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec；
+     顺桥向宽 bc、高 hc，等高矩形断面，坐于墩顶（底面 z=H，顶面 z=H+hc） */
+  q.capBase = baseB;
+  q.capL = p.useCap ? baseB + 2*p.cape : 0;
+  q.V_cap = p.useCap ? q.capL * p.capb * p.caph : 0;
+  q.capT  = p.useCap ? p.caph : 0;               // 盖梁高（不设盖梁时为 0）
+  q.total  = q.V_pier + q.V_cap + q.V_fd;
   /* 开挖：坑底平面=最底层基础轮廓（矩形 边长×边长）+每侧工作宽度，坑底=基础底面（z=−fdT）。
      分层放坡（下层石方 h石 坡比 m石、上层土方 h土 坡比 m土，层间连续，竖:横=m:1，0=竖直）；
      分级放坡：自坑底每累计一个分级高度 h分 设一级平台（宽 b平），平台处开挖线每侧水平外移 b平 再继续放坡。
@@ -421,6 +471,8 @@ function setViewPreset(kind){
 
 /* ---- 几何工具 ---- */
 const MAT = {
+  cap : ()=> new THREE.MeshLambertMaterial({color:0x86c28b, side:THREE.DoubleSide,
+           colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
   pier: ()=> new THREE.MeshLambertMaterial({color:0xc8a27c, side:THREE.DoubleSide,
            colorWrite: !$("wireOnly").checked, polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}),
   fd1 : ()=> new THREE.MeshLambertMaterial({color:0xc9d4de, side:THREE.DoubleSide,
@@ -587,6 +639,20 @@ function excProfile(p, q){
 }
 /* 参数 → 部位/边长映射：{pts:粗线段} / {circles:[x,y,z,R]} / {parts:[部件标签]}，null=不适用 */
 const PARAM_HL = {
+  useCap:(p,q)=> p.useCap ? {parts:["cap"]} : null,
+  caph:  (p,q)=> p.useCap ? {pts:[
+            -p.capb/2,-q.capL/2,p.H, -p.capb/2,-q.capL/2,p.H+p.caph,     /* 盖梁四条竖直棱 */
+             p.capb/2,-q.capL/2,p.H,  p.capb/2,-q.capL/2,p.H+p.caph,
+            -p.capb/2, q.capL/2,p.H, -p.capb/2, q.capL/2,p.H+p.caph,
+             p.capb/2, q.capL/2,p.H,  p.capb/2, q.capL/2,p.H+p.caph ]} : null,
+  capb:  (p,q)=> p.useCap ? {pts:[
+            -p.capb/2,-q.capL/2,p.H+p.caph, p.capb/2,-q.capL/2,p.H+p.caph,   /* 顺桥向边（顶/底） */
+            -p.capb/2, q.capL/2,p.H+p.caph, p.capb/2, q.capL/2,p.H+p.caph,
+            -p.capb/2,-q.capL/2,p.H,        p.capb/2,-q.capL/2,p.H,
+            -p.capb/2, q.capL/2,p.H,        p.capb/2, q.capL/2,p.H ]} : null,
+  cape:  (p,q)=> p.useCap ? {pts:[
+            p.capb/2, q.capBase/2, p.H+p.caph, p.capb/2, q.capL/2, p.H+p.caph,   /* 两端悬出段（顶面） */
+           -p.capb/2, q.capBase/2, p.H+p.caph,-p.capb/2, q.capL/2, p.H+p.caph ]} : null,
   Hp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
             -p.Lp/2,-p.Wp/2,0, -p.Lp/2,-p.Wp/2,p.H,     /* 四条竖直棱（墩底→墩顶） */
              p.Lp/2,-p.Wp/2,0,  p.Lp/2,-p.Wp/2,p.H,
@@ -714,6 +780,14 @@ function buildModel(p, q){
     }
   }
 
+  /* 盖梁（墩帽）：等高矩形断面，坐于墩顶（底面 z=H、顶面 z=H+hc）；
+     横桥向长 Lc（墩身横桥向尺寸 + 两端各悬出 ec）、顺桥向宽 bc */
+  if(p.useCap){
+    group.add(Object.assign(
+      box(-p.capb/2, p.capb/2, -q.capL/2, q.capL/2, p.H, p.H+p.caph, MAT.cap()),
+      {userData:{part:"cap"}}));
+  }
+
   /* ---- 开挖显示：分级放坡棱台带 + 现状地平面（半透明，显隐由工具栏开关控制） ----
      坑底=最底层基础轮廓+每侧工作宽度（坑底标高 z=−fdT），地面=zBot+H挖；
      分层放坡（下石上土、层间连续）+分级平台（每 h分 一级、宽 b平，平台处断面外移 b平 形成台阶） */
@@ -805,6 +879,14 @@ function buildModel(p, q){
     const xP = isRect ? p.Lp/2 : p.d/2;          /* 墩身纵桥向边缘 */
     /* 竖向：墩身高 H、一层/二层厚度 */
     L.add(makeDimRaw(V(-xP,-q.b1/2,0), V(-xP,-q.b1/2,p.H), V(0,-1.6,0), `H=${ft(p.H)}`, DC, "pier"));
+    /* 盖梁：高 hc（竖向）、宽 bc（顺桥向）、长 Lc（横桥向）、两端悬出 ec */
+    if(p.useCap){
+      L.add(makeDimRaw(V(-p.capb/2,-q.capL/2,p.H), V(-p.capb/2,-q.capL/2,p.H+p.caph), V(-1.6,0,0), `hc=${ft(p.caph)}`, DC, "cap"));
+      L.add(makeDimRaw(V(-p.capb/2,-q.capL/2,p.H+p.caph), V(p.capb/2,-q.capL/2,p.H+p.caph), V(0,0,0.9), `bc=${ft(p.capb)}`, DC, "cap"));
+      L.add(makeDimRaw(V(p.capb/2,-q.capL/2,p.H+p.caph), V(p.capb/2,q.capL/2,p.H+p.caph), V(2.4,0,0), `Lc=${ft(q.capL)}`, DC, "cap"));
+      const yE = q.capBase/2;                     /* 墩身横桥向外缘 */
+      L.add(makeDimRaw(V(p.capb/2,yE,p.H+p.caph), V(p.capb/2,q.capL/2,p.H+p.caph), V(1.2,0,0), `ec=${ft(p.cape)}`, DC2, "cap"));
+    }
     L.add(makeDimRaw(V(-q.a1/2,-q.b1/2,0), V(-q.a1/2,-q.b1/2,-p.fh1), V(0,-1.6,0), `fh1=${ft(p.fh1)}`, DC, "fd1"));
     if(p.useFd2) L.add(makeDimRaw(V(-q.a2/2,-q.b2/2,-p.fh1), V(-q.a2/2,-q.b2/2,-q.fdT), V(0,-1.6,0), `fh2=${ft(p.fh2)}`, DC, "fd2"));
     /* 基础平面：一层纵桥向/横桥向边长，二层纵桥向边长 */
@@ -836,6 +918,7 @@ function buildModel(p, q){
       ["墩顶",    p.H,    "pier"]
     ];
     if(p.useFd2) items.splice(1, 0, ["一层顶", -p.fh1, "fd1"]);
+    if(p.useCap) items.push(["盖梁顶", p.H+p.caph, "cap"]);
     for(const [nm, z, part] of items){
       if($("showEL").checked)  L.add(makeLabelRaw(`${nm} ▽${ft(z,3)}`, 0, -q.b1/2-2.8, z+0.3, eC, 0.95, part));
       if($("showELa").checked) L.add(makeLabelRaw(`${nm} ▽${ft(z+ea,3)}`, 0, -q.b1/2-2.8+($("showEL").checked?2.4:0), z+0.3, eA, 0.95, part));
@@ -844,11 +927,12 @@ function buildModel(p, q){
 
   /* 视角对准模型 */
   if(!modelCenter) modelCenter = new THREE.Vector3();
-  modelCenter.set(0, 0, (p.H-q.fdT)/2);
+  const topZ = p.H + (p.useCap ? p.caph : 0);       /* 模型顶=盖梁顶（不设盖梁时=墩顶） */
+  modelCenter.set(0, 0, (topZ - q.fdT)/2);
   if(needFocus && camera){
     if(!tgt) tgt = new THREE.Vector3();
     tgt.copy(modelCenter);
-    sph.r = Math.min(Math.max(Math.max(p.H, q.b1)*2.1, 10), 300);
+    sph.r = Math.min(Math.max(Math.max(topZ, q.b1, q.capL || 0)*2.1, 10), 300);
     needFocus = false;
     updateCam();
   }
@@ -861,13 +945,15 @@ function buildModel(p, q){
 /* 分构件显示开关（同时控制对应标注） */
 function applyPartVisibility(){
   if(!group) return;
-  const show = { pier:$("pPier").checked, fd1:$("pFd").checked, fd2:$("pFd").checked,
+  const show = { cap:$("pCap").checked && p_useCap(), pier:$("pPier").checked, fd1:$("pFd").checked, fd2:$("pFd").checked,
     ground:$("exGround").checked, exS:$("exSoil").checked, exR:$("exRock").checked };
   [group, labelGroup].forEach(G=>{
     if(!G) return;
     G.traverse(o=>{ if(o.userData && o.userData.part) o.visible = !!show[o.userData.part]; });
   });
 }
+/* 盖梁是否设置（供显隐与标题判断，避免重复读 DOM） */
+function p_useCap(){ try{ return !!$("useCap").checked; }catch(_){ return true; } }
 
 /* ================= 表格 / 主流程 ================= */
 function renderTable(p, q){
@@ -877,6 +963,8 @@ function renderTable(p, q){
     `<tr${cls?` class="${cls}"`:""}><td>${name}</td><td class="fx">${fx}</td>`+
     `<td>${mt||"—"}</td><td class="num">${f(Math.abs(val),3)}</td><td>${unit}</td></tr>`);
   const isRect = p.type==="实体矩形桥墩";
+  if(p.useCap)
+    add("盖梁（墩帽）", `Lc×bc×hc = ${f(q.capL)}×${f(p.capb)}×${f(p.caph)}（横桥向长=${f(q.capBase)}墩身横桥向尺寸+2×悬出${f(p.cape)}；等高矩形断面）`, q.V_cap, "m³", mat("matCap"));
   if(isRect)
     add("墩身", `Lp×Wp×H = ${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}（实体矩形，竖直面）`, q.V_pier, "m³", mat("matPier"));
   else
@@ -884,7 +972,7 @@ function renderTable(p, q){
   add("基础一层", `${f(q.a1)}×${f(q.b1)}×${f(p.fh1)}（墩身尺寸+每侧襟边 ${f(p.c1)}）`, q.V_fd1, "m³", mat("matFd"));
   if(p.useFd2)
     add("基础二层", `${f(q.a2)}×${f(q.b2)}×${f(p.fh2)}（一层边长+每侧襟边 ${f(p.c2)}）`, q.V_fd2, "m³", mat("matFd"));
-  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">墩身+基础一层${p.useFd2?"+基础二层":""}</td><td>—</td>`+
+  rows.push(`<tr class="total"><td>圬工合计</td><td class="fx">${p.useCap?"盖梁+":""}墩身+基础一层${p.useFd2?"+基础二层":""}</td><td>—</td>`+
     `<td class="num">${f(q.total,3)}</td><td>m³</td></tr>`);
   const sl = m => m>0 ? `${Number(f(m,2))}:1` : "竖直";
   rows.push(`<tr class="sep"><td colspan="5">开挖（不计入圬工）</td></tr>`);
@@ -898,10 +986,126 @@ function renderTable(p, q){
     `② 实体矩形桥墩：墩身四面的竖直面（无放坡），平面断面=墩身长 Lp（纵桥向）×墩身宽 Wp（横桥向），体积=断面×墩身高 H；`,
     `③ 圆柱式桥墩：n 根直径 d 的圆柱沿横桥向单排布置，相邻圆柱中心距 s；体积=n×π×d²/4×H；最外侧圆柱外缘距 Wd=(n−1)×s+d；`,
     `④ 扩大基础边长：一层平面=墩身尺寸（矩形取长宽、圆柱取最外侧圆柱外缘距 Wd）+每侧襟边 c1；设第二层时平面=一层边长+每侧襟边 c2，自上而下分层；`,
-    `⑤ 体积：基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=墩身+基础各层；`,
-    `⑥ 柱中心距小于直径时按直径取值（避免柱体重叠）；根数按整数取值；`,
-    `⑦ 开挖：坑底平面=最底层基础轮廓（矩形墩身取长宽、圆柱取 Wd，含襟边）+每侧工作宽度 c，坑底=基础底面（标高 −基础总厚）；现状地面标高=坑底标高+开挖总高度 H挖；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
+    `⑤ 盖梁（墩帽）：等高矩形断面，横桥向长 Lc＝墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；体积=Lc×bc×hc，坐于墩顶（墩顶即盖梁底面）；`,
+    `⑥ 体积：盖梁=Lc×bc×hc；基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=盖梁+墩身+基础各层；`,
+    `⑦ 柱中心距小于直径时按直径取值（避免柱体重叠）；根数按整数取值；`,
+    `⑧ 开挖：坑底平面=最底层基础轮廓（矩形墩身取长宽、圆柱取 Wd，含襟边）+每侧工作宽度 c，坑底=基础底面（标高 −基础总厚）；现状地面标高=坑底标高+开挖总高度 H挖；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
     `土/石方量采用**分段拟棱台体积公式** V=∑hᵢ/6·(A下+4A中+A上)（以每级平台与石土界面为分段点，段内断面面积随高度线性外放、为高度的二次函数，故该公式解析精确）。经典棱台公式 V=h/3·(S₁+S₂+√S₁S₂) 仅当顶底面相似时精确，本坑底为不等边矩形（顶底不相似），套用会产生系统性偏小，故本表不用经典公式；三维网格体积独立测量与拟棱台公式结果一致，已相互印证。`
+  ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
+}
+
+/* ================= 稳定与承载力验算 =================
+   基准：自重取标准值（kN）=体积×γc；上部结构反力作用于墩中心（无偏心）。
+   水平力取顺桥向制动力（指向河心，不利方向），作用点=盖梁顶+dH。
+   抗滑移 Kc=μΣV/ΣH；抗倾覆绕基底前趾（纵桥向最外边缘，稳定力臂 a/2）；
+   基底反力按直线分布假定：p=N/A±6M/(b·a²)，M=ΣH·hH，a=纵桥向边长、b=横桥向边长。 */
+function calcCheck(p, q){
+  const c = {};
+  const aB = p.useFd2 ? q.a2 : q.a1;         /* 基底纵桥向长（弯矩方向） */
+  const bB = p.useFd2 ? q.b2 : q.b1;         /* 基底横桥向长 */
+  c.aB = aB; c.bB = bB; c.A = aB*bB;
+  c.Gc = q.V_cap  * p.gamC;                  /* 盖梁自重（不设盖梁时为0） */
+  c.Gp = q.V_pier * p.gamC;
+  c.Gf = q.V_fd   * p.gamC;
+  c.Nk = p.Nk;
+  c.Vsum = c.Gc + c.Gp + c.Gf + c.Nk;
+  c.topZ = p.H + (p.useCap ? p.caph : 0);    /* 模型顶（盖梁顶/墩顶），自墩底 */
+  c.yH = c.topZ + p.dH;                      /* 水平力作用点（自墩底） */
+  c.hH = c.yH + q.fdT;                       /* 至基底 */
+  c.Hk = p.Hk; c.Hsum = p.Hk;
+  c.Mo = c.Hk * c.hH;                        /* 倾覆力矩（对基底前趾；竖向力过中心，对形心力矩为0） */
+  c.Ms = c.Vsum * aB/2;                      /* 稳定力矩（竖向力对基底前趾） */
+  c.Kc = c.Hsum > 1e-9 ? p.mu*c.Vsum/c.Hsum : Infinity;
+  c.K0 = c.Mo   > 1e-9 ? c.Ms/c.Mo          : Infinity;
+  c.M  = c.Mo;                               /* 对基底形心的弯矩 */
+  c.e  = c.Vsum > 1e-9 ? Math.abs(c.M)/c.Vsum : 0;
+  c.eLim = aB/(p.fndRock ? 4 : 6);
+  c.pMean = c.Vsum/c.A;
+  c.s6 = 6*Math.abs(c.M)/(bB*aB*aB);
+  c.pMax = c.pMean + c.s6;
+  c.pMin = c.pMean - c.s6;
+  c.okKc   = c.Kc >= 1.3 - 1e-9;
+  c.okK0   = c.K0 >= 1.5 - 1e-9;
+  c.okE    = c.e  <= c.eLim + 1e-9;
+  c.okPMax = c.pMax <= 1.2*p.fa + 1e-9;
+  c.okPMin = c.pMin >= -1e-9;
+  return c;
+}
+
+function renderCheck(p, q){
+  const c = calcCheck(p, q);
+  const rows = [];
+  const mk = ok => ok === undefined ? "" :
+    (ok ? '<span style="color:#15803d;font-weight:700;">✓ 满足</span>'
+        : '<span class="neg">✗ 不满足</span>');
+  const num = v => v === Infinity ? "∞" : (typeof v === "string" ? v : f(v, 3));
+  const row = (n, fx, v, u, ok) => rows.push(
+    `<tr><td>${n}</td><td class="fx">${fx}</td><td class="num">${num(v)}</td><td>${u}</td>`+
+    `<td style="text-align:center;">${mk(ok)}</td></tr>`);
+  const sep = t => rows.push(`<tr class="sep"><td colspan="5">${t}</td></tr>`);
+
+  /* ---- 一、竖向力 ---- */
+  sep("一、竖向力（标准值）");
+  if(p.useCap)
+    row("盖梁自重 Gc",
+      `V×γc＝Lc×bc×hc×γc＝${f(q.capL,2)}×${f(p.capb,2)}×${f(p.caph,2)}×${f(p.gamC,1)}`,
+      c.Gc, "kN");
+  if(p.type==="实体矩形桥墩")
+    row("墩身自重 Gp", `Lp×Wp×H×γc＝${f(p.Lp,2)}×${f(p.Wp,2)}×${f(p.H,2)}×${f(p.gamC,1)}`, c.Gp, "kN");
+  else
+    row("墩身自重 Gp", `n×π·d²/4×H×γc＝${p.n}×π×${f(p.d,2)}²/4×${f(p.H,2)}×${f(p.gamC,1)}`, c.Gp, "kN");
+  row("基础自重 Gf",
+    p.useFd2
+      ? `a1×b1×fh1×γc＋a2×b2×fh2×γc＝${f(q.a1,2)}×${f(q.b1,2)}×${f(p.fh1,2)}×${f(p.gamC,1)}＋${f(q.a2,2)}×${f(q.b2,2)}×${f(p.fh2,2)}×${f(p.gamC,1)}`
+      : `a1×b1×fh1×γc＝${f(q.a1,2)}×${f(q.b1,2)}×${f(p.fh1,2)}×${f(p.gamC,1)}`,
+    c.Gf, "kN");
+  row("上部结构竖向反力 Nk", "支座反力合计（竖向，按作用于墩中心计）", c.Nk, "kN");
+  rows.push(`<tr class="total"><td>ΣV 合计</td><td class="fx">`+
+    `${p.useCap?"Gc＋":""}Gp＋Gf＋Nk＝${f(c.Vsum,1)}</td><td class="num">${f(c.Vsum,3)}</td><td>kN</td><td></td></tr>`);
+
+  /* ---- 二、水平力 ---- */
+  sep("二、水平力（顺桥向，指向河心为不利方向）");
+  row("制动力 Hk", "按墩顶制动力取用（标准值）", c.Hk, "kN");
+  rows.push(`<tr class="total"><td>ΣH 合计</td><td class="fx">＝Hk＝${f(c.Hsum,1)}</td>`+
+    `<td class="num">${f(c.Hsum,3)}</td><td>kN</td><td></td></tr>`);
+
+  /* ---- 三、抗滑移 ---- */
+  sep("三、抗滑移稳定");
+  row("抗滑移系数 Kc",
+    `Kc＝μ·ΣV/ΣH＝${f(p.mu,2)}×${f(c.Vsum,1)}/${f(c.Hsum,1)}；要求 ≥ 1.3`,
+    c.Kc, "—", c.okKc);
+
+  /* ---- 四、抗倾覆 ---- */
+  sep("四、抗倾覆稳定（绕基底前趾，即纵桥向最外边缘）");
+  row("水平力至基底力臂 hH",
+    `＝模型顶 ${f(c.topZ,2)}（墩高 ${f(p.H,2)}${p.useCap?"＋盖梁高 "+f(p.caph,2):""}）＋dH ${f(p.dH,2)}＋基础总厚 ${f(q.fdT,2)}`,
+    c.hH, "m");
+  row("倾覆力矩 ΣM倾", `＝Hk×hH＝${f(c.Hk,1)}×${f(c.hH,3)}`, c.Mo, "kN·m");
+  row("稳定力矩 ΣM稳", `＝ΣV×a/2＝${f(c.Vsum,1)}×${f(c.aB,2)}/2（a＝基底纵桥向长，竖向力过基底中心）`, c.Ms, "kN·m");
+  row("抗倾覆系数 K0", `K0＝ΣM稳/ΣM倾＝${f(c.Ms,1)}/${f(c.Mo,1)}；要求 ≥ 1.5`, c.K0, "—", c.okK0);
+
+  /* ---- 五、基底承载力 ---- */
+  sep("五、基底承载力（直线分布假定）");
+  row("基底面积 A", `=a×b=${f(c.aB,2)}×${f(c.bB,2)}（a 纵桥向、b 横桥向${p.useFd2?"，取二层基础底面":"，取一层基础底面"}）`, c.A, "m²");
+  row("对基底形心弯矩 M", `＝ΣH×hH＝${f(c.Hsum,1)}×${f(c.hH,3)}（竖向力过基中心，不产生弯矩）`, c.M, "kN·m");
+  row("偏心距 e", `e＝|M|/N＝${f(Math.abs(c.M),1)}/${f(c.Vsum,1)}`, c.e, "m", c.okE);
+  row("偏心距限值", `a/${p.fndRock?4:6}＝${f(c.aB,2)}/${p.fndRock?4:6}（${p.fndRock?"岩石":"土基"}）`, c.eLim, "m");
+  row("基底平均应力 p均", `＝N/A＝${f(c.Vsum,1)}/${f(c.A,2)}`, c.pMean, "kPa");
+  row("基底最大应力 p最大",
+    `p最大＝N/A＋6|M|/(b·a²)＝${f(c.pMean,4)}＋6×${f(Math.abs(c.M),1)}/(${f(c.bB,2)}×${f(c.aB,2)}²)；要求 ≤ 1.2fa＝${f(1.2*p.fa,1)}`,
+    c.pMax, "kPa", c.okPMax);
+  row("基底最小应力 p最小",
+    `p最小＝N/A−6|M|/(b·a²)＝${f(c.pMean,4)}−${f(Math.abs(c.s6),4)}；要求 ≥ 0`,
+    c.pMin, "kPa", c.okPMin);
+
+  $("checkBody").innerHTML = rows.join("");
+  $("checkNote").innerHTML = [
+    `① 自重均取标准值：G＝体积×混凝土容重 γc（盖梁、墩身、基础分别计算，体积见上方工程量表）；上部结构反力 Nk 按作用于墩中心，不产生偏心力矩；`,
+    `② 水平力取顺桥向制动力 Hk，作用点＝模型顶${p.useCap?"（盖梁顶）":"（墩顶）"}＋dH，指向河心（不利方向）；基础底面为验算截面；`,
+    `③ 抗倾覆绕<b>基底前趾</b>（纵桥向最外边缘）：稳定力矩＝ΣV×a/2，倾覆力矩＝ΣH×hH；抗滑移 Kc＝μ·ΣV/ΣH；`,
+    `④ 基底反力按直线分布假定，弯矩沿纵桥向（a 为纵桥向边长、b 为横桥向边长）：p最大/最小＝N/A±6|M|/(b·a²)；`,
+    `⑤ 限值：Kc≥1.3、K0≥1.5；偏心距 e≤a/${p.fndRock?4:6}（${p.fndRock?"岩石":"土基"}）；p最大≤1.2fa、p最小≥0；`,
+    `⑥ 本表未计横桥向水平力（风力、地震、横向制动力）、基础顶面覆土重与水的浮力，横向可按同一方法补充验算；方案阶段用于初判，施工图应结合规范组合复核。`
   ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
 }
 
@@ -909,6 +1113,7 @@ function rebuild(){
   const p = readP(), q = calcQ(p);
   try{
     $("Wdshow").value = f(q.Wd);
+    $("capLshow").value = p.useCap ? f(q.capL) : "—";
     $("f1ABshow").value = `${f(q.a1)}×${f(q.b1)}`;
     $("f2ABshow").value = p.useFd2 ? `${f(q.a2)}×${f(q.b2)}` : "—";
     $("excHr").value = f(q.excHr);
@@ -917,6 +1122,11 @@ function rebuild(){
     renderTable(p, q);
   }catch(err){
     $("resultBody").innerHTML = '<tr><td colspan="5" class="neg">计算表渲染出错：'+(err && err.message ? err.message : err)+'</td></tr>';
+  }
+  try{
+    renderCheck(p, q);
+  }catch(err){
+    $("checkBody").innerHTML = '<tr><td colspan="5" class="neg">验算表渲染出错：'+(err && err.message ? err.message : err)+'</td></tr>';
   }
   if(scene){
     try{
@@ -936,11 +1146,13 @@ function exportCSV(){
   const p = readP(), q = calcQ(p);
   const lines = [];
   lines.push(`${$("projName").value || "桥墩"} - 桥墩工程量计算表`);
-  lines.push(`标高以墩底=0.000;绝对标高=相对标高+原点绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;单位m`);
+  lines.push(`标高以墩底=0.000;绝对标高=相对标高+原点绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;盖梁长=墩身横向尺寸+2×悬出;单位m`);
   lines.push(`项目,计算式,材料,数量,单位`);
   const qq = s => `"${String(s).replace(/"/g,'""')}"`;
   const row = (n2,fx,v,u,mt) => lines.push([qq(n2),qq(fx),qq(mt||""),f(Math.abs(v),3),qq(u)].join(","));
   const mt = id => { try{ return $(id).value || ""; }catch(_){ return ""; } };
+  if(p.useCap)
+    row("盖梁（墩帽）", `${f(q.capL)}×${f(p.capb)}×${f(p.caph)}(横桥向长×纵桥向宽×高, +2×悬出${f(p.cape)})`, q.V_cap, "m3", mt("matCap"));
   if(p.type==="实体矩形桥墩")
     row("墩身", `${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}(实体矩形)`, q.V_pier, "m3", mt("matPier"));
   else
@@ -952,7 +1164,7 @@ function exportCSV(){
     .map(s=>`${f(s.h,2)}×(${f(s.S1,2)}+4×${f(s.Sm,2)}+${f(s.S2,2)})/6`).join("+") || "0";
   row("土方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(false)}, 坑底${f(q.excLa)}×${f(q.excWb)}(基础轮廓+工作宽度每侧${f(p.excW)}), 坡比(竖:横)${sl0(p.excMs)}, 分级高度${f(p.excHst,2)}/平台宽${f(p.excB,2)}`, q.V_exSoil, "m3");
   row("石方开挖", `分段拟棱台 V=Σh/6(A下+4A中+A上)=${segTerms(true)}, 坑底同上, 坡比(竖:横)${sl0(p.excMr)}`, q.V_exRock, "m3");
-  row("圬工合计", "墩身+基础一层"+(p.useFd2?"+基础二层":""), q.total, "m3");
+  row("圬工合计", (p.useCap?"盖梁+":"")+"墩身+基础一层"+(p.useFd2?"+基础二层":""), q.total, "m3");
   lines.push("说明:三维参数化估算,最终以施工图工程数量表为准");
   const blob = new Blob(["\ufeff" + lines.join("\r\n")], {type:"text/csv;charset=utf-8"});
   const a = document.createElement("a");

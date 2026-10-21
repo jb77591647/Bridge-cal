@@ -16,11 +16,13 @@ const vals = {
   d:"1.6", n:"3", s:"4.5", Wdshow:"", f1ABshow:"", f2ABshow:"",
   fh1:"1", c1:"0.5", fh2:"1", c2:"0.5",
   matPier:"C30砼", matFd:"C25砼",
-  excMs:"1", excMr:"1", excW:"0.5", excH:"3", excHs:"1", excHr:"", excHst:"5", excB:"1"
+  excMs:"1", excMr:"1", excW:"0.5", excH:"3", excHs:"1", excHr:"", excHst:"5", excB:"1",
+  caph:"1.2", capb:"2.5", cape:"0.5", capLshow:"",
+  Nk:"3000", Hk:"300", dH:"0.25", gamC:"24", mu:"0.3", fa:"500"
 };
 const checks = {
   useFd2:false, showLabels:false, showEL:false, showELa:false, showAxes:false, wireOnly:false, pPier:true, pFd:true,
-  exGround:false, exSoil:false, exRock:false
+  exGround:false, exSoil:false, exRock:false, pCap:true, useCap:true
 };
 const els = {};
 for(const k in vals) els[k] = { value: vals[k], checked:true, innerHTML:"", style:{}, disabled:true,
@@ -35,6 +37,10 @@ els.view3d = { value:"", checked:false, innerHTML:"", style:{}, addEventListener
   appendChild(){}, clientWidth:800, clientHeight:560 };
 els.resultBody = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.assumpNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.fndType  = { value:"土基", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.matCap   = { value:"C30砼", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.checkBody = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.checkNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 
 global.document = {
   getElementById(id){
@@ -52,7 +58,7 @@ global.window = { addEventListener(){}, devicePixelRatio:1 };
 global.requestAnimationFrame = ()=>{};
 global.Blob = class {};
 
-app += "\n;global.__api={readP,calcQ,buildModel,renderTable,setScene:(s)=>{scene=s;},groupRef:()=>group};";
+app += "\n;global.__api={readP,calcQ,calcCheck,buildModel,renderTable,renderCheck,rebuild,setScene:(s)=>{scene=s;},groupRef:()=>group};";
 global.THREE = require(LIB);
 
 let pass=0, fail=0;
@@ -113,7 +119,9 @@ near(q.V_pier, 120, 1e-6, "A 墩身体积 2.5×6×8=120");
 near(q.a1, 3.5, 1e-9, "A 一层边长(纵)=Lp+2c1=3.5");
 near(q.b1, 7, 1e-9, "A 一层边长(横)=Wp+2c1=7");
 near(q.V_fd, 24.5, 1e-6, "A 基础体积（1层）=24.5");
-near(q.total, 144.5, 1e-6, "A 圬工合计=144.5");
+near(q.capL, 7, 1e-9, "A 盖梁长=Wp+2×ec=7");
+near(q.V_cap, 21, 1e-9, "A 盖梁体积=Lc×bc×hc=7×2.5×1.2=21");
+near(q.total, 144.5+21, 1e-6, "A 圬工合计=盖梁21+墩身120+基础24.5=165.5");
 api.renderTable(p, q);
 let tbl = els.resultBody.innerHTML;
 isTrue(tbl.indexOf("墩身")>=0 && tbl.indexOf("基础一层")>=0 && tbl.indexOf("圬工合计")>=0, "A 表格行齐全");
@@ -138,7 +146,8 @@ near(q.V_pier, 3*Math.PI*1.6*1.6/4*8, 1e-9, "B 墩身体积=n×π d²/4×H");
 near(q.a1, 2.6, 1e-9, "B 一层边长(纵)=d+2c1=2.6");
 near(q.b1, 11.6, 1e-9, "B 一层边长(横)=Wd+2c1=11.6");
 near(q.V_fd, 30.16, 1e-6, "B 基础体积=2.6×11.6×1=30.16");
-near(q.total, q.V_pier+30.16, 1e-9, "B 圬工合计=墩身+基础");
+near(q.total, q.V_pier+30.16+q.V_cap, 1e-9, "B 圬工合计=墩身+基础+盖梁");
+near(q.capL, 11.6, 1e-9, "B 盖梁长=Wd+2×ec=11.6");
 api.renderTable(p, q);
 tbl = els.resultBody.innerHTML;
 isTrue(tbl.indexOf("π")>=0 && tbl.indexOf("圆柱")>=0, "B 表格含圆柱公式");
@@ -159,7 +168,7 @@ near(q.a2, 3.6, 1e-9, "C 二层边长(纵)=2.6+2×0.5=3.6");
 near(q.b2, 12.6, 1e-9, "C 二层边长(横)=11.6+2×0.5=12.6");
 near(q.V_fd2, 45.36, 1e-6, "C 二层体积=3.6×12.6×1=45.36");
 near(q.fdT, 2, 1e-9, "C 基础总厚=2");
-near(q.total, q.V_pier+30.16+45.36, 1e-9, "C 圬工合计");
+near(q.total, q.V_pier+30.16+45.36+q.V_cap, 1e-9, "C 圬工合计（含盖梁）");
 api.renderTable(p, q);
 tbl = els.resultBody.innerHTML;
 isTrue(tbl.indexOf("基础二层")>=0, "C 表格含基础二层行");
@@ -230,5 +239,74 @@ const bandTop = Math.max(...parts.exS.map(m=>bb(m).max.z));
 near(bandTop, -1+12, 1e-6, "G 顶带顶面=坑底+H挖（地面）");
 els.excH.value = "3"; els.excHs.value = "1"; els.excB.value = "1";
 
+
+/* ===== 工况H：盖梁 + 基底稳定与承载力验算（默认 矩形 H=8、一层基础、盖梁 hc1.2 bc2.5 ec0.5） =====
+   V_cap=7×2.5×1.2=21 → Gc=504；V_pier=120 → Gp=2880；V_fd=24.5 → Gf=588；Nk=3000 → ΣV=6972
+   模型顶=8+1.2=9.2、hH=9.2+0.25+1=10.45；M倾=300×10.45=3135；M稳=6972×3.5/2=12201 */
+els.pierType.value = "实体矩形桥墩";
+els.useFd2.checked = false; els.useCap.checked = true;
+els.caph.value = "1.2"; els.capb.value = "2.5"; els.cape.value = "0.5";
+els.Nk.value = "3000"; els.Hk.value = "300"; els.dH.value = "0.25"; els.gamC.value = "24";
+els.mu.value = "0.3"; els.fa.value = "500"; els.fndType.value = "土基";
+p = api.readP(), q = api.calcQ(p);
+api.rebuild();
+isTrue(els.capLshow.value === "7.00", "H 盖梁长自动填入 7.00");
+try{ api.buildModel(p, q); }catch(e){ console.error("FAIL: buildModel(H 盖梁) 异常:", e.message); process.exit(1); }
+parts = partsOf();
+isTrue((parts.cap||[]).length===1, "H 盖梁构件 1 块");
+const bbC = bb(parts.cap[0]);
+near(bbC.min.z, 8, 1e-6, "H 盖梁底面 z=墩顶 H=8");
+near(bbC.max.z, 9.2, 1e-6, "H 盖梁顶面 z=H+hc=9.2");
+near(bbC.max.x-bbC.min.x, 2.5, 1e-6, "H 盖梁顺桥向宽=bc=2.5");
+near(bbC.max.y-bbC.min.y, 7, 1e-6, "H 盖梁横桥向长=Lc=7");
+tbl = els.resultBody.innerHTML;
+isTrue(tbl.indexOf("盖梁（墩帽）")>=0, "H 工程量表含盖梁行");
+
+const cH = api.calcCheck(p, q);
+near(cH.Gc, 504, 1e-6, "H 盖梁自重=21×24=504");
+near(cH.Gp, 2880, 1e-6, "H 墩身自重=120×24=2880");
+near(cH.Gf, 588, 1e-6, "H 基础自重=24.5×24=588");
+near(cH.Vsum, 504+2880+588+3000, 1e-6, "H ΣV=6972");
+near(cH.yH, 9.45, 1e-9, "H 水平力作用点=模型顶9.2+dH0.25");
+near(cH.hH, 10.45, 1e-9, "H 至基底力臂=9.45+1.0");
+near(cH.Mo, 3135, 1e-6, "H 倾覆力矩=300×10.45");
+near(cH.Ms, 12201, 1e-6, "H 稳定力矩=6972×3.5/2");
+near(cH.Kc, 0.3*6972/300, 1e-9, "H 抗滑移 Kc=μΣV/ΣH");
+near(cH.K0, 12201/3135, 1e-9, "H 抗倾覆 K0=ΣM稳/ΣM倾");
+near(cH.A, 24.5, 1e-9, "H 基底面积=3.5×7");
+near(cH.e, 3135/6972, 1e-9, "H 偏心距 e=|M|/N");
+near(cH.eLim, 3.5/6, 1e-9, "H 土基偏心距限值=a/6");
+near(cH.pMean, 6972/24.5, 1e-9, "H p均=N/A");
+near(cH.pMax, 6972/24.5 + 6*3135/(7*3.5*3.5), 1e-9, "H p最大=N/A+6|M|/(b a²)");
+near(cH.pMin, 6972/24.5 - 6*3135/(7*3.5*3.5), 1e-9, "H p最小=N/A−6|M|/(b a²)");
+isTrue(cH.okKc && cH.okK0 && cH.okE && cH.okPMax && cH.okPMin, "H 默认参数下五项验算全部满足（✓）");
+const ckHtml = els.checkBody.innerHTML;
+isTrue(ckHtml.indexOf("一、竖向力")>=0 && ckHtml.indexOf("五、基底承载力")>=0 &&
+       ckHtml.indexOf("三、抗滑移")>=0 && ckHtml.indexOf("四、抗倾覆")>=0, "H 验算表五个分节齐全");
+isTrue(ckHtml.indexOf("抗滑移系数 Kc")>=0 && ckHtml.indexOf("抗倾覆系数 K0")>=0 &&
+       ckHtml.indexOf("基底最大应力 p最大")>=0, "H 验算表含 Kc / K0 / p最大 行");
+isTrue(ckHtml.indexOf("出错")<0 && els.checkNote.innerHTML.indexOf("出错")<0, "H 验算表与说明无渲染错误");
+isTrue(ckHtml.indexOf("NaN")<0 && ckHtml.indexOf("undefined")<0, "H 验算表无 NaN / undefined");
+
+/* ===== 工况I：不设盖梁 + 二层基础（基底取二层 a2×b2、岩石限值 a/4） ===== */
+els.useCap.checked = false; els.useFd2.checked = true;
+p = api.readP(), q = api.calcQ(p);
+near(q.V_cap, 0, 1e-12, "I 不设盖梁 V_cap=0");
+near(q.total, 120+24.5+36, 1e-9, "I 圬工合计=墩身+一层+二层（无盖梁）");
+try{ api.buildModel(p, q); }catch(e){ console.error("FAIL: buildModel(I) 异常:", e.message); process.exit(1); }
+parts = partsOf();
+isTrue(!parts.cap, "I 不设盖梁时无 cap 构件");
+const cI = api.calcCheck(p, q);
+near(cI.aB, 4.5, 1e-9, "I 基底纵桥向长取二层 a2=4.5");
+near(cI.bB, 8, 1e-9, "I 基底横桥向长取二层 b2=8");
+near(cI.yH, 8.25, 1e-9, "I 无盖梁时作用点=墩顶8+dH0.25");
+els.fndType.value = "岩石";
+near(api.calcCheck(api.readP(), q).eLim, 4.5/4, 1e-9, "I 岩石偏心距限值=a/4");
+api.rebuild();
+isTrue(els.checkBody.innerHTML.indexOf("盖梁自重")<0 &&
+       els.checkBody.innerHTML.indexOf("=a×b=4.50×8.00")>=0,
+  "I 不设盖梁时验算表无盖梁行、基底取二层 4.50×8.00");
+els.fndType.value = "土基";
+els.useCap.checked = true; els.useFd2.checked = false;
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail ? 1 : 0);

@@ -87,6 +87,17 @@ b = bbOf("excHst");
 nearHL(b.max.z - b.min.z, 5, 0.45, "桥墩 excHst 无平台时示意高度=h分");
 b = bbOf("excB");
 nearHL(b.max.z - b.min.z, 0.4, 0.45, "桥墩 excB 无平台时水平示意");
+b = bbOf("caph");
+nearHL(b.max.z - b.min.z, 1.2, 0.45, "桥墩 caph 高亮竖向跨=盖梁高 hc");
+nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 caph 高亮纵向跨=盖梁宽 bc");
+b = bbOf("capb");
+nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 capb 高亮纵向跨=bc");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 capb 高亮横向跨=Lc");
+b = bbOf("cape");
+nearHL(b.max.y - b.min.y, 0.5, 0.45, "桥墩 cape 高亮横向跨=悬出 ec");
+b = bbOf("useCap");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 useCap 高亮=整个盖梁 Lc");
+nearHL(b.max.z, 9.2, 0.5, "桥墩 useCap 高亮顶面=H+hc");
 b = bbOf("elAbs");
 nearHL(b.max.x - b.min.x, 1.2, 1e-6, "桥墩 elAbs 原点十字臂长");
 /* fh2：勾选二层基础后，高亮应为二层基础四个角点的竖直棱 */
