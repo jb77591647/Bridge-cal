@@ -100,6 +100,7 @@ nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 useCap 高亮=整个盖梁 Lc");
 nearHL(b.max.z, 9.2, 0.5, "桥墩 useCap 高亮顶面=H+hc");
 b = bbOf("elAbs");
 nearHL(b.max.x - b.min.x, 1.2, 1e-6, "桥墩 elAbs 原点十字臂长");
+nearHL((b.max.z + b.min.z)/2, -q0.fdT, 1e-6, "桥墩 elAbs 原点十字位于基础最低面(z=−基础总厚)");
 /* fh2：勾选二层基础后，高亮应为二层基础四个角点的竖直棱 */
 els.useFd2.checked = true;
 const p2 = api.readP(), q2 = api.calcQ(p2);

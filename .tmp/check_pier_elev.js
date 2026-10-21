@@ -19,12 +19,29 @@ isTrue(sp.every(s=>s.userData.part), "标签均带 part 归属");
 isTrue(sp.some(s=>s.userData.part==="fd1") && sp.filter(s=>s.userData.part==="pier").length===2 &&
   sp.filter(s=>s.userData.part==="cap").length===1,
   "part 归属：基础底=fd1，墩底/墩顶=pier，盖梁顶=cap");
+/* 相对标高以基础底面=0.000 计：墩底=基础总厚(fh1=1)、墩顶=1+8、盖梁顶=1+8+1.2 */
+const relTxt = sp.map(s=>s.userData.text).sort().join("|");
+const relExp = ["基础底 ▽0","墩底 ▽1","墩顶 ▽9","盖梁顶 ▽10.2"].sort().join("|");
+isTrue(relTxt === relExp, "相对标高基准=基础底面0.000（墩底=基础总厚1）: " + relTxt);
+
+/* 坐标原点：AxesHelper 落在基础最低面中心（场景 z=−基础总厚），x/y 仍为 0 */
+els.showAxes.checked = true;
+api.buildModel(p0, q0);
+let axObj = null;
+api.groupRef().traverse(o=>{ if(o.type === "AxesHelper") axObj = o; });
+isTrue(!!axObj && Math.abs(axObj.position.x) < 1e-9 && Math.abs(axObj.position.y) < 1e-9 &&
+  Math.abs(axObj.position.z + q0.fdT) < 1e-9,
+  "坐标轴原点下移到基础最低面中心（z=−基础总厚）");
+els.showAxes.checked = false;
 
 /* 场景2：仅绝对标高 → 4个，y 不外移 */
 els.showEL.checked = false; els.showELa.checked = true;
 api.buildModel(p0, q0);
 sp = api.labelSpritesRef();
 isTrue(sp.length===4, "单层基础+盖梁 仅绝对: 标签数=4 实际=" + sp.length);
+const absTxt = sp.map(s=>s.userData.text).sort().join("|");
+const absExp = ["基础底 ▽146","墩底 ▽147","墩顶 ▽155","盖梁顶 ▽156.2"].sort().join("|");
+isTrue(absTxt === absExp, "绝对标高=相对标高(基底0.000起算)+高程基准146: " + absTxt);
 let ys = sp.map(s=>s.position.y);
 isTrue(Math.min(...ys) === Math.max(...ys), "仅绝对时同一列(y无外移)");
 

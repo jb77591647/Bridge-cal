@@ -118,7 +118,7 @@
           <div class="field"><label>桥墩类型</label><select id="pierType">
             <option selected>实体矩形桥墩</option><option>圆柱式桥墩</option></select></div>
           <div class="field"><label>墩身高 H <small>墩底(基础顶)→墩顶</small></label><input type="number" id="Hp" value="6" step="0.01"></div>
-          <div class="field"><label>原点绝对标高 <small>墩底(0.000)对应高程</small></label><input type="number" id="elAbs" value="146" step="0.01"></div>
+          <div class="field"><label>高程基准绝对标高 <small>基础底面(标高0.000，与坐标原点同面)对应高程</small></label><input type="number" id="elAbs" value="146" step="0.01"></div>
         </div>
       </div>
 
@@ -213,7 +213,7 @@
       <div class="card">
         <h2>说明</h2>
         <div class="note" style="margin-top:0;">
-          坐标系：原点=墩身底面中心（基础顶面中心），x=纵桥向、y=横桥向、z=竖向；标高以墩底=0.000 计，绝对标高=相对标高+原点绝对标高。<br>
+          坐标系：原点=<strong>基础最低面（最下层基础底面）中心</strong>，x=纵桥向、y=横桥向、z=竖向（向上为正）；标高以<strong>基础底面=0.000</strong> 计（墩底标高即等于基础总厚），绝对标高=相对标高+高程基准绝对标高。<br>
           基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。<br>
           盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），等高矩形断面：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；勾掉「设置盖梁」即不计盖梁。
         </div>
@@ -315,7 +315,8 @@ function readP(){
 }
 
 /* ================= 工程量计算 =================
-   坐标系：原点=墩身底面中心，x纵桥向, y横桥向, z竖向(墩底=0, 基础在 z<0)
+   坐标系：原点=基础最低面（最下层基础底面）中心，x纵桥向, y横桥向, z竖向向上为正；
+           建模内部仍以「墩底=0、基础在 z<0」书写，展示标高 = 场景 z + 基础总厚（基础底面=0.000）
    基础边长：一层=墩身尺寸(矩形长宽 或 最外侧圆柱外缘距)+每侧襟边 c1；
              二层=一层边长+每侧襟边 c2（自上而下分层） */
 function calcQ(p){
@@ -547,6 +548,7 @@ function makeLabelRaw(text, x, y, z, color, scale, part){
   labelSprites.push(sp);
   sp.position.set(x,y,z);
   sp.userData.part = part;
+  sp.userData.text = text;        /* 留档文字：无头校验与调试可直接读标签内容 */
   return sp;
 }
 /* CAD 风格尺寸标注：p1/p2=被测点，off=尺寸线偏移矢量，text=测量文字，part=所属构件（随构件显隐） */
@@ -580,9 +582,10 @@ function makeDimRaw(p1, p2, off, text, color, part){
   return g;
 }
 
-/* ---- 建模（场景坐标：x纵桥向, y横桥向, z竖向；墩底=0，基础在 z<0） ---- */
+/* ---- 建模（场景坐标：x纵桥向, y横桥向, z竖向；几何以墩底=0、基础在 z<0 书写，
+        展示坐标原点=基础最低面中心，即场景 z=−基础总厚 处） ---- */
 /* ================= 参数高亮：输入框聚焦时对应部位/边长闪烁（实体粗管，避免线宽限制） =================
-   约定：几何点均用场景坐标 (x=纵桥向, y=横桥向, z=竖向)，原点=墩底中心 */
+   约定：几何点均用场景坐标 (x=纵桥向, y=横桥向, z=竖向)，几何基准=墩底中心（展示原点在 z=−基础总厚） */
 const HL_C = 0xef4444;
 let lastP = null, lastQ = null;
 function hlR(p, q){
@@ -737,7 +740,8 @@ const PARAM_HL = {
             if(!pts.length){ const zA = -q.fdT + p.excH;   /* 无平台：在坑口后角示意台阶宽 */
               pts.push(w0x + q.excOffTop, w0y + q.excOffTop, zA, w0x + q.excOffTop + p.excB, w0y + q.excOffTop, zA); }
             return {pts}; },                                                /* 平台台阶宽度 */
-  elAbs: ()=>({pts:[-0.6,0,0, 0.6,0,0,  0,-0.6,0, 0,0.6,0,  0,0,-0.6, 0,0,0.6]}),  /* 原点十字 */
+  elAbs: (p,q)=>{ const z = -(q.fdT || 0);   /* 原点十字：位于基础最低面（基底）中心 */
+            return {pts:[-0.6,0,z, 0.6,0,z,  0,-0.6,z, 0,0.6,z,  0,0,z-0.6, 0,0,z+0.6]}; },
   matPier:(p,q)=>({parts:["pier"]}),
   matFd: (p,q)=>({parts:["fd1","fd2"]})
 };
@@ -764,6 +768,10 @@ function buildModel(p, q){
     V(x0,y0,z1), V(x1,y0,z1), V(x1,y1,z1), V(x0,y1,z1)
   ], mat);
   const isRect = p.type==="实体矩形桥墩";
+  /* 坐标原点 = 基础最低面（最下层基础底面）中心：zO 为原点在场景竖向的位置。
+     几何仍以"墩底=0、基础在 z<0"书写，展示坐标 = 场景 z − zO，故部件标高 = z + 基础总厚。
+     x、y 原点本就落在基底中心（墩身与基础同轴、左右对称），无需平移。 */
+  const zO = -q.fdT;
 
   /* 基础（自上而下：一层 z∈[−fh1,0]，二层 z∈[−fdT,−fh1]） */
   group.add(Object.assign(box(-q.a1/2,q.a1/2,-q.b1/2,q.b1/2,-p.fh1,0, MAT.fd1()), {userData:{part:"fd1"}}));
@@ -858,12 +866,13 @@ function buildModel(p, q){
     }
   }
 
-  /* ---- 三维坐标轴（原点=墩底中心：x纵桥向, y横桥向, z竖向；长度2，端点带箭头，
-          depthTest=false 保证不被构件面遮挡） ---- */
+  /* ---- 三维坐标轴（原点=基础最低面中心，即最下层基础底面中心：x纵桥向, y横桥向, z竖向；
+          长度2，端点带箭头，depthTest=false 保证不被构件面遮挡） ---- */
   if($("showAxes").checked){
     const axLen = 2;
     const ax = new THREE.AxesHelper(axLen);
     ax.material.depthTest = false; ax.material.transparent = true; ax.renderOrder = 20;
+    ax.position.set(0, 0, zO);          /* 原点下移到基础底面（场景 z=−基础总厚） */
     group.add(ax);
     const axG = new THREE.Group();
     [[axLen,0,0,0xdc2626,[1,0,0]], [0,axLen,0,0x16a34a,[0,1,0]], [0,0,axLen,0x2563eb,[0,0,1]]]
@@ -874,9 +883,13 @@ function buildModel(p, q){
       cone.position.set(ex,ey,ez); cone.renderOrder = 20; axG.add(cone);
     });
     group.add(axG);
-    labelGroup.add(makeLabelRaw("x(纵桥向)", axLen+0.55, 0, 0, "#dc2626", 0.9));
-    labelGroup.add(makeLabelRaw("y(横桥向)", 0, axLen+0.55, 0, "#16a34a", 0.9));
-    labelGroup.add(makeLabelRaw("z(竖向)", 0, 0, axLen+0.55, "#2563eb", 0.9));
+    axG.position.set(0, 0, zO);         /* 箭头组与 AxesHelper 同步下移到原点（基础底面） */
+    labelGroup.add(makeLabelRaw("x(纵桥向)", axLen+0.55, 0, zO, "#dc2626", 0.9));
+    labelGroup.add(makeLabelRaw("y(横桥向)", 0, axLen+0.55, zO, "#16a34a", 0.9));
+    labelGroup.add(makeLabelRaw("z(竖向)", 0, 0, zO+axLen+0.55, "#2563eb", 0.9));
+    /* 原点文字：基底中心埋在基础实体里，坐标轴又是不被遮挡的（depthTest=false），
+       加一个标签明确"三轴交点＝基础最低面中心的原点"，避免误读为浮在基础顶面 */
+    labelGroup.add(makeLabelRaw("原点(基底中心)", 0, -0.9, zO-1.15, "#7c3aed", 0.9));
   }
 
   /* ---- 尺寸标注（CAD 风格，受"显示尺寸标注"与构件开关控制） ---- */
@@ -914,10 +927,12 @@ function buildModel(p, q){
     }
   }
 
-  /* ---- 部件标高：相对标高（墩底=0.000）/ 绝对标高（=相对+原点绝对标高），
-          分别受"显示相对标高/显示绝对标高"及分构件开关控制；两者同开时绝对标高外移一列避免重叠 ---- */
+  /* ---- 部件标高：相对标高（基础底面=0.000，墩底=基础总厚）/ 绝对标高（=相对+高程基准绝对标高），
+          分别受"显示相对标高/显示绝对标高"及分构件开关控制；两者同开时绝对标高外移一列避免重叠。
+          几何 z 自墩底起算，展示标高 = z + 基础总厚（与坐标原点 z=0 在基础底面一致） ---- */
   if($("showEL").checked || $("showELa").checked){
     const L = labelGroup, eC = "#0f766e", eA = "#0e7490", ea = isFinite(+p.elAbs) ? +p.elAbs : 0;
+    const zB = q.fdT || 0;            /* 展示标高 = 场景 z + 基础总厚 */
     const items = [
       ["基础底", -q.fdT,  p.useFd2 ? "fd2" : "fd1"],
       ["墩底",    0,      "pier"],
@@ -926,8 +941,8 @@ function buildModel(p, q){
     if(p.useFd2) items.splice(1, 0, ["一层顶", -p.fh1, "fd1"]);
     if(p.useCap) items.push(["盖梁顶", p.H+p.caph, "cap"]);
     for(const [nm, z, part] of items){
-      if($("showEL").checked)  L.add(makeLabelRaw(`${nm} ▽${ft(z,3)}`, 0, -q.b1/2-2.8, z+0.3, eC, 0.95, part));
-      if($("showELa").checked) L.add(makeLabelRaw(`${nm} ▽${ft(z+ea,3)}`, 0, -q.b1/2-2.8+($("showEL").checked?2.4:0), z+0.3, eA, 0.95, part));
+      if($("showEL").checked)  L.add(makeLabelRaw(`${nm} ▽${ft(z + zB,3)}`, 0, -q.b1/2-2.8, z+0.3, eC, 0.95, part));
+      if($("showELa").checked) L.add(makeLabelRaw(`${nm} ▽${ft(z + zB + ea,3)}`, 0, -q.b1/2-2.8+($("showEL").checked?2.4:0), z+0.3, eA, 0.95, part));
     }
   }
 
@@ -988,14 +1003,14 @@ function renderTable(p, q){
   add("石方开挖", `V=Σh/6(A下＋4A中＋A上)＝${segTerms(true)}（坑底同上，坡比(竖:横)${sl(p.excMr)}）`, q.V_exRock, "m³", "—");
   $("resultBody").innerHTML = rows.join("");
   $("assumpNote").innerHTML = `<b>模型与计算约定</b>` + [
-    `① 坐标系：原点=墩身底面中心（基础顶面中心），x 轴=纵桥向、y 轴=横桥向、z 轴=竖向；标高以墩底=0.000 计，绝对标高=相对标高+原点绝对标高；`,
+    `① 坐标系：原点=基础最低面（最下层基础底面）中心，x 轴=纵桥向、y 轴=横桥向、z 轴=竖向（向上为正）；标高以基础底面=0.000 计（墩底标高即等于基础总厚），绝对标高=相对标高+高程基准绝对标高；`,
     `② 实体矩形桥墩：墩身四面的竖直面（无放坡），平面断面=墩身长 Lp（纵桥向）×墩身宽 Wp（横桥向），体积=断面×墩身高 H；`,
     `③ 圆柱式桥墩：n 根直径 d 的圆柱沿横桥向单排布置，相邻圆柱中心距 s；体积=n×π×d²/4×H；最外侧圆柱外缘距 Wd=(n−1)×s+d；`,
     `④ 扩大基础边长：一层平面=墩身尺寸（矩形取长宽、圆柱取最外侧圆柱外缘距 Wd）+每侧襟边 c1；设第二层时平面=一层边长+每侧襟边 c2，自上而下分层；`,
     `⑤ 盖梁（墩帽）：等高矩形断面，横桥向长 Lc＝墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；体积=Lc×bc×hc，坐于墩顶（墩顶即盖梁底面）；`,
     `⑥ 体积：盖梁=Lc×bc×hc；基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=盖梁+墩身+基础各层；`,
     `⑦ 柱中心距小于直径时按直径取值（避免柱体重叠）；根数按整数取值；`,
-    `⑧ 开挖：坑底平面=最底层基础轮廓（矩形墩身取长宽、圆柱取 Wd，含襟边）+每侧工作宽度 c，坑底=基础底面（标高 −基础总厚）；现状地面标高=坑底标高+开挖总高度 H挖；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
+    `⑧ 开挖：坑底平面=最底层基础轮廓（矩形墩身取长宽、圆柱取 Wd，含襟边）+每侧工作宽度 c，坑底=基础底面（标高0.000，即坐标原点所在面）；现状地面标高=坑底标高+开挖总高度 H挖；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
     `土/石方量采用**分段拟棱台体积公式** V=∑hᵢ/6·(A下+4A中+A上)（以每级平台与石土界面为分段点，段内断面面积随高度线性外放、为高度的二次函数，故该公式解析精确）。经典棱台公式 V=h/3·(S₁+S₂+√S₁S₂) 仅当顶底面相似时精确，本坑底为不等边矩形（顶底不相似），套用会产生系统性偏小，故本表不用经典公式；三维网格体积独立测量与拟棱台公式结果一致，已相互印证。`
   ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
 }
@@ -1152,7 +1167,7 @@ function exportCSV(){
   const p = readP(), q = calcQ(p);
   const lines = [];
   lines.push(`${$("projName").value || "桥墩"} - 桥墩工程量计算表`);
-  lines.push(`标高以墩底=0.000;绝对标高=相对标高+原点绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;盖梁长=墩身横向尺寸+2×悬出;单位m`);
+  lines.push(`标高以基础底面(坐标原点z=0)=0.000,墩底标高=基础总厚;绝对标高=相对标高+高程基准绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;盖梁长=墩身横向尺寸+2×悬出;单位m`);
   lines.push(`项目,计算式,材料,数量,单位`);
   const qq = s => `"${String(s).replace(/"/g,'""')}"`;
   const row = (n2,fx,v,u,mt) => lines.push([qq(n2),qq(fx),qq(mt||""),f(Math.abs(v),3),qq(u)].join(","));
