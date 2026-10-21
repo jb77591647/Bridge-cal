@@ -19,11 +19,11 @@ const vals = {
   excMs:"1", excMr:"1", excW:"0.5", excH:"3", excHs:"1", excHr:"", excHst:"5", excB:"1",
   capL:"7", capb:"2.5", caph:"1.2", caphe:"1.2", cantL:"0", cantR:"0",
   dkH:"0.3", dkWT:"0.2", dkWB:"0.2",
-  Nk:"3000", Hk:"300", dH:"0.25", gamC:"24", mu:"0.3", fa:"500"
+  Nk:"3000", Hk:"300", brkL:"20", dH:"0.25", gamC:"24", mu:"0.3", fa:"500"
 };
 const checks = {
   useFd2:false, showLabels:false, showEL:false, showELa:false, showAxes:false, wireOnly:false, pPier:true, pFd:true,
-  exGround:false, exSoil:false, exRock:false, pCap:true, useCap:true
+  exGround:false, exSoil:false, exRock:false, pCap:true, useCap:true, autoHk:false
 };
 const els = {};
 for(const k in vals) els[k] = { value: vals[k], checked:true, innerHTML:"", style:{}, disabled:true,
@@ -41,6 +41,8 @@ els.resultBody = { value:"", checked:false, innerHTML:"", style:{}, addEventList
 els.assumpNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.capWarn   = { value:"", checked:false, innerHTML:"", style:{display:"none"}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.fndType  = { value:"土基", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.brkGrade = { value:"I", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.brkN     = { value:"1", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.matCap   = { value:"C30砼", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.checkBody = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.checkNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
@@ -418,6 +420,38 @@ isTrue(ckHtml.indexOf("抗滑移系数 Kc")>=0 && ckHtml.indexOf("抗倾覆系�
        ckHtml.indexOf("基底最大应力 p最大")>=0, "H 验算表含 Kc / K0 / p最大 行");
 isTrue(ckHtml.indexOf("出错")<0 && els.checkNote.innerHTML.indexOf("出错")<0, "H 验算表与说明无渲染错误");
 isTrue(ckHtml.indexOf("NaN")<0 && ckHtml.indexOf("undefined")<0, "H 验算表无 NaN / undefined");
+
+/* ===== 制动力自动计算（JTG D60—2015 4.3.6）：加载长度 Lk=20、Ⅰ级、1 车道 =====
+   Pk=270+2×(20−5)=300；G=10.5×20+300=510；T1=max(10%×510,165)=165；kf=1.00 → Hk=165 */
+els.autoHk.checked = true; els.brkL.value = "20"; els.brkGrade.value = "I"; els.brkN.value = "1";
+let pb = api.readP();
+near(pb.brk.Pk, 300, 1e-9, "制动力 Pk=270+2×(20−5)=300");
+near(pb.brk.G, 510, 1e-9, "制动力 G=qkLk+Pk=10.5×20+300=510");
+near(pb.brk.T1, 165, 1e-9, "制动力 单车道 T1=max(10%×510,165)=165（取下限）");
+near(pb.brk.kf, 1.00, 1e-9, "制动力 1 车道折减系数 kf=1.00");
+near(pb.brk.T, 165, 1e-9, "制动力 多车道 Hk=T1×kf=165");
+isTrue(pb.Hk === pb.brk.T, "自动时 readP 的 Hk=brk.T（写回锁定）");
+api.renderCheck(pb, api.calcQ(pb));
+const ckBrk = els.checkBody.innerHTML;
+isTrue(ckBrk.indexOf("G＝q<sub>k</sub>L<sub>k</sub>＋P<sub>k</sub>＝10.5×20.00＋300.0＝510.0")>=0,
+       "制动力行列出车道荷载总重 G=qkLk+Pk 全过程");
+isTrue(ckBrk.indexOf("一个设计车道制动力 T<sub>1</sub>＝10%G＝51.0（下限 165 kN，取大）＝165.0")>=0,
+       "制动力行列出单车道 10%G 与下限取大");
+isTrue(ckBrk.indexOf("车道折减 1.00 → Hk＝165.0×1.00＝165.0")>=0,
+       "制动力行列出多车道折减与最终 Hk");
+/* 双车道折减验证：brkN=2 → kf=2.00 → Hk=330 */
+els.brkN.value = "2";
+pb = api.readP();
+near(pb.brk.kf, 2.00, 1e-9, "制动力 2 车道折减系数 kf=2.00");
+near(pb.brk.T, 330, 1e-9, "制动力 2 车道 Hk=165×2=330");
+/* Ⅱ级下限验证：brkGrade=II → 下限 90，G=510 时 10%G=51<90 取 90 */
+els.brkN.value = "1"; els.brkGrade.value = "II";
+pb = api.readP();
+near(pb.brk.lo, 90, 1e-9, "制动力 Ⅱ级下限 lo=90 kN");
+near(pb.brk.T, 90, 1e-9, "制动力 Ⅱ级 Hk=max(51,90)=90");
+/* 恢复默认：关自动，手输 Hk=300 */
+els.autoHk.checked = false; els.brkGrade.value = "I"; els.brkN.value = "1"; els.Hk.value = "300";
+p = api.readP(), q = api.calcQ(p);
 
 /* ===== 工况I：不设盖梁 + 二层基础（基底取二层 a2×b2、岩石限值 a/4） ===== */
 els.useCap.checked = false; els.useFd2.checked = true;

@@ -63,14 +63,14 @@
     font-size:13px; font-weight:700; margin-bottom:8px; padding-left:8px;
     border-left:3px solid var(--accent); line-height:1.4;
   }
-  .fields{display:grid; grid-template-columns:1fr; gap:0;}
-  .field{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0;}
+  .fields{display:grid; grid-template-columns:minmax(0,1fr); gap:0;}
+  .field{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 0; min-width:0;}
   .field + .field{border-top:1px dashed #cbd5e1;}
-  .field label{color:#334155; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .field label{color:#334155; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1;}
   .field small{color:var(--sub); font-size:10.5px;}
   input[type=number]{
-    width:78px; padding:3px 6px; border:1px solid #96d3ab; border-radius:5px;
-    font-size:12.5px; text-align:right; background:#d6f2e0;
+    width:78px; flex:0 0 auto; padding:3px 6px; border:1px solid #96d3ab; border-radius:5px;
+    font-size:12.5px; text-align:right; background:#d6f2e0; box-sizing:content-box; max-width:100%;
   }
   input[type=number]:focus{outline:none; border-color:#2e9e5b; background:#c2ecd2;}
   input[type=number]:disabled{background:#eef2f6; border-color:var(--line);}
@@ -135,7 +135,7 @@
       <div class="card">
         <h2>墩身</h2>
         <div class="fields" id="fldRect">
-          <div class="field"><label>墩身长 Lp <small>纵桥向，须 ≥ 圆柱直径 d</small></label><input type="number" id="Lp" value="2.5" step="0.01"></div>
+          <div class="field"><label>墩身长 Lp <small>纵桥向墩身厚度</small></label><input type="number" id="Lp" value="2.5" step="0.01"></div>
           <div class="field"><label>墩身宽 Wp <small>横桥向</small></label><input type="number" id="Wp" value="6" step="0.01"></div>
         </div>
         <div class="fields" id="fldCyl" style="display:none;">
@@ -152,7 +152,7 @@
           <label for="useCap">设置盖梁</label></div>
         <div class="fields">
           <div class="field"><label>盖梁宽度 Lc <small>横桥向总长</small></label><input type="number" id="capL" value="13.00" step="0.01"></div>
-          <div class="field"><label>盖梁厚度 bc <small>顺桥向，须 ≥ 墩身长</small></label><input type="number" id="capb" value="1.80" step="0.01"></div>
+          <div class="field"><label>盖梁厚度 bc <small>顺桥向，须 ≥ 墩身长 Lp / 圆柱直径 d</small></label><input type="number" id="capb" value="1.80" step="0.01"></div>
           <div class="field"><label>盖梁中部高 hc <small>跨中断面高</small></label><input type="number" id="caph" value="1.50" step="0.01"></div>
           <div class="field"><label>盖梁端部高 he <small>两端断面高，≤中部高</small></label><input type="number" id="caphe" value="0.60" step="0.01"></div>
           <div class="field"><label>左悬臂长 aL <small>梁端→变高点（横桥向）</small></label><input type="number" id="cantL" value="1.50" step="0.01"></div>
@@ -217,7 +217,11 @@
         <h2>验算参数（标准值）</h2>
         <div class="fields">
           <div class="field"><label>上部结构竖向反力 Nk <small>支座反力合计</small></label><input type="number" id="Nk" value="3000" step="10"></div>
-          <div class="field"><label>制动力 Hk <small>顺桥向，作用点见图</small></label><input type="number" id="Hk" value="300" step="10"></div>
+          <div class="field"><label>制动力 Hk <small>自动时按规范公式给出并锁定</small></label><input type="number" id="Hk" value="300" step="10"></div>
+          <div class="field"><label>加载长度 Lk <small>相邻跨跨径，自动算制动力</small></label><input type="number" id="brkL" value="20" step="1"></div>
+          <div class="field"><label>荷载等级 <small>Ⅰ级≥165、Ⅱ级≥90kN</small></label><select id="brkGrade"><option value="I" selected>公路—Ⅰ级</option><option value="II">公路—Ⅱ级</option></select></div>
+          <div class="field"><label>同向车道数 <small>制动力车道折减</small></label><select id="brkN"><option value="1" selected>1 车道 ×1.00</option><option value="2">2 车道 ×2.00</option><option value="3">3 车道 ×2.34</option><option value="4">4 车道 ×2.68</option></select></div>
+          <div class="field wrap"><input type="checkbox" id="autoHk" checked><label for="autoHk" style="flex:none;">自动计算制动力（车道荷载总重的 10%，Ⅰ级≥165kN）</label></div>
           <div class="field"><label>水平力作用点距盖梁顶 dH</label><input type="number" id="dH" value="0.25" step="0.01"></div>
           <div class="field"><label>混凝土容重 γc <small>kN/m³</small></label><input type="number" id="gamC" value="24" step="0.5" min="0"></div>
           <div class="field"><label>基底摩擦系数 μ</label><input type="number" id="mu" value="0.30" step="0.05" min="0"></div>
@@ -305,6 +309,20 @@ window.addEventListener("error", e => {
   try{ const el=$("assumpNote"); if(el) el.innerHTML += '<br><span class="neg">脚本错误：'+e.message+'</span>'; }catch(_){}
 });
 
+/* 制动力（JTG D60—2015 第 4.3.6 条）：
+   一个设计车道按车道荷载总重力的 10% 计算，公路—Ⅰ级不小于 165 kN、公路—Ⅱ级不小于 90 kN；
+   同向多车道按 2.00 / 2.34 / 2.68 折减。车道荷载：qk=10.5kN/m，Pk 按加载长度线性内插（5m→270kN，50m→360kN）。 */
+function brakeForce(L, grade, n){
+  const Lk = Math.max(isFinite(L) ? L : 0, 1);
+  const Pk = Lk <= 5 ? 270 : (Lk >= 50 ? 360 : 270 + 2*(Lk - 5));
+  const qk = 10.5;
+  const G  = qk*Lk + Pk;                                   // 一个设计车道的车道荷载总重
+  const lo = grade === "II" ? 90 : 165;                    // 制动力下限
+  const T1 = Math.max(0.1*G, lo);                          // 一个设计车道制动力
+  const kf = n >= 4 ? 2.68 : (n === 3 ? 2.34 : (n === 2 ? 2.00 : 1.00));
+  return { Lk, Pk, qk, G, lo, T1, kf, T: T1*kf };
+}
+
 function readP(){
   const g0 = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
   const type = $("pierType").value;
@@ -312,6 +330,13 @@ function readP(){
   $("fldCyl").style.display  = type==="圆柱式桥墩"  ? "" : "none";
   const g = id => { const v = parseFloat($(id).value); return isFinite(v) && v>0 ? v : 0; };
   const n = Math.max(1, Math.round(g("n")));
+  /* 制动力自动：勾选时按规范算好写回输入框并锁定，取消勾选则恢复手工输入 */
+  const brk = brakeForce(g0("brkL"), $("brkGrade").value, g0("brkN"));
+  if($("autoHk").checked){
+    $("Hk").value = brk.T.toFixed(1); $("Hk").disabled = true; $("Hk").style.background = "#eef2f6";
+  }else{
+    $("Hk").disabled = false; $("Hk").style.background = "";
+  }
   return {
     type, H:g("Hp"), elAbs:g0("elAbs"),
     Lp:g("Lp"), Wp:g("Wp"),
@@ -320,7 +345,8 @@ function readP(){
     useCap:$("useCap").checked, capL:g("capL"), capb:g("capb"), caph:g("caph"), caphe:g0("caphe"),
     cantL:g0("cantL"), cantR:g0("cantR"),
     dkOn:$("dkOn").value==="是", dkH:g0("dkH"), dkWT:g0("dkWT"), dkWB:g0("dkWB"),
-    Nk:g0("Nk"), Hk:g0("Hk"), dH:g0("dH"), gamC:g0("gamC"), mu:g0("mu"), fa:g("fa"),
+    Nk:g0("Nk"), Hk:$("autoHk").checked ? brk.T : g0("Hk"), dH:g0("dH"), gamC:g0("gamC"), mu:g0("mu"), fa:g("fa"),
+    brkL:g0("brkL"), brkGrade:$("brkGrade").value, brkN:g0("brkN"), autoHk:$("autoHk").checked, brk:brk,
     fndRock:$("fndType").value==="岩石",
     excMs:g("excMs"), excMr:g("excMr"), excW:g("excW"), excH:g("excH"), excHs:g("excHs"),
     excHst:g("excHst"), excB:g("excB")
@@ -1223,7 +1249,11 @@ function renderCheck(p, q){
 
   /* ---- 二、水平力 ---- */
   sep("二、水平力（顺桥向，指向河心为不利方向）");
-  row("制动力 Hk", "按墩顶制动力取用（标准值）", c.Hk, "kN");
+  row("制动力 Hk", (p.brk && p.autoHk)
+        ? `车道荷载 G＝q<sub>k</sub>L<sub>k</sub>＋P<sub>k</sub>＝${f(p.brk.qk,1)}×${f(p.brk.Lk,2)}＋${f(p.brk.Pk,1)}＝${f(p.brk.G,1)} kN；` +
+          `一个设计车道制动力 T<sub>1</sub>＝10%G＝${f(0.1*p.brk.G,1)}（下限 ${f(p.brk.lo,0)} kN，取大）＝${f(p.brk.T1,1)} kN；` +
+          `车道折减 ${f(p.brk.kf,2)} → Hk＝${f(p.brk.T1,1)}×${f(p.brk.kf,2)}＝${f(p.brk.T,1)} kN`
+        : "手工输入（应自行叠加温度力等）", c.Hk, "kN");
   rows.push(`<tr class="total"><td>ΣH 合计</td><td class="fx">＝Hk＝${f(c.Hsum,1)}</td>`+
     `<td class="num">${f(c.Hsum,3)}</td><td>kN</td><td></td></tr>`);
 
