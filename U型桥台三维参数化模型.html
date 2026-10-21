@@ -232,7 +232,15 @@
         <h2>稳定与承载力验算</h2>
         <div class="fields">
           <div class="field"><label>支座竖向荷载 Nk <small>标准值，支座传来</small></label><input type="number" id="Nk" value="1000" step="10"></div>
-          <div class="field"><label>水平荷载 Hk <small>制动力+温度等，标准值</small></label><input type="number" id="Hk" value="100" step="10"></div>
+          <div class="field"><label>制动力 Hk <small>自动时按规范公式给出并锁定</small></label><input type="number" id="Hk" value="165" step="10"></div>
+          <div class="field"><label>加载长度 Lk <small>相邻跨跨径，自动算制动力</small></label><input type="number" id="brkL" value="20" step="1"></div>
+          <div class="field"><label>荷载等级 <small>决定制动力下限</small></label><select id="brkGrade"><option value="I" selected>公路—Ⅰ级（≥165kN）</option><option value="II">公路—Ⅱ级（≥90kN）</option></select></div>
+          <div class="field"><label>同向车道数 <small>制动力车道折减</small></label><select id="brkN"><option value="1" selected>1 车道 ×1.00</option><option value="2">2 车道 ×2.00</option><option value="3">3 车道 ×2.34</option><option value="4">4 车道 ×2.68</option></select></div>
+          <div class="field"><label>台后填土高度 h填 <small>自基础顶至路基顶，留空=侧墙总高</small></label><input type="number" id="chkHf" value="" placeholder="自动" step="0.1"></div>
+          <div class="field"><label>填土内摩擦角 φ <small>度，默认 30</small></label><input type="number" id="chkPhi" value="30" step="1"></div>
+          <div class="field"><label>墙背摩擦角 δ <small>度，须 ≤ φ</small></label><input type="number" id="chkDelta" value="20" step="1"></div>
+          <div class="field"><label>主动土压力系数 Ka <small>库仑，自动</small></label><input type="number" id="chkKaShow" value="" disabled style="background:#eef2f6;"></div>
+          <div class="field"><label>台后主动土压力 Ea <small>kN，仅水平分量参与稳定</small></label><input type="number" id="chkEaShow" value="" disabled style="background:#eef2f6;"></div>
           <div class="field"><label>支座中心至背墙前缘 d支 <small>往河心侧量</small></label><input type="number" id="dBear" value="0.40" step="0.05"></div>
           <div class="field"><label>水平力作用点距帽梁顶 dH <small>支座高+梁底至合力点</small></label><input type="number" id="dH" value="0.10" step="0.05"></div>
           <div class="field"><label>混凝土容重 γc <small>kN/m³</small></label><input type="number" id="gamC" value="24" step="0.5"></div>
@@ -241,10 +249,14 @@
           <div class="field"><label>持力层承载力 fa <small>kPa，基本容许值</small></label><input type="number" id="fa" value="400" step="10"></div>
           <div class="field"><label>持力层类型 <small>决定偏心距限值</small></label><select id="fndType"><option value="soil" selected>土基 b/6</option><option value="rock">岩石 b/4</option></select></div>
         </div>
-        <div class="chk" style="margin:6px 0 2px;"><input type="checkbox" id="incFill" checked>
+        <div class="chk" style="margin:6px 0 2px;"><input type="checkbox" id="autoHk" checked>
+          <label for="autoHk">自动计算制动力（车道荷载总重的 10%，Ⅰ级≥165kN）</label></div>
+        <div class="chk" style="margin:2px 0;"><input type="checkbox" id="incEa" checked>
+          <label for="incEa">顺桥向计入台后主动土压力（与制动力同向叠加）</label></div>
+        <div class="chk" style="margin:2px 0 2px;"><input type="checkbox" id="incFill" checked>
           <label for="incFill">竖向力计入台腔回填土重</label></div>
         <div class="tblnote" style="font-size:11.5px;color:var(--sub);margin-top:4px;">
-          稳定系数要求：抗滑移≥1.3、抗倾覆≥1.5；基底应力：p均≤fa、p最大≤1.2fa。
+          稳定系数要求：抗滑移≥1.3、抗倾覆≥1.5；基底应力：p均≤fa、p最大≤1.2fa。制动力与土压力均可自动计算，取消勾选可手输。
         </div>
       </div>
 
@@ -347,6 +359,20 @@ function integrate(fn, a, b, n){
   return s*h;
 }
 
+/* 制动力（JTG D60—2015 第 4.3.6 条）：
+   一个设计车道按车道荷载总重力的 10% 计算，公路—Ⅰ级不小于 165 kN、公路—Ⅱ级不小于 90 kN；
+   同向多车道按 2.00 / 2.34 / 2.68 折减。车道荷载：qk=10.5kN/m，Pk 按加载长度线性内插（5m→270kN，50m→360kN）。 */
+function brakeForce(L, grade, n){
+  const Lk = Math.max(isFinite(L) ? L : 0, 1);
+  const Pk = Lk <= 5 ? 270 : (Lk >= 50 ? 360 : 270 + 2*(Lk - 5));
+  const qk = 10.5;
+  const G  = qk*Lk + Pk;                                   // 一个设计车道的车道荷载总重
+  const lo = grade === "II" ? 90 : 165;                    // 制动力下限
+  const T1 = Math.max(0.1*G, lo);                          // 一个设计车道制动力
+  const kf = n >= 4 ? 2.68 : (n === 3 ? 2.34 : (n === 2 ? 2.00 : 1.00));
+  return { Lk, Pk, qk, G, lo, T1, kf, T: T1*kf };
+}
+
 function readP(){
   $("Wf").value = $("W").value; /* 前墙横桥向宽度自动 = 桥台总宽 W（只读显示） */
   const g0 = id => { const v = parseFloat($(id).value); return isFinite(v) ? v : 0; };
@@ -354,6 +380,13 @@ function readP(){
   $("Hs").value = (g0("bwH") + g0("capH") + g0("H1")).toFixed(2); /* 侧墙总高自动 = 背墙高+帽梁高+前墙高 H1 */
   const g = id => { const v = parseFloat($(id).value); return isFinite(v) && v>0 ? v : 0; };
   const gn = id => { const v = parseFloat($(id).value); return isFinite(v) && v>=0 ? v : 0; };
+  /* 制动力自动：勾选时按规范算好写回输入框并锁定，取消勾选则恢复手工输入 */
+  const brk = brakeForce(g0("brkL"), $("brkGrade").value, g0("brkN"));
+  if($("autoHk").checked){
+    $("Hk").value = brk.T.toFixed(1); $("Hk").disabled = true; $("Hk").style.background = "#eef2f6";
+  }else{
+    $("Hk").disabled = false; $("Hk").style.background = "";
+  }
   return {
     Wf:g("Wf"), H1:g("H1"), t1:g("t1"), m1:g("m1"),
     W:g("W"), Hs:g("Hs"), t2:g("t2"), L2:g("L2"), m2:g("m2"), m3:g("m3"), elAbs:g("elAbs"),
@@ -364,7 +397,10 @@ function readP(){
     fd1H:g("fd1H"), fd1X:g("fd1X"), fd1Zf:g("fd1Zf"), fd1Zb:g("fd1Zb"),
     useFd2:$("useFd2").checked, fd2H:g("fd2H"), fd2X:g("fd2X"), fd2Zf:g("fd2Zf"), fd2Zb:g("fd2Zb"),
     /* 验算参数 */
-    Nk:gn("Nk"), Hk:gn("Hk"), dBear:gn("dBear"), dH:gn("dH"),
+    Nk:gn("Nk"), Hk: $("autoHk").checked ? brk.T : gn("Hk"),
+    brkL:g0("brkL"), brkGrade:$("brkGrade").value, brkN:g0("brkN"), autoHk:$("autoHk").checked, brk:brk,
+    chkHf:gn("chkHf"), chkPhi:gn("chkPhi"), chkDelta:gn("chkDelta"), incEa:$("incEa").checked,
+    dBear:gn("dBear"), dH:gn("dH"),
     gamC:gn("gamC"), gamS:gn("gamS"), fric:gn("fric"), fa:gn("fa"),
     fndRock:$("fndType").value === "rock", incFill:$("incFill").checked
   };
@@ -563,13 +599,30 @@ function calcCheck(p, q){
   c.items = items; c.Gc = Gc; c.Gs = Gs; c.Nk = p.Nk;
   c.Vsum = Gc + Gs + p.Nk;
   c.zbar = c.Vsum > 1e-9 ? (Mz + p.Nk*c.zN)/c.Vsum : c.zc;
-  /* 水平力 */
-  c.yH = p.H1 + p.capH + p.dH;     // 作用点标高（相对前墙底）
+  /* 水平力（顺桥向，均取指向河心的不利方向） */
+  c.yH = p.H1 + p.capH + p.dH;     // 制动力作用点标高（相对前墙底）
   c.hH = c.yH + fdT;               // 对基底的力臂
-  c.Hk = p.Hk;
-  c.Mh = p.Hk * c.hH;
+  c.Hk = p.Hk;                     // 制动力（自动或手输）
+  c.brk = p.brk || null;
+  /* 台后主动土压力（库仑，墙背竖直、填土面水平；仅取水平分量，竖向分量偏安全不计） */
+  const hf = p.chkHf > 1e-9 ? p.chkHf : (p.H1 + p.capH + p.bwH);
+  const phiDeg = Math.min(Math.max(p.chkPhi, 0), 45);
+  const phi = phiDeg * Math.PI/180;
+  const dl  = Math.min(Math.max(p.chkDelta, 0), phiDeg) * Math.PI/180;
+  const cd  = Math.max(Math.cos(dl), 1e-6);
+  const sq  = Math.sqrt(Math.max(Math.sin(phi + dl)*Math.sin(phi)/cd, 0));
+  const Ka  = Math.pow(Math.cos(phi), 2) / (cd * Math.pow(1 + sq, 2));
+  c.hf  = hf;
+  c.Ka  = Ka;
+  c.Ea  = p.incEa ? 0.5*p.gamS*hf*hf*Ka*p.Wf : 0;   // 土压力合力（沿墙背法线方向）
+  c.EaH = c.Ea * cd;                                 // 水平分量
+  c.yEa = fdT + hf/3;                                // 合力点距基底（三角形分布）
+  c.MhB = c.Hk * c.hH;
+  c.MhE = c.EaH * c.yEa;
+  c.Htot = c.Hk + c.EaH;
+  c.Mh  = c.MhB + c.MhE;
   /* 抗滑移 */
-  c.Kc = c.Hk > 1e-9 ? p.fric*c.Vsum/c.Hk : Infinity;
+  c.Kc = c.Htot > 1e-9 ? p.fric*c.Vsum/c.Htot : Infinity;
   /* 抗倾覆：绕前趾 / 后趾 */
   let MsF = 0, MsB = 0;
   items.forEach(it=>{ MsF += it.W*(it.z - c.zF); MsB += it.W*(c.zB - it.z); });
@@ -1443,21 +1496,35 @@ function renderCheck(p, q){
     `<td class="num">${f(c.Vsum,3)}</td><td>kN</td><td></td></tr>`);
   row("合力作用点 z", `距基底前趾 ${f(c.zbar - c.zF,2)}，距后趾 ${f(c.zB - c.zbar,2)}`, c.zbar, "m");
 
+  sep("顺桥向水平力（标准值，均取指向河心的不利方向）");
+  const brk = c.brk;
+  row("制动力 Hk", (brk && p.autoHk)
+        ? `车道荷载 ${f(brk.qk,1)}×${f(brk.Lk,2)}＋Pk ${f(brk.Pk,1)}＝${f(brk.G,1)} kN，×10%＝${f(0.1*brk.G,1)}；下限 ${f(brk.lo,0)}×车道系数 ${f(brk.kf,2)}`
+        : "手工输入（应自行叠加温度力等）",
+      c.Hk, "kN");
+  row("台后主动土压力 Ea", p.incEa
+        ? `Ka＝${f(c.Ka,3)}（φ=${f(p.chkPhi,0)}°、δ=${f(p.chkDelta,0)}°），0.5×${f(p.gamS,1)}×${f(c.hf,2)}²×${f(p.Wf,2)}`
+        : "按偏安全不计入",
+      c.Ea, "kN");
+  row("土压力水平分量 EaH", `Ea·cosδ，合力点距基底 ${f(c.yEa,2)}（h填/3＋基础厚）`, c.EaH, "kN");
+  rows.push(`<tr class="total"><td>ΣH 合计</td><td class="fx">制动力＋土压力水平分量</td>`+
+    `<td class="num">${f(c.Htot,3)}</td><td>kN</td><td></td></tr>`);
+
   sep("抗滑移稳定");
-  row("Kc = μ·ΣV / Hk", `= ${f(p.fric,2)}×${f(c.Vsum,1)} / ${f(c.Hk,1)}，要求 ≥ ${f(K_SLIDE,1)}`,
+  row("Kc = μ·ΣV / ΣH", `= ${f(p.fric,2)}×${f(c.Vsum,1)} / ${f(c.Htot,1)}，要求 ≥ ${f(K_SLIDE,1)}`,
       c.Kc, "—", c.okKc);
 
-  sep("抗倾覆稳定（水平力取不利方向，绕基底边缘取矩）");
-  row("K0(前趾) = ΣM稳 /(Hk·h)", `ΣM稳=${f(c.MsF,1)} kN·m，力臂 h=${f(c.hH,2)}（作用点标高 ${f(c.yH,2)}），要求 ≥ ${f(K_OVER,1)}`,
+  sep("抗倾覆稳定（绕基底边缘取矩）");
+  row("K0(前趾) = ΣM稳 / ΣM倾", `ΣM稳＝${f(c.MsF,1)} kN·m；ΣM倾＝制动力 ${f(c.MhB,1)}＋土压力 ${f(c.MhE,1)}＝${f(c.Mh,1)}，要求 ≥ ${f(K_OVER,1)}`,
       c.K0F, "—", c.okK0);
-  row("K0(后趾) = ΣM稳 /(Hk·h)", `ΣM稳=${f(c.MsB,1)} kN·m`, c.K0B, "—", c.okK0);
+  row("K0(后趾) = ΣM稳 / ΣM倾", `ΣM稳＝${f(c.MsB,1)} kN·m`, c.K0B, "—", c.okK0);
   rows.push(`<tr class="total"><td>控制值 K0</td><td class="fx">取前趾/后趾不利者（本例${c.gov}控制）</td>`+
     `<td class="num">${num(c.K0)}</td><td>—</td><td style="text-align:center;">${mk(c.okK0)}</td></tr>`);
 
   sep("基底承载力（直线分布假定）");
   row("基底面积 A", `B×L = ${f(c.Wb,2)}×${f(c.Lb,2)}`, c.A, "m²");
   row("竖向力 N", `= ΣV`, c.Vsum, "kN");
-  row("对基底形心弯矩 M", `竖向力偏心＋水平力 Hk×${f(c.hH,2)}`, c.M, "kN·m");
+  row("对基底形心弯矩 M", `竖向力偏心＋ΣM倾＝${f(c.Mh,1)}`, c.M, "kN·m");
   row("偏心距 e", `|M|/N，限值 ${f(c.eLim,3)}（${p.fndRock ? "岩石 b/4" : "土基 b/6"}）`,
       Math.abs(c.e), "m", c.okE);
   row("平均应力 p均", `N/A，要求 ≤ fa = ${f(p.fa,0)}`, c.pMean, "kPa", c.okPm);
@@ -1467,12 +1534,14 @@ function renderCheck(p, q){
   rows.push(`<tr class="total"><td>验算结论</td><td class="fx">抗滑移 / 抗倾覆 / 承载力</td>`+
     `<td class="num">—</td><td>—</td><td style="text-align:center;">${mk(c.okAll)}</td></tr>`);
   $("checkBody").innerHTML = rows.join("");
+  try{ $("chkKaShow").value = f(c.Ka, 3); $("chkEaShow").value = f(c.Ea, 1); }catch(_){}
 
   $("checkNote").innerHTML = `<b>验算依据与假定</b>` + [
-    `① 荷载均取<strong>标准值</strong>（桥台自重＋台腔回填＋支座反力＋水平力），未计入台后主动土压力、水浮力、地震作用及横桥向偏心；<strong>水平荷载 Hk 应自行计入制动力、温度力与台后主动土压力</strong>，否则抗滑移结果偏乐观。承载能力极限状态应另按 JTG 3362 / JTG D60 组合复核。`,
-    `② 抗滑移 Kc = μ·ΣV/Hk ≥ 1.3；抗倾覆分别绕基底前趾（河心侧）与后趾（台后侧）取矩，K0 = ΣM稳/(Hk·h) ≥ 1.5，取不利者控制；基底应力按直线分布，p均 ≤ fa、p最大 ≤ 1.2fa，偏心距 e ≤ L/6（土基）或 L/4（岩石）。限值取自《公路桥涵地基与基础设计规范》JTG 3363—2019 的常规规定，项目另有规定或持力层软弱时应按实际调整。`,
+    `① 荷载均取<strong>标准值</strong>。制动力按 JTG D60—2015 第 4.3.6 条自动计算：一个设计车道取车道荷载总重力的 10%（qk=10.5 kN/m，Pk 随加载长度内插），公路—Ⅰ级不小于 165 kN、Ⅱ级不小于 90 kN，同向多车道乘 1.00/2.00/2.34/2.68；取消勾选可手输，此时应自行叠加温度力等。台后主动土压力按库仑公式自动计算（墙背竖直、填土面水平），<strong>仅取水平分量、竖向分量偏安全不计</strong>，并与制动力按同向叠加。未计入水浮力、地震作用、横桥向偏心及斜交影响。承载能力极限状态应另按 JTG D60 组合、JTG 3363 复核。`,
+    `② 抗滑移 Kc = μ·ΣV/ΣH ≥ 1.3；抗倾覆分别绕基底前趾（河心侧）与后趾（台后侧）取矩，K0 = ΣM稳/ΣM倾 ≥ 1.5，取不利者控制；基底应力按直线分布，p均 ≤ fa、p最大 ≤ 1.2fa，偏心距 e ≤ L/6（土基）或 L/4（岩石）。限值取自《公路桥涵地基与基础设计规范》JTG 3363—2019 的常规规定，项目另有规定或持力层软弱时应按实际调整。`,
     `③ 各构件自重按几何形心取矩（前墙梯形按解析形心，侧墙、回填按断面面积加权数值积分，牛腿按直角梯形断面形心），与三维模型同源；竖向力作用点、基底轮廓均随参数联动。`,
-    `④ 本表用于方案比较与初判；施工图阶段应按实际荷载组合、地基容许承载力深宽修正、下卧层验算及沉降验算另行复核。`
+    `④ 土压力计算宽度取前墙横桥向宽度 B，高度取自基础顶至路基顶（留空时默认＝侧墙总高）。若台后设搭板并做柔性隔离、或由耳墙/翼墙独立挡土，实际传给台身者小于此值，可按实际挡土高度折减 h填，但不应取零；若路基顶高于背墙顶，应据实加大 h填。台腔回填对两侧墙的土压力左右对称、相互抵消，不产生横桥向合力。`,
+    `⑤ 本表用于方案比较与初判；施工图阶段应按实际荷载组合、地基容许承载力深宽修正、下卧层验算及沉降验算另行复核。`
   ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
 }
 

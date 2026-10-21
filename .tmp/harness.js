@@ -22,13 +22,15 @@ const vals = {
   matCap:"C30砼", matFw:"C30砼", matSw:"C30砼", matFd:"C25砼", matFill:"砂砾石",
   excMs:"1", excMr:"1", excW:"0.5", excH:"3", excHs:"1", excHr:"",
   excHst:"5", excB:"1",
-  Nk:"1000", Hk:"100", dBear:"0.40", dH:"0.10", gamC:"24", gamS:"18", fric:"0.30", fa:"400",
-  fndType:"soil"
+  Nk:"1000", Hk:"165", dBear:"0.40", dH:"0.10", gamC:"24", gamS:"18", fric:"0.30", fa:"400",
+  fndType:"soil",
+  brkL:"20", brkGrade:"I", brkN:"1",
+  chkHf:"", chkPhi:"30", chkDelta:"20", chkKaShow:"", chkEaShow:""
 };
 const checks = {
   useFd2:false, showLabels:false, showAxes:false, showEL:false, showELa:false, wireOnly:false,
   pFw:true, pSw:true, pCap:true, pNb:true, pBw:true, pFd:true, pFill:true,
-  incFill:true,
+  autoHk:true, incEa:true, incFill:true,
   exGround:false, exSoil:false, exRock:false
 };
 const els = {};
@@ -58,7 +60,7 @@ global.requestAnimationFrame = ()=>{};
 global.Blob = class {};
 
 /* 提取 api 探针 */
-app += "\n;global.__api={readP,calcQ,calcCheck,buildModel,renderTable,renderCheck,rebuild,applyPartVisibility,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup};";
+app += "\n;global.__api={brakeForce,readP,calcQ,calcCheck,buildModel,renderTable,renderCheck,rebuild,applyPartVisibility,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup};";
 global.THREE = require(LIB);
 
 let pass=0, fail=0;
@@ -373,6 +375,9 @@ function meshStat(m){
   }
   return {V: Math.abs(V), c: new THREE.Vector3(sx/V, sy/V, sz/V)};
 }
+/* 本段固定为「手输制动力 Hk=100、不计土压力」，校验纯制动力通路；
+   自动制动力与台后土压力另在本段末尾校验 */
+els.autoHk.checked = false; els.incEa.checked = false; els.Hk.value = "100";
 const pChk = api.readP(), qChk = api.calcQ(pChk), cChk = api.calcCheck(pChk, qChk);
 const ec0 = pChk.capCant;
 const statOf = part => {
@@ -441,6 +446,69 @@ const ckTbl = els.checkBody.innerHTML;
 isTrue(ckTbl.indexOf("抗滑移")>=0 && ckTbl.indexOf("抗倾覆")>=0 && ckTbl.indexOf("偏心距")>=0 &&
        ckTbl.indexOf("p最大")>=0 && ckTbl.indexOf("验算结论")>=0, "验算表含抗滑移/抗倾覆/承载力/结论");
 isTrue(els.checkNote.innerHTML.indexOf("标准值")>=0 && els.checkNote.innerHTML.indexOf("3363")>=0, "验算说明含荷载标准值与规范依据");
+
+/* ===== 制动力自动计算（JTG D60—2015 第 4.3.6 条） ===== */
+els.incEa.checked = false; els.autoHk.checked = true;
+els.brkL.value = "20"; els.brkGrade.value = "I"; els.brkN.value = "1";
+const pH1 = api.readP();
+near(pH1.Hk, 165, 1e-9, "制动力自动：L=20m、Ⅰ级、1 车道 → 下限 165kN 控制（10% 仅 51kN）");
+near(pH1.brk.Pk, 300, 1e-9, "Pk 内插 = 270+2×(20−5) = 300kN");
+isTrue(els.Hk.value === "165.0" && els.Hk.disabled === true, "自动制动力写回输入框并锁定");
+els.brkGrade.value = "II";
+near(api.readP().Hk, 90, 1e-9, "Ⅱ级下限 90kN 控制");
+els.brkGrade.value = "I"; els.brkN.value = "4";
+near(api.readP().Hk, 165*2.68, 1e-9, "4 车道折减 ×2.68 → 442.2kN");
+els.brkN.value = "3";
+near(api.readP().Hk, 165*2.34, 1e-9, "3 车道折减 ×2.34 → 386.1kN");
+els.brkN.value = "1"; els.brkL.value = "150";
+near(api.readP().Hk, 0.1*(10.5*150+360), 1e-9, "L=150m 时 10% 控制 = 193.5kN（大于 165 下限）");
+els.brkL.value = "3";
+near(api.readP().brk.Pk, 270, 1e-9, "L≤5m 时 Pk 取 270kN");
+els.brkL.value = "20";
+els.autoHk.checked = false;
+api.readP();
+isTrue(els.Hk.disabled === false, "取消自动后 Hk 恢复可编辑");
+els.Hk.value = "100";
+
+/* ===== 台后主动土压力（库仑，仅取水平分量） ===== */
+els.incEa.checked = true;
+const cE = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+const r30 = Math.PI/6, r20 = 20*Math.PI/180;
+const KaExp = Math.pow(Math.cos(r30),2) / (Math.cos(r20)*Math.pow(1+Math.sqrt(Math.sin(r20+r30)*Math.sin(r30)/Math.cos(r20)),2));
+near(cE.Ka, KaExp, 1e-12, "库仑 Ka(φ=30°、δ=20°) = 0.2974");
+near(cE.hf, 6.5, 1e-9, "填土高度留空自动取侧墙总高 = 5+0.6+0.9 = 6.5");
+near(cE.Ea, 0.5*18*6.5*6.5*KaExp*12, 1e-6, "Ea = 0.5γs·h填²·Ka·B = 1357kN");
+near(cE.EaH, cE.Ea*Math.cos(r20), 1e-9, "EaH = Ea·cosδ");
+near(cE.yEa, 1+6.5/3, 1e-9, "土压力合力点距基底 = 基础厚 + h填/3");
+near(cE.Htot, 100 + cE.EaH, 1e-9, "ΣH = 制动力 + 土压力水平分量");
+near(cE.Mh, 100*cE.hH + cE.EaH*cE.yEa, 1e-9, "ΣM倾 = 制动力 + 土压力");
+near(cE.Kc, 0.3*cE.Vsum/cE.Htot, 1e-9, "Kc = μΣV/ΣH");
+isTrue(cE.Kc < cChk.Kc*0.2, "计入土压力后 Kc 由 39.6 降至约 2.9（富余收窄一个数量级）");
+isTrue(cE.okAll, "计入台后土压力后三项验算仍全部通过");
+/* 敏感性 */
+els.incEa.checked = false;
+const cNoE = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cNoE.Ea, 0, 1e-12, "取消土压力后 Ea = 0");
+near(cNoE.Htot, 100, 1e-9, "取消土压力后 ΣH 仅剩制动力");
+els.incEa.checked = true; els.chkHf.value = "3";
+const cHf = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cHf.hf, 3, 1e-9, "手填填土高度 3m 生效");
+near(cHf.Ea, 0.5*18*9*KaExp*12, 1e-6, "Ea 随 h填² 折减（3m 时约 289kN）");
+els.chkHf.value = "";
+els.chkPhi.value = "40";
+const cPhi = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+isTrue(cPhi.Ka < cE.Ka && cPhi.Ea < cE.Ea, "φ 增至 40° 时 Ka、Ea 下降");
+els.chkPhi.value = "30"; els.chkDelta.value = "0";
+const cD0 = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cD0.Ka, Math.pow(Math.tan(Math.PI/4 - r30/2),2), 1e-9, "δ=0 退化为朗肯 Ka=tan²(45°−φ/2)=0.3333");
+els.chkDelta.value = "20";
+/* 默认工况：自动制动力 165kN + 土压力 */
+els.autoHk.checked = true;
+const cAll = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+isTrue(cAll.Htot > 1400 && cAll.Htot < 1500, "默认工况 ΣH ≈ 165+1275 = 1440kN");
+isTrue(cAll.EaH > 6*cAll.Hk, "土压力水平分量是制动力的 7 倍以上（默认工况）");
+isTrue(cAll.okAll, "默认工况（自动制动力＋台后土压力）三项验算全部通过");
+els.autoHk.checked = false; els.Hk.value = "100";
 
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail?1:0);
