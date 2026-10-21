@@ -383,7 +383,8 @@ const ec0 = pChk.capCant;
 const statOf = part => {
   let V = 0, sx = 0;
   (parts[part]||[]).forEach(m=>{ const r = meshStat(m); V += r.V; sx += r.V*r.c.x; });
-  return { V, z: V > 1e-9 ? sx/V + ec0 : NaN };
+  /* 场景坐标已减 datumX=ec，即「前墙前缘 x=0」，与 calcCheck 基准一致，无需再补偿 */
+  return { V, z: V > 1e-9 ? sx/V : NaN };
 };
 let SV = 0, SZ = 0, SZF = 0, SZc = 0;
 [["台身（前墙）","fw",pChk.gamC], ["侧墙（两道）","sw",pChk.gamC], ["帽梁","cap",pChk.gamC],
@@ -407,19 +408,19 @@ near(cChk.K0, cChk.MsF/cChk.Mh, 1e-9, "K0 = ΣM稳/ΣM倾（只验算前趾）")
 isTrue(cChk.MsB === undefined && cChk.K0B === undefined && cChk.K0F === undefined,
        "后趾稳定力矩与 K0(后趾) 已移除");
 isTrue(cChk.items.length >= 7 && cChk.items.every(it=>it.W > 0 && it.z > -1),
-       "抗倾覆明细含 7 个及以上竖向力分项（各自带 W 与作用点 z）");
+       "抗倾覆明细含 7 个及以上竖向力分项（各自带 W 与作用点 x）");
 near(cChk.M, SZc + cChk.Mh, 10.0, "验算 基底弯矩（竖向偏心＋水平力，同向叠加）");
-/* 独立互证：由绕前趾力矩平衡反求合力作用点 zR，再算 M=ΣV(zc−zR) */
+/* 独立互证：由绕前趾力矩平衡反求合力作用点 xR，再算 M=ΣV(xc−xR) */
 const zR_chk = cChk.zF + (cChk.MsF - cChk.Mh)/cChk.Vsum;
 near(cChk.M, cChk.Vsum*(cChk.zc - zR_chk), 10.0,
      "基底弯矩 = ΣV×(形心−合力作用点)，与 Σ(M稳−M倾)=ΣV·力臂 等价");
-near(cChk.e, cChk.zc - zR_chk, 1e-6, "偏心距 e = z形心 − 合力作用点（向河心为正）");
+near(cChk.e, cChk.zc - zR_chk, 1e-6, "偏心距 e = x形心 − 合力作用点（向河心为正）");
 /* 几何基准与代数关系 */
-near(cChk.zF, -0.9, 1e-9, "基底前趾 z=ec−fd1Zf=−0.9");
-near(cChk.zB, 7.1, 1e-9, "基底后趾 z=ec+L2+fd1Zb=7.1");
+near(cChk.zF, -1.0, 1e-9, "基底前趾 x=−fd1Zf=−1.0（原点=前墙前缘）");
+near(cChk.zB, 7.0, 1e-9, "基底后趾 x=L2+fd1Zb=7.0");
 near(cChk.A, 112, 1e-9, "基底面积 A=(W+2×1)×(L2+1+1)=14×8=112");
-near(cChk.zc, 3.1, 1e-9, "基底形心 z=3.1");
-near(cChk.zN, 0.4, 1e-9, "支座作用点 z=背墙前缘0.8−d支0.4=0.4");
+near(cChk.zc, 3.0, 1e-9, "基底形心 x=3.0");
+near(cChk.zN, 0.3, 1e-9, "支座作用点 x=背墙前缘0.7−d支0.4=0.3");
 near(cChk.yH, 5.7, 1e-9, "水平力作用点标高=H1+capH+dH=5.7");
 near(cChk.hH, 6.7, 1e-9, "水平力对基底的力臂=5.7+fdT1.0=6.7");
 near(cChk.Mh, 670, 1e-6, "水平力力矩 Hk×h=100×6.7=670");
@@ -461,7 +462,7 @@ els.incFill.checked = true;
 els.dBear.value = "5";
 const cD = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cD.dBear, pChk.capWid - pChk.bwT, 1e-9, "d支超限时按背墙前缘距离截断(0.8)");
-near(cD.zN, 0, 1e-9, "d支超限后支座落在帽梁前缘 z=0");
+near(cD.zN, -0.1, 1e-9, "d支超限后支座落在帽梁前缘 x=−ec=−0.1");
 els.dBear.value = "0.40";
 /* 验算表渲染 */
 api.renderCheck(pChk, qChk);
@@ -473,6 +474,14 @@ isTrue(ckTbl.indexOf("ΣM稳 合计")>=0 && ckTbl.indexOf("支座竖向反力 Nk
        ckTbl.indexOf("台身（前墙）自重")>=0, "验算表逐项列出 ΣM稳（各构件自重＋支座反力，带力臂）");
 isTrue(ckTbl.indexOf("K0(后趾)")<0 && ckTbl.indexOf("控制值 K0")<0, "验算表不再出现后趾验算（合力位置仍标注距后趾距离）");
 isTrue(ckTbl.indexOf("ΣM倾 合计")>=0, "验算表列出 ΣM倾 合计");
+/* 坐标符号与原点口径：顺桥向一律记作 x，竖向才是 z；表中 x 以「前墙前缘=0」为原点 */
+isTrue(ckTbl.indexOf("前趾 x=")>=0 && ckTbl.indexOf("作用点 x=")>=0,
+       "结果表把顺桥向坐标标为 x（作用点 x= / 前趾 x=）");
+isTrue(ckTbl.indexOf("前趾 z=")<0 && ckTbl.indexOf("作用点 z=")<0,
+       "结果表不再把顺桥向坐标误标为 z");
+isTrue(ckTbl.indexOf("前趾 x=-1.0")>=0 || ckTbl.indexOf("前趾 x=−1.0")>=0,
+       "表中前趾 x=−1.0，与说明①「前墙前缘 x=0、帽梁前缘 x=−ec」同一原点");
+near(cChk.zN - cChk.zF, 1.3, 1e-9, "支座至前趾距离 1.3（0.3−(−1.0)，坐标平移不影响力臂）");
 
 /* ===== 制动力自动计算（JTG D60—2015 第 4.3.6 条） ===== */
 els.incEa.checked = false; els.autoHk.checked = true;

@@ -556,16 +556,19 @@ function calcCheck(p, q){
   const ec = p.capCant, fdT = q.fdT;
   const use2 = p.useFd2 && p.fd2H > 1e-9;
   /* 基底轮廓（顺桥向） */
-  c.zF = ec - p.fd1Zf - (use2 ? p.fd2Zf : 0);          // 前趾（河心侧）
-  c.zB = ec + p.L2 + p.fd1Zb + (use2 ? p.fd2Zb : 0);   // 后趾（台后侧）
+  /* 坐标基准（与页面说明①、剖面图惯例一致）：x＝顺桥向，原点＝前墙底前缘（x=0），指向台后为正。
+     calcQ / 建模内部以帽梁前缘为 0（前墙前缘=+ec），故基底轮廓、支座点与各作用点统一按前墙前缘为 0 取值。 */
+  c.zF = -p.fd1Zf - (use2 ? p.fd2Zf : 0);              // 前趾（河心侧）
+  c.zB = p.L2 + p.fd1Zb + (use2 ? p.fd2Zb : 0);        // 后趾（台后侧）
   c.Lb = Math.max(c.zB - c.zF, 1e-9);
   c.Wb = Math.max(use2 ? q.fdW2 : q.fdW1, 1e-9);
   c.A  = c.Lb * c.Wb;
   c.zc = (c.zF + c.zB)/2;
-  /* 支座反力作用点：背墙前缘（迎梁面）向河心侧量 d支 */
-  const zFace = Math.max(q.capWid - p.bwT, 0);
-  c.dBear = Math.min(Math.max(p.dBear, 0), zFace);
-  c.zN = Math.max(zFace - c.dBear, 0);
+  /* 支座反力作用点：自背墙前缘（迎梁面）向河心量 d支；d支上限=背墙前缘至帽梁前缘的距离，
+     超出后支座落在帽梁前缘（x=−ec），即桥台最前端。 */
+  const zFace = Math.max(q.capWid - p.bwT - ec, 0);    // 背墙前缘 x 坐标
+  c.dBear = Math.min(Math.max(p.dBear, 0), Math.max(q.capWid - p.bwT, 0));
+  c.zN = Math.max(zFace - c.dBear, -ec);
   /* 竖向力分项（V=体积，z=顺桥向形心，kind: c=圬工 / s=回填） */
   const items = [];
   const tb = q.t1b, tt = p.t1;
@@ -585,6 +588,7 @@ function calcCheck(p, q){
     items.push({n:"基础", V:q.V_fd, z:zFd, kind:"c"});
   }
   if(p.incFill && q.V_fill > 1e-9) items.push({n:"台腔回填", V:q.V_fill, z:q.zbar_fill, kind:"s"});
+  items.forEach(it=>{ it.z -= ec; });   /* 统一到「前墙前缘 x=0」基准（calcQ 的内部基准是帽梁前缘） */
   let Gc = 0, Gs = 0, Mz = 0;
   items.forEach(it=>{
     it.W = it.V * (it.kind === "s" ? p.gamS : p.gamC);
@@ -1486,12 +1490,12 @@ function renderCheck(p, q){
   const sep = t => rows.push(`<tr class="sep"><td colspan="5">${t}</td></tr>`);
 
   sep("竖向力（标准值，基底以上全部竖向力）");
-  row("支座竖向荷载 Nk", `支座中心 z=${f(c.zN,2)}（自背墙前缘向内 ${f(c.dBear,2)}）`, p.Nk, "kN");
+  row("支座竖向荷载 Nk", `支座中心 x=${f(c.zN,2)}（自背墙前缘向河心 ${f(c.dBear,2)}）`, p.Nk, "kN");
   row("桥台圬工自重", `ΣVi×γc = ${f(q.total,3)}×${f(p.gamC,1)}`, c.Gc, "kN");
   row("台腔回填土重", p.incFill ? `V填×γs = ${f(q.V_fill,2)}×${f(p.gamS,1)}` : "按偏安全不计入", c.Gs, "kN");
   rows.push(`<tr class="total"><td>ΣV 合计</td><td class="fx">支座反力＋自重＋回填</td>`+
     `<td class="num">${f(c.Vsum,3)}</td><td>kN</td><td></td></tr>`);
-  row("合力作用点 z", `距基底前趾 ${f(c.zbar - c.zF,2)}，距后趾 ${f(c.zB - c.zbar,2)}`, c.zbar, "m");
+  row("合力作用点 x", `距基底前趾 ${f(c.zbar - c.zF,2)}，距后趾 ${f(c.zB - c.zbar,2)}`, c.zbar, "m");
 
   sep("顺桥向水平力（标准值，均取指向河心的不利方向）");
   const brk = c.brk;
@@ -1514,10 +1518,10 @@ function renderCheck(p, q){
   sep("抗倾覆稳定（绕基底前趾取矩，即向河心倾覆；ΣM稳＝Σ 竖向力×力臂）");
   c.items.forEach(it=>{
     const gm = it.kind === "s" ? p.gamS : p.gamC;
-    row(it.n + "自重", `V=${f(it.V,3)}×${f(gm,1)}＝${f(it.W,1)} kN；力臂 ${f(it.z - c.zF,3)}（作用点 z=${f(it.z,3)}，前趾 z=${f(c.zF,3)}）`,
+    row(it.n + "自重", `V=${f(it.V,3)}×${f(gm,1)}＝${f(it.W,1)} kN；力臂 ${f(it.z - c.zF,3)}（作用点 x=${f(it.z,3)}，前趾 x=${f(c.zF,3)}）`,
         it.W*(it.z - c.zF), "kN·m");
   });
-  row("支座竖向反力 Nk", `Nk=${f(p.Nk,1)} kN；力臂 ${f(c.zN - c.zF,3)}（作用点 z=${f(c.zN,3)}，前趾 z=${f(c.zF,3)}）`,
+  row("支座竖向反力 Nk", `Nk=${f(p.Nk,1)} kN；力臂 ${f(c.zN - c.zF,3)}（作用点 x=${f(c.zN,3)}，前趾 x=${f(c.zF,3)}）`,
       p.Nk*(c.zN - c.zF), "kN·m");
   rows.push(`<tr class="total"><td>ΣM稳 合计</td><td class="fx">圬工自重＋回填土重＋支座反力，均对前趾取矩</td>`+
     `<td class="num">${f(c.MsF,1)}</td><td>kN·m</td><td></td></tr>`);
@@ -1543,7 +1547,7 @@ function renderCheck(p, q){
   $("checkNote").innerHTML = `<b>验算依据与假定</b>` + [
     `① 荷载均取<strong>标准值</strong>。制动力按 JTG D60—2015 第 4.3.6 条自动计算：一个设计车道取车道荷载总重力的 10%（qk=10.5 kN/m，Pk 随加载长度内插），公路—Ⅰ级不小于 165 kN、Ⅱ级不小于 90 kN，同向多车道乘 1.00/2.00/2.34/2.68；取消勾选可手输，此时应自行叠加温度力等。台后主动土压力按库仑公式自动计算（墙背竖直、填土面水平），<strong>仅取水平分量、竖向分量偏安全不计</strong>，并与制动力按同向叠加。未计入水浮力、地震作用、横桥向偏心及斜交影响。承载能力极限状态应另按 JTG D60 组合、JTG 3363 复核。`,
     `② 抗滑移 Kc = μ·ΣV/ΣH ≥ 1.3。抗倾覆<strong>只验算绕基底前趾（河心侧）取矩</strong>，即向河心倾覆：ΣM稳 由台身、侧墙、帽梁、背墙、牛腿、基础的自重（V×γc）、台腔回填土重（V×γs）与支座反力 Nk 各自乘以"作用点至前趾的顺桥向距离"累加而成（表中逐项列出）；ΣM倾 = Hk·hH＋EaH·yEa。K0 = ΣM稳/ΣM倾 ≥ 1.5。台后土压力恒指向河心且远大于制动力，水平力合力不可能指向台后，后趾工况不控制，故不再验算。<strong>注意：支座反力 Nk 是竖向力，其力臂是顺桥向水平距离，计入 ΣM稳 —— Nk 越大 K0 越大，它是抗倾覆力而不是倾覆力；倾覆力矩只能由水平力产生（力臂是竖向高度）。</strong>Nk 作用点偏河心时会加大基底朝河心的偏心与 p最大，那属于基底承载力范畴，与抗倾覆是两个不同的验算。基底应力按直线分布，p均 ≤ fa、p最大 ≤ 1.2fa，偏心距 e ≤ L/6（土基）或 L/4（岩石）。限值取自《公路桥涵地基与基础设计规范》JTG 3363—2019 的常规规定，项目另有规定或持力层软弱时应按实际调整。`,
-    `③ 各构件自重按几何形心取矩（前墙梯形按解析形心，侧墙、回填按断面面积加权数值积分，牛腿按直角梯形断面形心），与三维模型同源；竖向力作用点、基底轮廓均随参数联动。基底弯矩 M = 竖向力偏心 [ΣV×(z形心−z作用点)] ＋ ΣM倾，两者都使前趾受压、方向相同，<strong>必须同向叠加而非相减</strong>；e>0 表示合力偏向河心（前趾），e<0 表示偏向台后（后趾）。`,
+    `③ 各构件自重按几何形心取矩（前墙梯形按解析形心，侧墙、回填按断面面积加权数值积分，牛腿按直角梯形断面形心），与三维模型同源；竖向力作用点、基底轮廓均随参数联动。基底弯矩 M = 竖向力偏心 [ΣV×(x形心−x作用点)] ＋ ΣM倾，两者都使前趾受压、方向相同，<strong>必须同向叠加而非相减</strong>；e>0 表示合力偏向河心（前趾），e<0 表示偏向台后（后趾）。`,
     `④ 土压力计算宽度取前墙横桥向宽度 B，高度取自基础顶至路基顶（留空时默认＝侧墙总高）。若台后设搭板并做柔性隔离、或由耳墙/翼墙独立挡土，实际传给台身者小于此值，可按实际挡土高度折减 h填，但不应取零；若路基顶高于背墙顶，应据实加大 h填。台腔回填对两侧墙的土压力左右对称、相互抵消，不产生横桥向合力。`,
     `⑤ 本表用于方案比较与初判；施工图阶段应按实际荷载组合、地基容许承载力深宽修正、下卧层验算及沉降验算另行复核。`
   ].map(s=>`<div style="margin-top:5px; text-align:justify;">${s}</div>`).join("");
