@@ -135,7 +135,7 @@
       <div class="card">
         <h2>墩身</h2>
         <div class="fields" id="fldRect">
-          <div class="field"><label>墩身长 Lp <small>纵桥向</small></label><input type="number" id="Lp" value="2.5" step="0.01"></div>
+          <div class="field"><label>墩身长 Lp <small>纵桥向，须 ≥ 圆柱直径 d</small></label><input type="number" id="Lp" value="2.5" step="0.01"></div>
           <div class="field"><label>墩身宽 Wp <small>横桥向</small></label><input type="number" id="Wp" value="6" step="0.01"></div>
         </div>
         <div class="fields" id="fldCyl" style="display:none;">
@@ -152,7 +152,7 @@
           <label for="useCap">设置盖梁</label></div>
         <div class="fields">
           <div class="field"><label>盖梁宽度 Lc <small>横桥向总长</small></label><input type="number" id="capL" value="13.00" step="0.01"></div>
-          <div class="field"><label>盖梁厚度 bc <small>顺桥向</small></label><input type="number" id="capb" value="1.80" step="0.01"></div>
+          <div class="field"><label>盖梁厚度 bc <small>顺桥向，须 ≥ 墩身长</small></label><input type="number" id="capb" value="1.80" step="0.01"></div>
           <div class="field"><label>盖梁中部高 hc <small>跨中断面高</small></label><input type="number" id="caph" value="1.50" step="0.01"></div>
           <div class="field"><label>盖梁端部高 he <small>两端断面高，≤中部高</small></label><input type="number" id="caphe" value="0.60" step="0.01"></div>
           <div class="field"><label>左悬臂长 aL <small>梁端→变高点（横桥向）</small></label><input type="number" id="cantL" value="1.50" step="0.01"></div>
@@ -162,7 +162,7 @@
           <div class="field"><label>挡块上部宽</label><input type="number" id="dkWT" value="0.20" step="0.01"></div>
           <div class="field"><label>挡块下部宽</label><input type="number" id="dkWB" value="0.20" step="0.01"></div>
         </div>
-        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），变截面断面：跨中高 hc、两端高 he（生效值≤hc）；左/右悬臂长=梁端至变高点的横桥向距离，该段底面自端部斜向上抬至中部高；挡块设于两端顶面（断面梯形：下部宽→上部宽，沿厚度 bc 全宽贯通）。总长 Lc 直接输入，宜与墩身横桥向尺寸+左右悬臂一致。<b>限值：Lc ＞ 墩身横桥向尺寸（矩形墩=Wp，圆柱墩=最外侧圆柱外缘距 Wd），且 (Lc−aL−aR) ＞ 同一尺寸；不满足时按限值取用（aL/aR 等比压缩）并见下方红字提示。</b>单位：m。</div>
+        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），变截面断面：跨中高 hc、两端高 he（生效值≤hc）；左/右悬臂长=梁端至变高点的横桥向距离，该段底面自端部斜向上抬至中部高；挡块设于两端顶面（断面梯形：下部宽→上部宽，沿厚度 bc 全宽贯通）。总长 Lc 直接输入，宜与墩身横桥向尺寸+左右悬臂一致。<b>限值（超出时该参数自动归位）：Lc ＞ 墩身横桥向尺寸（矩形墩=Wp，圆柱墩=最外侧圆柱外缘距 Wd）；(Lc−aL−aR) ＞ 同一尺寸（超时 aL/aR 等比压缩）；bc ≥ 墩身顺桥向长（矩形墩=Lp，圆柱墩=d）。</b>单位：m。</div>
         <div class="note" id="capWarn" style="display:none; margin-top:5px; border-left:3px solid #dc2626; background:#fef2f2; color:#991b1b; font-weight:600;"></div>
       </div>
 
@@ -232,7 +232,7 @@
         <div class="note" style="margin-top:0;">
           坐标系：原点=<strong>基础最低面（最下层基础底面）中心</strong>，x=纵桥向、y=横桥向、z=竖向（向上为正）；标高以<strong>基础底面=0.000</strong> 计（墩底标高即等于基础总厚），绝对标高=相对标高+高程基准绝对标高。<br>
           基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。<br>
-          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），变截面断面：横桥向总长 Lc 直接输入（宜=墩身横桥向尺寸+左右悬臂），顺桥向厚度 bc；跨中高 hc、两端高 he（≤hc），左右悬臂段（梁端→变高点）底面斜向上抬；两端顶面可设挡块（高 h挡、断面梯形 上部宽/下部宽，沿 bc 贯通）；勾掉「设置盖梁」即不计盖梁。<b>限值（违反时按限值取用并红字提示）：Lc ＞ 墩身横桥向尺寸 Wp（圆柱墩取最外侧圆柱外缘距 Wd），且 (Lc−aL−aR) ＞ 同一尺寸。</b>
+          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），变截面断面：横桥向总长 Lc 直接输入（宜=墩身横桥向尺寸+左右悬臂），顺桥向厚度 bc；跨中高 hc、两端高 he（≤hc），左右悬臂段（梁端→变高点）底面斜向上抬；两端顶面可设挡块（高 h挡、断面梯形 上部宽/下部宽，沿 bc 贯通）；勾掉「设置盖梁」即不计盖梁。<b>限值（超出时该参数自动归位）：Lc ＞ 墩身横桥向尺寸 Wp（圆柱墩取最外侧圆柱外缘距 Wd）；(Lc−aL−aR) ＞ 同一尺寸（超时 aL/aR 等比压缩）；bc ≥ 墩身顺桥向长（矩形墩=Lp，圆柱墩=d）；墩身顺桥向长 ≥ 圆柱直径 d。</b>
         </div>
       </div>
     </div>
@@ -335,13 +335,18 @@ function readP(){
 function calcQ(p){
   const q = {};
   const isRect = p.type==="实体矩形桥墩";
-  const baseA = isRect ? p.Lp : p.d;             // 纵桥向基准尺寸
+  /* 【墩身顺桥向长限值】墩身顺桥向长（矩形墩=Lp、圆柱墩=d）须 ≥ 圆柱直径 d：
+     圆柱式时两者同为 d，自动满足；矩形墩若 Lp＜d 则按 d 取用并在参数卡提示 */
+  q.pierLmin = p.d;
+  q.pierL    = Math.max(isRect ? p.Lp : p.d, p.d);
+  q.pierLbad = isRect && p.Lp < p.d - 1e-9;
+  const baseA = q.pierL;                         // 纵桥向基准尺寸（生效值）
   const baseB = isRect ? p.Wp : (p.n-1)*p.s + p.d; // 横桥向基准尺寸（最外侧圆柱外缘距）
   q.Wd  = (p.n-1)*p.s + p.d;
   q.a1  = baseA + 2*p.c1;  q.b1 = baseB + 2*p.c1;
   q.a2  = q.a1 + 2*p.c2;   q.b2 = q.b1 + 2*p.c2;
   q.fdT = p.fh1 + (p.useFd2 ? p.fh2 : 0);        // 基础总厚
-  q.V_pier = isRect ? p.Lp*p.Wp*p.H : p.n*Math.PI*p.d*p.d/4*p.H;
+  q.V_pier = isRect ? q.pierL*p.Wp*p.H : p.n*Math.PI*p.d*p.d/4*p.H;
   q.V_fd1  = q.a1*q.b1*p.fh1;
   q.V_fd2  = p.useFd2 ? q.a2*q.b2*p.fh2 : 0;
   q.V_fd   = q.V_fd1 + q.V_fd2;
@@ -352,30 +357,37 @@ function calcQ(p){
      挡块：设于两端顶面，断面梯形（下部宽 wb → 上部宽 wt、高 h挡）沿 bc 全宽贯通，
      单个体积 = (wt+wb)/2×h挡×bc，两端共 2 个 */
   q.capBase = baseB;
-  /* 【盖梁尺寸限值】（严格大于，违反时按限值取用并在参数卡提示）
+  /* 【盖梁尺寸限值】（违反时按限值取用，并令输入框自动归位到合规值）
      ① Lc ＞ 墩身横桥向基准尺寸（矩形墩=Wp、圆柱墩=最外侧圆柱外缘距 Wd）：盖梁须横桥向盖住墩身；
      ② (Lc − aL − aR) ＞ 同一基准尺寸：跨中等高段须完全覆盖墩顶，变高点落在墩身以外。
-     违反②时 aL、aR 按原比例等比压缩至刚好满足；违反①时 Lc 抬至 baseB（+1e-6）后再判②。 */
-  const CAP_EPS = 1e-6;
-  q.capLmin   = baseB + CAP_EPS;
-  q.capL      = p.useCap ? Math.max(p.capL, q.capLmin) : 0;
+     归位值取「下一个 0.01 步进」的明确合规数（如 baseB=6 → 6.01），避免 6.000001 之类浮点微差反复触发。
+     违反②时 aL、aR 按原比例等比压缩至刚好满足；违反①时 Lc 抬至归位值后再判②。 */
+  const CAP_STEP = 0.01;                                 // 归位步进
+  q.capLmin   = baseB;                                  // 原始限值（用于提示文案）
+  q.capLset   = Math.max(baseB, 0) + CAP_STEP;          // 归位值（严格大于 baseB 的最小 0.01 倍数）
+  q.capL      = p.useCap ? Math.max(p.capL, q.capLset) : 0;
   q.capHm     = p.useCap ? Math.max(p.caph, 0) : 0;
   q.capHe     = p.useCap ? Math.min(Math.max(p.caphe, 0), q.capHm) : 0;
-  const cantMax = Math.max(q.capL - q.capLmin, 0);       // aL+aR 上限
+  const cantMax = Math.max(q.capL - q.capLmin - CAP_STEP, 0); // aL+aR 上限（保证等高段 ≥ baseB+0.01 ＞ baseB）
   const cantSum = Math.max(p.cantL, 0) + Math.max(p.cantR, 0);
   const cantK   = (cantSum > cantMax && cantSum > 1e-9) ? cantMax/cantSum : 1;
   q.cantL = p.useCap ? Math.max(p.cantL, 0)*cantK : 0;
   q.cantR = p.useCap ? Math.max(p.cantR, 0)*cantK : 0;
   const flatL = Math.max(q.capL - q.cantL - q.cantR, 0);
   q.capFlat   = flatL;                                  // 跨中等高段长（须＞baseB）
-  q.capLbad   = p.useCap && p.capL <= q.capLmin;        // 违反①
+  q.capLbad   = p.useCap && p.capL <= q.capLmin;        // 违反①（输入 ≤ 限值即触发）
   q.capCantBad = p.useCap && cantK < 1 - 1e-12;         // 违反②
-  q.V_cap = p.useCap ? p.capb * (q.capHm*flatL + (q.capHm+q.capHe)/2*(q.cantL+q.cantR)) : 0;
+  /* 【盖梁厚度限值】③ bc ≥ 墩身顺桥向长（矩形墩=Lp、圆柱墩=d）：盖梁须顺桥向盖住墩身；
+     违反时 bc 按该限值取用（≥ 直接取限值本身）并在参数卡提示 */
+  q.capBmin = q.pierL;
+  q.capB    = Math.max(p.capb, q.capBmin);
+  q.capBbad = p.useCap && p.capb < q.capBmin - 1e-9;
+  q.V_cap = p.useCap ? q.capB * (q.capHm*flatL + (q.capHm+q.capHe)/2*(q.cantL+q.cantR)) : 0;
   q.dkOn  = p.useCap && p.dkOn;
   q.dkH   = Math.max(p.dkH, 0);
   q.dkWT  = Math.max(p.dkWT, 0);
   q.dkWB  = Math.max(p.dkWB, 0);
-  q.V_dk  = q.dkOn ? 2 * (q.dkWT+q.dkWB)/2 * q.dkH * p.capb : 0;
+  q.V_dk  = q.dkOn ? 2 * (q.dkWT+q.dkWB)/2 * q.dkH * q.capB : 0;
   q.capT  = p.useCap ? p.caph : 0;               // 盖梁中部高（不设盖梁时为 0）
   q.total  = q.V_pier + q.V_cap + q.V_dk + q.V_fd;
   /* 开挖：坑底平面=最底层基础轮廓（矩形 边长×边长）+每侧工作宽度，坑底=基础底面（z=−fdT）。
@@ -719,60 +731,60 @@ function excProfile(p, q){
 const PARAM_HL = {
   useCap:(p,q)=> p.useCap ? {parts:["cap"]} : null,
   capL:  (p,q)=> p.useCap ? {pts:[                       /* 顶面两条横桥向长边（总长） */
-            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2, q.capL/2,p.H+q.capHm,
-             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2, q.capL/2,p.H+q.capHm ]} : null,
+            -q.capB/2,-q.capL/2,p.H+q.capHm, -q.capB/2, q.capL/2,p.H+q.capHm,
+             q.capB/2,-q.capL/2,p.H+q.capHm,  q.capB/2, q.capL/2,p.H+q.capHm ]} : null,
   caph:  (p,q)=> p.useCap ? {pts:[                       /* 变高点处四条通高竖棱（中部高） */
-            -p.capb/2,-q.capL/2+q.cantL,p.H, -p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm,
-             p.capb/2,-q.capL/2+q.cantL,p.H,  p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm,
-            -p.capb/2, q.capL/2-q.cantR,p.H, -p.capb/2, q.capL/2-q.cantR,p.H+q.capHm,
-             p.capb/2, q.capL/2-q.cantR,p.H,  p.capb/2, q.capL/2-q.cantR,p.H+q.capHm ]} : null,
+            -q.capB/2,-q.capL/2+q.cantL,p.H, -q.capB/2,-q.capL/2+q.cantL,p.H+q.capHm,
+             q.capB/2,-q.capL/2+q.cantL,p.H,  q.capB/2,-q.capL/2+q.cantL,p.H+q.capHm,
+            -q.capB/2, q.capL/2-q.cantR,p.H, -q.capB/2, q.capL/2-q.cantR,p.H+q.capHm,
+             q.capB/2, q.capL/2-q.cantR,p.H,  q.capB/2, q.capL/2-q.cantR,p.H+q.capHm ]} : null,
   caphe: (p,q)=> (p.useCap && q.capHe < q.capHm-1e-9) ? {pts:[   /* 两端梁端竖直边（端部高） */
-            -p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe, -p.capb/2,-q.capL/2,p.H+q.capHm,
-             p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe,  p.capb/2,-q.capL/2,p.H+q.capHm,
-            -p.capb/2, q.capL/2,p.H+q.capHm-q.capHe, -p.capb/2, q.capL/2,p.H+q.capHm,
-             p.capb/2, q.capL/2,p.H+q.capHm-q.capHe,  p.capb/2, q.capL/2,p.H+q.capHm ]} : null,
+            -q.capB/2,-q.capL/2,p.H+q.capHm-q.capHe, -q.capB/2,-q.capL/2,p.H+q.capHm,
+             q.capB/2,-q.capL/2,p.H+q.capHm-q.capHe,  q.capB/2,-q.capL/2,p.H+q.capHm,
+            -q.capB/2, q.capL/2,p.H+q.capHm-q.capHe, -q.capB/2, q.capL/2,p.H+q.capHm,
+             q.capB/2, q.capL/2,p.H+q.capHm-q.capHe,  q.capB/2, q.capL/2,p.H+q.capHm ]} : null,
   cantL: (p,q)=> (p.useCap && q.cantL>1e-9) ? {pts:[     /* 左悬臂段：顶面梁端→变高点 */
-            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm,
-             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2,-q.capL/2+q.cantL,p.H+q.capHm ]} : null,
+            -q.capB/2,-q.capL/2,p.H+q.capHm, -q.capB/2,-q.capL/2+q.cantL,p.H+q.capHm,
+             q.capB/2,-q.capL/2,p.H+q.capHm,  q.capB/2,-q.capL/2+q.cantL,p.H+q.capHm ]} : null,
   cantR: (p,q)=> (p.useCap && q.cantR>1e-9) ? {pts:[     /* 右悬臂段：顶面变高点→梁端 */
-            -p.capb/2, q.capL/2-q.cantR,p.H+q.capHm, -p.capb/2, q.capL/2,p.H+q.capHm,
-             p.capb/2, q.capL/2-q.cantR,p.H+q.capHm,  p.capb/2, q.capL/2,p.H+q.capHm ]} : null,
+            -q.capB/2, q.capL/2-q.cantR,p.H+q.capHm, -q.capB/2, q.capL/2,p.H+q.capHm,
+             q.capB/2, q.capL/2-q.cantR,p.H+q.capHm,  q.capB/2, q.capL/2,p.H+q.capHm ]} : null,
   capb:  (p,q)=> p.useCap ? {pts:[                       /* 顺桥向边：两端面顶/底各一条 */
-            -p.capb/2,-q.capL/2,p.H+q.capHm, p.capb/2,-q.capL/2,p.H+q.capHm,
-            -p.capb/2, q.capL/2,p.H+q.capHm, p.capb/2, q.capL/2,p.H+q.capHm,
-            -p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe, p.capb/2,-q.capL/2,p.H+q.capHm-q.capHe,
-            -p.capb/2, q.capL/2,p.H+q.capHm-q.capHe, p.capb/2, q.capL/2,p.H+q.capHm-q.capHe ]} : null,
+            -q.capB/2,-q.capL/2,p.H+q.capHm, q.capB/2,-q.capL/2,p.H+q.capHm,
+            -q.capB/2, q.capL/2,p.H+q.capHm, q.capB/2, q.capL/2,p.H+q.capHm,
+            -q.capB/2,-q.capL/2,p.H+q.capHm-q.capHe, q.capB/2,-q.capL/2,p.H+q.capHm-q.capHe,
+            -q.capB/2, q.capL/2,p.H+q.capHm-q.capHe, q.capB/2, q.capL/2,p.H+q.capHm-q.capHe ]} : null,
   dkOn:  (p,q)=> (p.useCap && q.dkOn) ? {parts:["cap"]} : null,
   dkH:   (p,q)=> (p.useCap && q.dkOn && q.dkH>1e-9) ? {pts:[     /* 挡块外缘竖直边（两端×两侧） */
-            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH,
-             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH,
-            -p.capb/2, q.capL/2,p.H+q.capHm, -p.capb/2, q.capL/2,p.H+q.capHm+q.dkH,
-             p.capb/2, q.capL/2,p.H+q.capHm,  p.capb/2, q.capL/2,p.H+q.capHm+q.dkH ]} : null,
+            -q.capB/2,-q.capL/2,p.H+q.capHm, -q.capB/2,-q.capL/2,p.H+q.capHm+q.dkH,
+             q.capB/2,-q.capL/2,p.H+q.capHm,  q.capB/2,-q.capL/2,p.H+q.capHm+q.dkH,
+            -q.capB/2, q.capL/2,p.H+q.capHm, -q.capB/2, q.capL/2,p.H+q.capHm+q.dkH,
+             q.capB/2, q.capL/2,p.H+q.capHm,  q.capB/2, q.capL/2,p.H+q.capHm+q.dkH ]} : null,
   dkWT:  (p,q)=> (p.useCap && q.dkOn && q.dkWT>1e-9) ? {pts:[    /* 挡块顶面横桥向边 */
-            -p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH, -p.capb/2,-q.capL/2+q.dkWT,p.H+q.capHm+q.dkH,
-             p.capb/2,-q.capL/2,p.H+q.capHm+q.dkH,  p.capb/2,-q.capL/2+q.dkWT,p.H+q.capHm+q.dkH,
-            -p.capb/2, q.capL/2,p.H+q.capHm+q.dkH, -p.capb/2, q.capL/2-q.dkWT,p.H+q.capHm+q.dkH,
-             p.capb/2, q.capL/2,p.H+q.capHm+q.dkH,  p.capb/2, q.capL/2-q.dkWT,p.H+q.capHm+q.dkH ]} : null,
+            -q.capB/2,-q.capL/2,p.H+q.capHm+q.dkH, -q.capB/2,-q.capL/2+q.dkWT,p.H+q.capHm+q.dkH,
+             q.capB/2,-q.capL/2,p.H+q.capHm+q.dkH,  q.capB/2,-q.capL/2+q.dkWT,p.H+q.capHm+q.dkH,
+            -q.capB/2, q.capL/2,p.H+q.capHm+q.dkH, -q.capB/2, q.capL/2-q.dkWT,p.H+q.capHm+q.dkH,
+             q.capB/2, q.capL/2,p.H+q.capHm+q.dkH,  q.capB/2, q.capL/2-q.dkWT,p.H+q.capHm+q.dkH ]} : null,
   dkWB:  (p,q)=> (p.useCap && q.dkOn && q.dkWB>1e-9) ? {pts:[    /* 挡块底面横桥向边（贴盖梁顶） */
-            -p.capb/2,-q.capL/2,p.H+q.capHm, -p.capb/2,-q.capL/2+q.dkWB,p.H+q.capHm,
-             p.capb/2,-q.capL/2,p.H+q.capHm,  p.capb/2,-q.capL/2+q.dkWB,p.H+q.capHm,
-            -p.capb/2, q.capL/2,p.H+q.capHm, -p.capb/2, q.capL/2-q.dkWB,p.H+q.capHm,
-             p.capb/2, q.capL/2,p.H+q.capHm,  p.capb/2, q.capL/2-q.dkWB,p.H+q.capHm ]} : null,
+            -q.capB/2,-q.capL/2,p.H+q.capHm, -q.capB/2,-q.capL/2+q.dkWB,p.H+q.capHm,
+             q.capB/2,-q.capL/2,p.H+q.capHm,  q.capB/2,-q.capL/2+q.dkWB,p.H+q.capHm,
+            -q.capB/2, q.capL/2,p.H+q.capHm, -q.capB/2, q.capL/2-q.dkWB,p.H+q.capHm,
+             q.capB/2, q.capL/2,p.H+q.capHm,  q.capB/2, q.capL/2-q.dkWB,p.H+q.capHm ]} : null,
   Hp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
-            -p.Lp/2,-p.Wp/2,0, -p.Lp/2,-p.Wp/2,p.H,     /* 四条竖直棱（墩底→墩顶） */
-             p.Lp/2,-p.Wp/2,0,  p.Lp/2,-p.Wp/2,p.H,
-            -p.Lp/2, p.Wp/2,0, -p.Lp/2, p.Wp/2,p.H,
-             p.Lp/2, p.Wp/2,0,  p.Lp/2, p.Wp/2,p.H ]} : {parts:["pier"]},
+            -q.pierL/2,-p.Wp/2,0, -q.pierL/2,-p.Wp/2,p.H,     /* 四条竖直棱（墩底→墩顶） */
+             q.pierL/2,-p.Wp/2,0,  q.pierL/2,-p.Wp/2,p.H,
+            -q.pierL/2, p.Wp/2,0, -q.pierL/2, p.Wp/2,p.H,
+             q.pierL/2, p.Wp/2,0,  q.pierL/2, p.Wp/2,p.H ]} : {parts:["pier"]},
   Lp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
-            -p.Lp/2,-p.Wp/2,0,  p.Lp/2,-p.Wp/2,0,     /* 底边（纵桥向） */
-            -p.Lp/2, p.Wp/2,0,  p.Lp/2, p.Wp/2,0,
-            -p.Lp/2,-p.Wp/2,p.H, p.Lp/2,-p.Wp/2,p.H,  /* 顶边 */
-            -p.Lp/2, p.Wp/2,p.H, p.Lp/2, p.Wp/2,p.H ]} : {parts:["pier"]},
+            -q.pierL/2,-p.Wp/2,0,  q.pierL/2,-p.Wp/2,0,     /* 底边（纵桥向） */
+            -q.pierL/2, p.Wp/2,0,  q.pierL/2, p.Wp/2,0,
+            -q.pierL/2,-p.Wp/2,p.H, q.pierL/2,-p.Wp/2,p.H,  /* 顶边 */
+            -q.pierL/2, p.Wp/2,p.H, q.pierL/2, p.Wp/2,p.H ]} : {parts:["pier"]},
   Wp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
-            -p.Lp/2,-p.Wp/2,0, -p.Lp/2, p.Wp/2,0,     /* 底边（横桥向） */
-             p.Lp/2,-p.Wp/2,0,  p.Lp/2, p.Wp/2,0,
-            -p.Lp/2,-p.Wp/2,p.H, -p.Lp/2, p.Wp/2,p.H,
-             p.Lp/2,-p.Wp/2,p.H,  p.Lp/2, p.Wp/2,p.H ]} : {parts:["pier"]},
+            -q.pierL/2,-p.Wp/2,0, -q.pierL/2, p.Wp/2,0,     /* 底边（横桥向） */
+             q.pierL/2,-p.Wp/2,0,  q.pierL/2, p.Wp/2,0,
+            -q.pierL/2,-p.Wp/2,p.H, -q.pierL/2, p.Wp/2,p.H,
+             q.pierL/2,-p.Wp/2,p.H,  q.pierL/2, p.Wp/2,p.H ]} : {parts:["pier"]},
   d:     (p,q)=>{ const y0 = -(p.n-1)/2*p.s, y1 = (p.n-1)/2*p.s;
             const C = [[0,y0,0,p.d/2], [0,y0,p.H,p.d/2]];
             if(Math.abs(y1-y0) > 1e-9){ C.push([0,y1,0,p.d/2], [0,y1,p.H,p.d/2]); }
@@ -790,7 +802,7 @@ const PARAM_HL = {
   fh2:   (p,q)=>{ if(!p.useFd2) return null; const a=q.a2, b=q.b2;   /* 二层基础：四个角点竖直棱 */
             return {pts:[ -a/2,-b/2,-q.fdT, -a/2,-b/2,-p.fh1,  a/2,-b/2,-q.fdT,  a/2,-b/2,-p.fh1,
                           -a/2, b/2,-q.fdT, -a/2, b/2,-p.fh1,  a/2, b/2,-q.fdT,  a/2, b/2,-p.fh1 ]}; },
-  c1:    (p,q)=>{ const a0 = p.type==="实体矩形桥墩" ? p.Lp : p.d,
+  c1:    (p,q)=>{ const a0 = p.type==="实体矩形桥墩" ? q.pierL : p.d,
                       b0 = p.type==="实体矩形桥墩" ? p.Wp : q.Wd;
             return {pts:[...hlRect(-a0/2,a0/2,-b0/2,b0/2,0),        /* 墩身底轮廓 */
                          ...hlRect(-q.a1/2,q.a1/2,-q.b1/2,q.b1/2,0)]}; },  /* 一层顶轮廓（襟边环带） */
@@ -876,7 +888,7 @@ function buildModel(p, q){
 
   /* 墩身 */
   if(isRect){
-    group.add(Object.assign(box(-p.Lp/2,p.Lp/2,-p.Wp/2,p.Wp/2,0,p.H, MAT.pier()), {userData:{part:"pier"}}));
+    group.add(Object.assign(box(-q.pierL/2,q.pierL/2,-p.Wp/2,p.Wp/2,0,p.H, MAT.pier()), {userData:{part:"pier"}}));
   }else{
     for(let i=0;i<p.n;i++){
       const y = (i-(p.n-1)/2)*p.s;
@@ -900,14 +912,14 @@ function buildModel(p, q){
     if(q.cantL > 1e-9){ poly.push([-yl, zbE], [yL, p.H]); } else poly.push([-yl, p.H]);
     if(q.cantR > 1e-9){ poly.push([yR, p.H], [yl, zbE]); } else poly.push([yl, p.H]);
     poly.push([yl, zt], [-yl, zt]);
-    const capMesh = prismMesh(poly, -p.capb/2, p.capb/2, MAT.cap());
+    const capMesh = prismMesh(poly, -q.capB/2, q.capB/2, MAT.cap());
     capMesh.userData.part = "cap";
     group.add(capMesh);
     if(q.dkOn && q.dkH > 1e-9 && q.dkWT + q.dkWB > 1e-9){
       const mkBlk = (yOut, inw) => {                 /* inw：挡块由梁端指向跨中的方向 */
         /* 逆时针绕向（底→顶），保证正面朝外、法线正确 */
         const bp = [[yOut, zt], [yOut+inw*q.dkWB, zt], [yOut+inw*q.dkWT, zt+q.dkH], [yOut, zt+q.dkH]];
-        const m = prismMesh(bp, -p.capb/2, p.capb/2, MAT.cap());
+        const m = prismMesh(bp, -q.capB/2, q.capB/2, MAT.cap());
         m.userData.part = "cap";
         group.add(m);
       };
@@ -1008,7 +1020,7 @@ function buildModel(p, q){
   /* ---- 尺寸标注（CAD 风格，受"显示尺寸标注"与构件开关控制） ---- */
   if($("showLabels").checked){
     const L = labelGroup, DC = "#1e40af", DC2 = "#0f766e";
-    const xP = isRect ? p.Lp/2 : p.d/2;          /* 墩身纵桥向边缘 */
+    const xP = isRect ? q.pierL/2 : p.d/2;          /* 墩身纵桥向边缘 */
     /* 竖向：墩身高 H、一层/二层厚度 */
     L.add(makeDimRaw(V(-xP,-q.b1/2,0), V(-xP,-q.b1/2,p.H), V(0,-1.6,0), `H=${ft(p.H)}`, DC, "pier"));
     /* 盖梁：中部高 hc（变高点处竖直量）、端部高 he（梁端竖直量）、厚度 bc（顺桥向）、
@@ -1016,14 +1028,14 @@ function buildModel(p, q){
     if(p.useCap){
       const zt = p.H + q.capHm, zbE = zt - q.capHe, yl = q.capL/2;
       const yL = -yl + q.cantL, yR = yl - q.cantR;
-      L.add(makeDimRaw(V(-p.capb/2,yL,p.H), V(-p.capb/2,yL,zt), V(-1.6,0,0), `hc=${ft(q.capHm)}`, DC, "cap"));
-      L.add(makeDimRaw(V(p.capb/2,yl,zbE), V(p.capb/2,yl,zt), V(1.6,0,0), `he=${ft(q.capHe)}`, DC, "cap"));
-      L.add(makeDimRaw(V(-p.capb/2,-yl,zt), V(p.capb/2,-yl,zt), V(0,0,0.9), `bc=${ft(p.capb)}`, DC, "cap"));
-      L.add(makeDimRaw(V(p.capb/2,-yl,zt), V(p.capb/2,yl,zt), V(2.4,0,0), `Lc=${ft(q.capL)}`, DC, "cap"));
-      L.add(makeDimRaw(V(p.capb/2,-yl,zt), V(p.capb/2,yL,zt), V(1.2,0,0), `aL=${ft(q.cantL)}`, DC2, "cap"));
-      L.add(makeDimRaw(V(p.capb/2,yR,zt), V(p.capb/2,yl,zt), V(1.2,0,0), `aR=${ft(q.cantR)}`, DC2, "cap"));
+      L.add(makeDimRaw(V(-q.capB/2,yL,p.H), V(-q.capB/2,yL,zt), V(-1.6,0,0), `hc=${ft(q.capHm)}`, DC, "cap"));
+      L.add(makeDimRaw(V(q.capB/2,yl,zbE), V(q.capB/2,yl,zt), V(1.6,0,0), `he=${ft(q.capHe)}`, DC, "cap"));
+      L.add(makeDimRaw(V(-q.capB/2,-yl,zt), V(q.capB/2,-yl,zt), V(0,0,0.9), `bc=${ft(q.capB)}`, DC, "cap"));
+      L.add(makeDimRaw(V(q.capB/2,-yl,zt), V(q.capB/2,yl,zt), V(2.4,0,0), `Lc=${ft(q.capL)}`, DC, "cap"));
+      L.add(makeDimRaw(V(q.capB/2,-yl,zt), V(q.capB/2,yL,zt), V(1.2,0,0), `aL=${ft(q.cantL)}`, DC2, "cap"));
+      L.add(makeDimRaw(V(q.capB/2,yR,zt), V(q.capB/2,yl,zt), V(1.2,0,0), `aR=${ft(q.cantR)}`, DC2, "cap"));
       if(q.dkOn && q.dkH > 1e-9)
-        L.add(makeDimRaw(V(-p.capb/2,-yl,zt), V(-p.capb/2,-yl,zt+q.dkH), V(-1.0,0,0), `挡块h=${ft(q.dkH)}`, DC2, "cap"));
+        L.add(makeDimRaw(V(-q.capB/2,-yl,zt), V(-q.capB/2,-yl,zt+q.dkH), V(-1.0,0,0), `挡块h=${ft(q.dkH)}`, DC2, "cap"));
     }
     L.add(makeDimRaw(V(-q.a1/2,-q.b1/2,0), V(-q.a1/2,-q.b1/2,-p.fh1), V(0,-1.6,0), `fh1=${ft(p.fh1)}`, DC, "fd1"));
     if(p.useFd2) L.add(makeDimRaw(V(-q.a2/2,-q.b2/2,-p.fh1), V(-q.a2/2,-q.b2/2,-q.fdT), V(0,-1.6,0), `fh2=${ft(p.fh2)}`, DC, "fd2"));
@@ -1035,8 +1047,8 @@ function buildModel(p, q){
     L.add(makeDimRaw(V(xP,-q.b1/2,0), V(q.a1/2,-q.b1/2,0), V(0,-1.2,0), `c1=${ft(p.c1)}`, DC2, "fd1"));
     if(isRect){
       /* 墩身长/宽 */
-      L.add(makeDimRaw(V(-p.Lp/2,p.Wp/2,0), V(p.Lp/2,p.Wp/2,0), V(0,2.0,0), `Lp=${ft(p.Lp)}`, DC, "pier"));
-      L.add(makeDimRaw(V(p.Lp/2,-p.Wp/2,0), V(p.Lp/2,p.Wp/2,0), V(2.2,0,0), `Wp=${ft(p.Wp)}`, DC, "pier"));
+      L.add(makeDimRaw(V(-q.pierL/2,p.Wp/2,0), V(q.pierL/2,p.Wp/2,0), V(0,2.0,0), `Lp=${ft(q.pierL)}`, DC, "pier"));
+      L.add(makeDimRaw(V(q.pierL/2,-p.Wp/2,0), V(q.pierL/2,p.Wp/2,0), V(2.2,0,0), `Wp=${ft(p.Wp)}`, DC, "pier"));
     }else{
       /* 圆柱：直径 d（最外侧柱）、柱中心距 s、最外侧圆柱外缘距 Wd */
       const y0 = -(p.n-1)/2*p.s, y1 = (p.n-1)/2*p.s;
@@ -1105,12 +1117,12 @@ function renderTable(p, q){
   const isRect = p.type==="实体矩形桥墩";
   if(p.useCap)
     add("盖梁（墩帽）", (q.capHe < q.capHm - 1e-9 && (q.cantL > 1e-9 || q.cantR > 1e-9))
-      ? `变截面：V=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]＝${f(p.capb)}×[${f(q.capHm)}×${f(q.capL-q.cantL-q.cantR)}＋(${f(q.capHm)}+${f(q.capHe)})/2×(${f(q.cantL)}+${f(q.cantR)})]（Lc=${f(q.capL)} 直接输入；跨中高 ${f(q.capHm)}、端部高 ${f(q.capHe)}）`
-      : `Lc×bc×hc＝${f(q.capL)}×${f(p.capb)}×${f(q.capHm)}（等高矩形断面，Lc=${f(q.capL)} 直接输入）`, q.V_cap, "m³", mat("matCap"));
+      ? `变截面：V=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]＝${f(q.capB)}×[${f(q.capHm)}×${f(q.capL-q.cantL-q.cantR)}＋(${f(q.capHm)}+${f(q.capHe)})/2×(${f(q.cantL)}+${f(q.cantR)})]（Lc=${f(q.capL)} 直接输入；跨中高 ${f(q.capHm)}、端部高 ${f(q.capHe)}）`
+      : `Lc×bc×hc＝${f(q.capL)}×${f(q.capB)}×${f(q.capHm)}（等高矩形断面，Lc=${f(q.capL)} 直接输入）`, q.V_cap, "m³", mat("matCap"));
   if(p.useCap && q.dkOn && q.V_dk > 1e-12)
-    add("挡块", `2×(b上+b下)/2×h挡×bc＝2×(${f(q.dkWT)}+${f(q.dkWB)})/2×${f(q.dkH)}×${f(p.capb)}（两端顶面各一个，沿 bc 全宽贯通）`, q.V_dk, "m³", mat("matCap"));
+    add("挡块", `2×(b上+b下)/2×h挡×bc＝2×(${f(q.dkWT)}+${f(q.dkWB)})/2×${f(q.dkH)}×${f(q.capB)}（两端顶面各一个，沿 bc 全宽贯通）`, q.V_dk, "m³", mat("matCap"));
   if(isRect)
-    add("墩身", `Lp×Wp×H = ${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}（实体矩形，竖直面）`, q.V_pier, "m³", mat("matPier"));
+    add("墩身", `Lp×Wp×H = ${f(q.pierL)}×${f(p.Wp)}×${f(p.H)}（实体矩形，竖直面）`, q.V_pier, "m³", mat("matPier"));
   else
     add("墩身", `n×π×d²/4×H = ${p.n}×π×${f(p.d)}²/4×${f(p.H)}（${p.n} 根圆柱，中心距 ${f(p.s)}）`, q.V_pier, "m³", mat("matPier"));
   add("基础一层", `${f(q.a1)}×${f(q.b1)}×${f(p.fh1)}（墩身尺寸+每侧襟边 ${f(p.c1)}）`, q.V_fd1, "m³", mat("matFd"));
@@ -1197,7 +1209,7 @@ function renderCheck(p, q){
         : `V×γc＝${f(q.V_cap,3)}×${f(p.gamC,1)}（盖梁 V=bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)]）`,
       c.Gc, "kN");
   if(p.type==="实体矩形桥墩")
-    row("墩身自重 Gp", `Lp×Wp×H×γc＝${f(p.Lp,2)}×${f(p.Wp,2)}×${f(p.H,2)}×${f(p.gamC,1)}`, c.Gp, "kN");
+    row("墩身自重 Gp", `Lp×Wp×H×γc＝${f(q.pierL,2)}×${f(p.Wp,2)}×${f(p.H,2)}×${f(p.gamC,1)}`, c.Gp, "kN");
   else
     row("墩身自重 Gp", `n×π·d²/4×H×γc＝${p.n}×π×${f(p.d,2)}²/4×${f(p.H,2)}×${f(p.gamC,1)}`, c.Gp, "kN");
   row("基础自重 Gf",
@@ -1262,20 +1274,36 @@ function rebuild(){
     $("f1ABshow").value = `${f(q.a1)}×${f(q.b1)}`;
     $("f2ABshow").value = p.useFd2 ? `${f(q.a2)}×${f(q.b2)}` : "—";
     $("excHr").value = f(q.excHr);
-    /* 盖梁尺寸限值提示（违反时生效值已按限值取用） */
+    /* 盖梁尺寸限值提示：违反时生效值按限值取用，并把「最后一个超限的参数」输入框自动归位到合规值
+       （仅当该输入框当前未聚焦时回填，避免打断用户正在输入） */
     const bw = [];
     if(q.capLbad)
-      bw.push(`盖梁宽度 Lc 必须＞墩身横桥向尺寸 ${f(q.capBase,2)} m（矩形墩取 Wp，圆柱墩取最外侧圆柱外缘距 Wd）；当前按 ${f(q.capL,2)} m 取用`);
+      bw.push(`盖梁宽度 Lc 必须＞墩身横桥向尺寸 ${f(q.capBase,2)} m（矩形墩取 Wp，圆柱墩取最外侧圆柱外缘距 Wd）；已归位为 ${f(q.capL,2)} m`);
     if(q.capCantBad)
       bw.push(`跨中等高段 (Lc−aL−aR) 必须＞墩身横桥向尺寸 ${f(q.capBase,2)} m；aL、aR 已按原比例压缩为 ${f(q.cantL,3)} / ${f(q.cantR,3)} m（等高段 ${f(q.capFlat,3)} m）`);
+    if(q.capBbad)
+      bw.push(`盖梁厚度 bc 必须 ≥ 墩身顺桥向长 ${f(q.capBmin,2)} m（矩形墩取 Lp，圆柱墩取 d）；已归位为 ${f(q.capB,2)} m`);
+    if(q.pierLbad)
+      bw.push(`墩身顺桥向长（矩形墩 Lp）必须 ≥ 圆柱直径 ${f(q.pierLmin,2)} m；已归位为 ${f(q.pierL,2)} m`);
     const wel = $("capWarn");
     wel.style.display = bw.length ? "" : "none";
     wel.innerHTML = bw.map(s=>`<div style="margin-top:3px;">⚠ ${s}</div>`).join("");
-    [["capL", q.capLbad], ["cantL", q.capCantBad], ["cantR", q.capCantBad]].forEach(pair => {
-      const e = $(pair[0]);
+    /* 输入框自动归位（写回输入框本身，令用户看到的值即为生效值） */
+    const snap = [["capL", q.capLbad, q.capL],
+                  ["cantL", q.capCantBad, q.cantL],
+                  ["cantR", q.capCantBad, q.cantR],
+                  ["capb", q.capBbad, q.capB],
+                  ["Lp", q.pierLbad, q.pierL]];
+    snap.forEach(t => {
+      const [id, bad, val] = t;
+      const e = $(id);
       if(!e) return;
-      e.style.border = pair[1] ? "1px solid #dc2626" : "";
-      e.style.background = pair[1] ? "#fff5f5" : "";
+      e.style.border = bad ? "1px solid #dc2626" : "";
+      e.style.background = bad ? "#fff5f5" : "";
+      if(bad && document.activeElement !== e){
+        /* 回填输入框值（浮点微差时用生效值；保持原小数位） */
+        e.value = f(val, 2);
+      }
     });
   }catch(_){}
   try{
@@ -1528,12 +1556,12 @@ function exportWord(){
                 " " + ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2);
   const isRect = p.type === "实体矩形桥墩";
   const capTxt = p.useCap
-    ? `盖梁 Lc ${f(q.capL,2)}×bc ${f(p.capb,2)}，跨中高 hc ${f(q.capHm,2)}、端部高 he ${f(q.capHe,2)}，悬臂 aL ${f(q.cantL,2)}/aR ${f(q.cantR,2)}` +
+    ? `盖梁 Lc ${f(q.capL,2)}×bc ${f(q.capB,2)}，跨中高 hc ${f(q.capHm,2)}、端部高 he ${f(q.capHe,2)}，悬臂 aL ${f(q.cantL,2)}/aR ${f(q.cantR,2)}` +
       (q.dkOn ? `，两端挡块 h挡 ${f(q.dkH,2)}（上部宽 ${f(q.dkWT,2)}／下部宽 ${f(q.dkWB,2)}）` : "，不设挡块")
     : "不设盖梁";
   const fdTxt = `基础${p.useFd2 ? "两层" : "一层"}：一层 ${f(q.a1,2)}×${f(q.b1,2)}×${f(p.fh1,2)}` +
     (p.useFd2 ? `，二层 ${f(q.a2,2)}×${f(q.b2,2)}×${f(p.fh2,2)}` : "");
-  const pierTxt = isRect ? `墩身 Lp ${f(p.Lp,2)}×Wp ${f(p.Wp,2)}×H ${f(p.H,2)}`
+  const pierTxt = isRect ? `墩身 Lp ${f(q.pierL,2)}×Wp ${f(p.Wp,2)}×H ${f(p.H,2)}`
                          : `墩身 ${p.n} 根圆柱 d ${f(p.d,2)}，中心距 ${f(p.s,2)}，H ${f(p.H,2)}`;
   const tP = wParamTbl([3400, 1600, 5300]);                  /* 表1 验算参数（只取「验算参数」卡片当前值） */
   const head =
@@ -1621,13 +1649,13 @@ function exportCSV(){
   const mt = id => { try{ return $(id).value || ""; }catch(_){ return ""; } };
   if(p.useCap){
     row("盖梁（墩帽）", (q.capHe < q.capHm - 1e-9 && (q.cantL > 1e-9 || q.cantR > 1e-9))
-      ? `bc×[hc×(Lc−aL−aR)+(hc+he)/2×(aL+aR)]=${f(p.capb)}×[${f(q.capHm)}×${f(Math.max(q.capL-q.cantL-q.cantR,0))}+(${f(q.capHm)}+${f(q.capHe)})/2×(${f(q.cantL)}+${f(q.cantR)})](变截面:横桥向长Lc×厚度bc,跨中高hc/端部高he,悬臂aL/aR)`
-      : `Lc×bc×hc=${f(q.capL)}×${f(p.capb)}×${f(q.capHm)}(等高矩形断面)`, q.V_cap, "m3", mt("matCap"));
+      ? `bc×[hc×(Lc−aL−aR)+(hc+he)/2×(aL+aR)]=${f(q.capB)}×[${f(q.capHm)}×${f(Math.max(q.capL-q.cantL-q.cantR,0))}+(${f(q.capHm)}+${f(q.capHe)})/2×(${f(q.cantL)}+${f(q.cantR)})](变截面:横桥向长Lc×厚度bc,跨中高hc/端部高he,悬臂aL/aR)`
+      : `Lc×bc×hc=${f(q.capL)}×${f(q.capB)}×${f(q.capHm)}(等高矩形断面)`, q.V_cap, "m3", mt("matCap"));
     if(q.dkOn && q.V_dk > 1e-12)
-      row("挡块", `2×(b上+b下)/2×h挡×bc=2×(${f(q.dkWT)}+${f(q.dkWB)})/2×${f(q.dkH)}×${f(p.capb)}(两端顶面各一个,沿bc贯通)`, q.V_dk, "m3", mt("matCap"));
+      row("挡块", `2×(b上+b下)/2×h挡×bc=2×(${f(q.dkWT)}+${f(q.dkWB)})/2×${f(q.dkH)}×${f(q.capB)}(两端顶面各一个,沿bc贯通)`, q.V_dk, "m3", mt("matCap"));
   }
   if(p.type==="实体矩形桥墩")
-    row("墩身", `${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}(实体矩形)`, q.V_pier, "m3", mt("matPier"));
+    row("墩身", `${f(q.pierL)}×${f(p.Wp)}×${f(p.H)}(实体矩形)`, q.V_pier, "m3", mt("matPier"));
   else
     row("墩身", `${p.n}×π×${f(p.d)}^2/4×${f(p.H)}(圆柱式,中心距${f(p.s)})`, q.V_pier, "m3", mt("matPier"));
   row("基础一层", `${f(q.a1)}×${f(q.b1)}×${f(p.fh1)}(墩身尺寸+每侧襟边${f(p.c1)})`, q.V_fd1, "m3", mt("matFd"));

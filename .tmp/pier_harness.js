@@ -39,12 +39,14 @@ els.view3d = { value:"", checked:false, innerHTML:"", style:{}, addEventListener
   appendChild(){}, clientWidth:800, clientHeight:560 };
 els.resultBody = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.assumpNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
+els.capWarn   = { value:"", checked:false, innerHTML:"", style:{display:"none"}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.fndType  = { value:"土基", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.matCap   = { value:"C30砼", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.checkBody = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 els.checkNote = { value:"", checked:false, innerHTML:"", style:{}, addEventListener(){}, appendChild(){}, clientWidth:800, clientHeight:560 };
 
 global.document = {
+  activeElement: null,
   getElementById(id){
     if(!(id in els)) throw new Error("未知元素 id: " + id);
     return els[id];
@@ -156,6 +158,7 @@ isTrue(els.assumpNote.innerHTML.indexOf("出错")<0, "A 无错误提示");
    取模板默认值口径：Lc=13、bc=1.8、hc=1.5、he=0.6、aL=aR=1.5、挡块 h=0.3（上宽0.2/下宽0.2）
    V_cap = bc×[hc×(Lc−aL−aR)＋(hc+he)/2×(aL+aR)] = 1.8×[1.5×10＋1.05×3] = 1.8×18.15 = 32.67
    V_dk  = 2×(wt+wb)/2×h×bc = 2×0.2×0.3×1.8 = 0.216 */
+els.Lp.value = "1.8";          /* 满足新限值 bc(1.8) ≥ Lp，且 Lp(1.8) ≥ d(1.6) */
 els.capL.value = "13"; els.capb.value = "1.8"; els.caph.value = "1.5"; els.caphe.value = "0.6";
 els.cantL.value = "1.5"; els.cantR.value = "1.5";
 els.dkOn.value = "是"; els.dkH.value = "0.3"; els.dkWT.value = "0.2"; els.dkWB.value = "0.2";
@@ -220,22 +223,43 @@ isTrue(q.cantL + q.cantR <= 13 + 1e-9, "A2 aL+aR≤Lc（平段长度非负）");
 els.capL.value = "5"; els.cantL.value = "0.5"; els.cantR.value = "0.5";
 p = api.readP(), q = api.calcQ(p);
 near(q.capBase, 6, 1e-9, "A3 墩身横桥向基准尺寸=Wp=6");
-near(q.capL, 6 + 1e-6, 1e-9, "A3 Lc=5 ≤ Wp=6 → 生效值按限值①抬至 6.000001");
+near(q.capL, 6.01, 1e-9, "A3 Lc=5 ≤ Wp=6 → 生效值按限值①归位至下一个 0.01 步进 6.01");
 isTrue(q.capLbad === true, "A3 违反限值①时标记 capLbad（界面红字提示）");
-near(q.capFlat, 6 + 1e-6, 1e-9, "A3 抬升后等高段=Lc=6.000001 ＞ Wp=6");
+near(q.capFlat, 6.01, 1e-9, "A3 抬升后等高段=Lc=6.01 ＞ Wp=6");
 els.capL.value = "13"; els.cantL.value = "4"; els.cantR.value = "4";
 p = api.readP(), q = api.calcQ(p);
 isTrue(q.capLbad === false && q.capCantBad === true, "A3 Lc 合规但 aL+aR 过大 → 只标记违反②");
-near(q.cantL + q.cantR, 13 - (6 + 1e-6), 1e-9, "A3 违反②：aL+aR 压缩至 Lc−(Wp+ε)");
-near(q.capFlat, 6 + 1e-6, 1e-9, "A3 违反②：压缩后等高段=Wp+1e-6 ＞ Wp");
+near(q.cantL + q.cantR, 13 - 6.01, 1e-9, "A3 违反②：aL+aR 压缩至 Lc−(Wp+0.01)");
+near(q.capFlat, 6.01, 1e-9, "A3 违反②：压缩后等高段=Wp+0.01 ＞ Wp");
 near(q.cantL / q.cantR, 1, 1e-9, "A3 压缩保持 aL:aR 原比例（4:4 → 仍相等）");
 els.capL.value = "13"; els.cantL.value = "1.5"; els.cantR.value = "1.5";
 p = api.readP(), q = api.calcQ(p);
 isTrue(q.capLbad === false && q.capCantBad === false, "A3 合规工况不触发提示");
 near(q.capFlat, 10, 1e-9, "A3 合规工况等高段=13−1.5−1.5=10 ＞ Wp=6");
+/* 盖梁厚度限值③：bc ≥ 墩身顺桥向长（矩形=Lp、圆柱=d）；墩身顺桥向长限值：Lp ≥ 圆柱直径 d */
+els.Lp.value = "2.5"; els.capb.value = "1.8";
+p = api.readP(), q = api.calcQ(p);
+near(q.pierL, 2.5, 1e-9, "A4 矩形墩墩身顺桥向长=Lp=2.5（≥d=1.6，合规）");
+isTrue(q.pierLbad === false, "A4 Lp≥d 时不提示");
+near(q.capB, 2.5, 1e-9, "A4 bc=1.8 ＜ Lp=2.5 → 盖梁厚度按限值③抬至 2.5");
+isTrue(q.capBbad === true, "A4 盖梁厚度不足时标记 capBbad（红字提示）");
+els.capb.value = "2.5";
+p = api.readP(), q = api.calcQ(p);
+isTrue(q.capBbad === false && q.capB === 2.5, "A4 bc=2.5 ≥ Lp → 不提示、不改动");
+els.Lp.value = "1.2";
+p = api.readP(), q = api.calcQ(p);
+near(q.pierL, 1.6, 1e-9, "A4 Lp=1.2 ＜ d=1.6 → 生效墩身顺桥向长按 d=1.6 取用");
+isTrue(q.pierLbad === true, "A4 Lp＜圆柱直径时标记 pierLbad");
+/* 自动归位：rebuild 后超限参数输入框本身被回填为合规值 */
+els.Lp.value = "1.2"; els.capb.value = "1.0"; els.capL.value = "5";
+api.rebuild();
+isTrue(els.capL.value === "6.01", "A4 rebuild 后 Lc 输入框自动归位为 6.01（＞Wp=6）");
+isTrue(els.Lp.value === "1.60", "A4 rebuild 后 Lp 输入框自动归位为 1.60（≥d=1.6）");
+isTrue(els.capb.value === "1.60", "A4 rebuild 后 bc 输入框自动归位为 1.60（≥Lp=1.6）");
+els.Lp.value = "2.5"; els.capb.value = "2.5"; els.capL.value = "13";
 /* 复原：Lc=7、等高、无悬臂、无挡块，供后续工况沿用 */
 els.capL.value = "7"; els.capb.value = "2.5"; els.caph.value = "1.2"; els.caphe.value = "1.2";
-els.cantL.value = "0"; els.cantR.value = "0"; els.dkOn.value = "否";
+els.cantL.value = "0"; els.cantR.value = "0"; els.dkOn.value = "否"; els.Lp.value = "2.5";
 
 /* ===== 工况B：圆柱式（默认 d1.6 n3 s4.5） ===== */
 els.pierType.value = "圆柱式桥墩";
@@ -246,7 +270,7 @@ near(q.a1, 2.6, 1e-9, "B 一层边长(纵)=d+2c1=2.6");
 near(q.b1, 11.6, 1e-9, "B 一层边长(横)=Wd+2c1=11.6");
 near(q.V_fd, 30.16, 1e-6, "B 基础体积=2.6×11.6×1=30.16");
 near(q.total, q.V_pier+30.16+q.V_cap, 1e-9, "B 圬工合计=墩身+基础+盖梁");
-near(q.capL, 10.6 + 1e-6, 1e-9, "B Lc=7 ≤ 最外侧圆柱外缘距 Wd=10.6 → 按限值①抬至 10.600001");
+near(q.capL, 10.61, 1e-9, "B Lc=7 ≤ 最外侧圆柱外缘距 Wd=10.6 → 按限值①归位至 10.61");
 isTrue(q.capLbad === true, "B 盖梁宽度不足时标记 capLbad（红字提示）");
 els.capL.value = "13";
 p = api.readP(), q = api.calcQ(p);
@@ -351,7 +375,7 @@ els.excH.value = "3"; els.excHs.value = "1"; els.excB.value = "1";
 els.pierType.value = "实体矩形桥墩";
 els.useFd2.checked = false; els.useCap.checked = true;
 els.capL.value = "7"; els.capb.value = "2.5"; els.caph.value = "1.2"; els.caphe.value = "1.2";
-els.cantL.value = "0"; els.cantR.value = "0"; els.dkOn.value = "否";
+els.cantL.value = "0"; els.cantR.value = "0"; els.dkOn.value = "否"; els.Lp.value = "2.5";
 els.Nk.value = "3000"; els.Hk.value = "300"; els.dH.value = "0.25"; els.gamC.value = "24";
 els.mu.value = "0.3"; els.fa.value = "500"; els.fndType.value = "土基";
 p = api.readP(), q = api.calcQ(p);
