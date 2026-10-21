@@ -545,48 +545,92 @@ api.readP();
 isTrue(els.Hk.disabled === false, "取消自动后 Hk 恢复可编辑");
 els.Hk.value = "100";
 
-/* ===== 台后主动土压力（库仑，仅取水平分量） ===== */
+/* ===== 台后主动土压力（库仑通式：墙背按前墙背坡倾斜，竖向分量计入 ΣV 与 ΣM稳） ===== */
+/* 库仑通式（墙背与水平面夹角 α、填土面水平 β=0） */
+const kaGen = (alDeg, phiDeg, dlDeg) => {
+  const a = alDeg*Math.PI/180, p2 = phiDeg*Math.PI/180, d2 = dlDeg*Math.PI/180;
+  const sa = Math.sin(a), sad = Math.sin(a-d2);
+  return Math.pow(Math.sin(a+p2),2) / (sa*sa*sad*Math.pow(1+Math.sqrt(Math.sin(p2+d2)*Math.sin(p2)/(sad*sa)),2));
+};
 els.incEa.checked = true;
+els.chkHf.value = ""; els.chkPhi.value = "30"; els.chkDelta.value = "20"; els.m1.value = "3";
 const cE = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 const r30 = Math.PI/6, r20 = 20*Math.PI/180;
-const KaExp = Math.pow(Math.cos(r30),2) / (Math.cos(r20)*Math.pow(1+Math.sqrt(Math.sin(r20+r30)*Math.sin(r30)/Math.cos(r20)),2));
-near(cE.Ka, KaExp, 1e-12, "库仑 Ka(φ=30°、δ=20°) = 0.2974");
+const thD = Math.atan(1/3)*180/Math.PI;          // 18.435°
+const angD = thD + 20;                            // θ+δ = 38.435°
+/* 竖直墙基准值（旧口径），用于对比折减 */
+const KaVert = Math.pow(Math.cos(r30),2) / (Math.cos(r20)*Math.pow(1+Math.sqrt(Math.sin(r20+r30)*Math.sin(r30)/Math.cos(r20)),2));
+near(cE.thDeg, thD, 1e-9, "墙背倾角 θ = atan(1/m1) = atan(1/3) = 18.435°（坡比不取 0）");
+near(cE.alDeg, 90 + thD, 1e-9, "墙背与水平面夹角 α = 90°+θ = 108.435°");
+near(cE.angDeg, angD, 1e-9, "合力与水平方向夹角 = θ+δ = 38.435°");
+const KaGenExp = kaGen(90 + thD, 30, 20);
+near(cE.Ka, KaGenExp, 1e-12, "库仑通式 Ka(α=108.44°、φ=30°、δ=20°) = 0.1829");
+isTrue(cE.Ka < 0.7*KaVert, "计入 1:3 背坡后 Ka 由 0.2973 折减到 0.1829（−38%）");
 near(cE.hf, 6.5, 1e-9, "填土高度留空自动取侧墙总高 = 5+0.6+0.9 = 6.5");
-near(cE.Ea, 0.5*18*6.5*6.5*KaExp*12, 1e-6, "Ea = 0.5γs·h填²·Ka·B = 1357kN");
-near(cE.EaH, cE.Ea*Math.cos(r20), 1e-9, "EaH = Ea·cosδ");
+near(cE.Ea, 0.5*18*6.5*6.5*KaGenExp*12, 1e-6, "Ea = 0.5γs·h填²·Ka·B = 834.6kN");
+near(cE.EaH, cE.Ea*Math.cos(angD*Math.PI/180), 1e-9, "EaH = Ea·cos(θ+δ) = 653.8kN");
+near(cE.EaV, cE.Ea*Math.sin(angD*Math.PI/180), 1e-9, "EaV = Ea·sin(θ+δ) = 518.8kN");
 near(cE.yEa, 1+6.5/3, 1e-9, "土压力合力点距基底 = 基础厚 + h填/3");
+near(cE.xEa, 1.2 + (5 - 6.5/3)/3, 1e-9,
+     "EaV 作用点 x = t1+(H1−h填/3)/m1 = 2.144（墙背面在 h填/3 高度处）");
 near(cE.Htot, 100 + cE.EaH, 1e-9, "ΣH = 制动力 + 土压力水平分量");
-near(cE.Mh, 100*cE.hH + cE.EaH*cE.yEa, 1e-9, "ΣM倾 = 制动力 + 土压力");
-near(cE.Kc, 0.3*cE.Vsum/cE.Htot, 1e-9, "Kc = μΣV/ΣH");
-isTrue(cE.Kc < cChk.Kc*0.2, "计入土压力后 Kc 由 39.6 降至约 2.9（富余收窄一个数量级）");
+near(cE.Mh, 100*cE.hH + cE.EaH*cE.yEa, 1e-9, "ΣM倾 = 制动力 + 土压力水平分量");
+near(cE.Kc, 0.3*cE.Vsum/cE.Htot, 1e-9, "Kc = μΣV/ΣH（ΣV 已含 EaV）");
+isTrue(cE.Kc < cChk.Kc*0.25, "计入土压力后 Kc 由 39.6 降至约 5.5（富余收窄近一个数量级）");
 isTrue(cE.okAll, "计入台后土压力后三项验算仍全部通过");
-/* 敏感性 */
+/* 土压力计入后仍满足绕前趾力矩平衡（独立互证，防 ΣV 与 ΣM稳 口径不一致） */
+{
+  const zR = cE.zF + (cE.MsF - cE.Mh)/cE.Vsum;
+  near(cE.e, cE.zc - zR, 1e-6, "计入土压力后 e = x形心 − 合力作用点（绕前趾力矩平衡互证）");
+  near(cE.M, cE.Vsum*(cE.zc - zR), 1e-6, "计入土压力后 基底弯矩 M = ΣV(形心−合力点)，与 Σ(M稳−M倾) 等价");
+}
+/* 竖向分量：必须同时进 ΣV 与 ΣM稳 */
 els.incEa.checked = false;
 const cNoE = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cNoE.Ea, 0, 1e-12, "取消土压力后 Ea = 0");
+near(cNoE.EaV, 0, 1e-12, "取消土压力后 EaV = 0");
 near(cNoE.Htot, 100, 1e-9, "取消土压力后 ΣH 仅剩制动力");
-els.incEa.checked = true; els.chkHf.value = "3";
+els.incEa.checked = true;
+near(cE.Vsum - cNoE.Vsum, cE.EaV, 1e-6, "ΣV 计入土压力竖向分量 EaV（向下）");
+near(cE.MsF - cNoE.MsF, cE.EaV*(cE.xEa - cE.zF), 1e-6,
+     "ΣM稳 计入 EaV（力臂 = 作用点 x − 前趾 x）");
+isTrue(cE.MsF > cNoE.MsF, "EaV 使 ΣM稳 增大（δ>0、向下，起稳定作用）");
+/* 敏感性 */
+els.chkHf.value = "3";
 const cHf = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cHf.hf, 3, 1e-9, "手填填土高度 3m 生效");
-near(cHf.Ea, 0.5*18*9*KaExp*12, 1e-6, "Ea 随 h填² 折减（3m 时约 289kN）");
+near(cHf.Ea, 0.5*18*9*KaGenExp*12, 1e-6, "Ea 随 h填² 折减（3m 时约 178kN）");
+near(cHf.xEa, 1.2 + (5 - 1)/3, 1e-9, "h填 减小时 EaV 作用点随墙面下移（x=2.533）");
 els.chkHf.value = "";
 els.chkPhi.value = "40";
 const cPhi = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 isTrue(cPhi.Ka < cE.Ka && cPhi.Ea < cE.Ea, "φ 增至 40° 时 Ka、Ea 下降");
-els.chkPhi.value = "30"; els.chkDelta.value = "0";
+/* 坡比 m1=0（竖直墙）退化为旧口径；δ=0 再退化为朗肯 */
+els.chkPhi.value = "30"; els.chkDelta.value = "0"; els.m1.value = "0";
 const cD0 = api.calcCheck(api.readP(), api.calcQ(api.readP()));
-near(cD0.Ka, Math.pow(Math.tan(Math.PI/4 - r30/2),2), 1e-9, "δ=0 退化为朗肯 Ka=tan²(45°−φ/2)=0.3333");
+near(cD0.thDeg, 0, 1e-12, "m1=0 时 θ=0（竖直墙）");
+near(cD0.Ka, Math.pow(Math.tan(Math.PI/4 - r30/2),2), 1e-9, "m1=0、δ=0 退化为朗肯 Ka=tan²(45°−φ/2)=0.3333");
+els.m1.value = "3";
+const cD0b = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cD0b.Ka, kaGen(90 + thD, 30, 0), 1e-12, "δ=0 但保留背坡时 Ka=0.2211（≠朗肯，因墙背倾斜）");
+els.chkDelta.value = "20";
 /* δ 须 ≤ φ：超出时按 φ 取用，且表中显示生效值（不是手填值） */
 els.chkDelta.value = "40";
 const cDov = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cDov.dlDeg, 30, 1e-9, "δ=40° > φ=30° 时按 φ 取用（生效 δ=30°）");
-const r30b = 30*Math.PI/180, r40 = 40*Math.PI/180;
-const KaOver = Math.pow(Math.cos(r30b),2) / (Math.cos(r30b)*Math.pow(1+Math.sqrt(Math.sin(r30b+r30b)*Math.sin(r30b)/Math.cos(r30b)),2));
-near(cDov.Ka, KaOver, 1e-12, "δ 超限后 Ka 按 δ=30° 计算（而非 40°）");
+near(cDov.Ka, kaGen(90 + thD, 30, 30), 1e-12, "δ 超限后 Ka 按 δ=30° 计算（而非 40°）");
 api.renderCheck(api.readP(), api.calcQ(api.readP()));
 isTrue(els.checkBody.innerHTML.indexOf("δ=30°≤φ")>=0 && els.checkBody.innerHTML.indexOf("δ=40°")<0,
        "结果表显示生效 δ=30°≤φ，不显示越界的 40°");
 els.chkDelta.value = "20";
+/* 结果表列出 EaV 及其力臂、ΣV 合计口径 */
+api.renderCheck(api.readP(), api.calcQ(api.readP()));
+const ckTbl2 = els.checkBody.innerHTML;
+isTrue(ckTbl2.indexOf("土压力竖向分量 EaV")>=0, "竖向力段列出 EaV 分项");
+isTrue(ckTbl2.indexOf("Ea·cos(θ+δ)")>=0 && ckTbl2.indexOf("Ea·sin(θ+δ)")>=0,
+       "表中 EaH/EaV 分别标注 cos(θ+δ)、sin(θ+δ)");
+isTrue(ckTbl2.indexOf("α＝90°+θ")>=0, "Ea 行标注 Ka 的墙背倾角 α＝90°+θ");
+isTrue(ckTbl2.indexOf("已计入 ΣM稳")>=0, "K0 行注明 EaV 已计入 ΣM稳");
 /* 参数标签：δ 须 ≤ φ，并给出常用取值区间 */
 isTrue(tpl.indexOf("须 ≤ φ")>=0 && tpl.indexOf("常取 δ=(1/2~2/3)φ")>=0,
        "参数标签注明 δ 须 ≤ φ 及常用取值 δ=(1/2~2/3)φ");
@@ -596,8 +640,8 @@ els.chkDelta.value = "20";
 /* 默认工况：自动制动力 165kN + 土压力 */
 els.autoHk.checked = true;
 const cAll = api.calcCheck(api.readP(), api.calcQ(api.readP()));
-isTrue(cAll.Htot > 1400 && cAll.Htot < 1500, "默认工况 ΣH ≈ 165+1275 = 1440kN");
-isTrue(cAll.EaH > 6*cAll.Hk, "土压力水平分量是制动力的 7 倍以上（默认工况）");
+isTrue(cAll.Htot > 800 && cAll.Htot < 850, "默认工况 ΣH ≈ 165+654 = 819kN");
+isTrue(cAll.EaH > 3*cAll.Hk, "土压力水平分量约为制动力的 4 倍（默认工况）");
 isTrue(cAll.okAll, "默认工况（自动制动力＋台后土压力）三项验算全部通过");
 els.autoHk.checked = false; els.Hk.value = "100";
 
