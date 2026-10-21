@@ -95,6 +95,17 @@ nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 capb 高亮纵向跨=bc");
 nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 capb 高亮横向跨=Lc");
 b = bbOf("cape");
 nearHL(b.max.y - b.min.y, 0.5, 0.45, "桥墩 cape 高亮横向跨=悬出 ec");
+/* capch：默认 ch=0 无高亮；设 ch=0.3 后高亮为两端倒角斜边 */
+isTrue(bbOf("capch") === null, "桥墩 capch 默认 ch=0 无高亮");
+els.capch.value = "0.3";
+const p3 = api.readP(), q3 = api.calcQ(p3);
+api.buildModel(p3, q3);
+b = bbOf("capch");
+nearHL(b.max.z - b.min.z, 0.3, 0.45, "桥墩 capch 高亮竖向跨=倒角 ch");
+nearHL(b.max.x - b.min.x, 2.5, 0.45, "桥墩 capch 高亮纵向跨=bc（两端斜边）");
+nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 capch 高亮横向范围=Lc（左右两端各一条斜边）");
+els.capch.value = "0";
+api.buildModel(api.readP(), api.calcQ(api.readP()));
 b = bbOf("useCap");
 nearHL(b.max.y - b.min.y, 7, 0.45, "桥墩 useCap 高亮=整个盖梁 Lc");
 nearHL(b.max.z, 9.2, 0.5, "桥墩 useCap 高亮顶面=H+hc");

@@ -17,7 +17,7 @@ const vals = {
   fh1:"1", c1:"0.5", fh2:"1", c2:"0.5",
   matPier:"C30砼", matFd:"C25砼",
   excMs:"1", excMr:"1", excW:"0.5", excH:"3", excHs:"1", excHr:"", excHst:"5", excB:"1",
-  caph:"1.2", capb:"2.5", cape:"0.5", capLshow:"",
+  caph:"1.2", capb:"2.5", cape:"0.5", capch:"0", capLshow:"",
   Nk:"3000", Hk:"300", dH:"0.25", gamC:"24", mu:"0.3", fa:"500"
 };
 const checks = {
@@ -93,21 +93,30 @@ function bb(mesh){
   scene.updateMatrixWorld(true);
   return new THREE.Box3().setFromObject(mesh);
 }
-/* 凸多面体体积（散度定理，面朝向按形心归一化——hexaMesh 面绕向不一致，须先定向）
-   position 为展开顶点：每面 6 个 [a,b,c,a,c,d]，面 f 四角 = f*6, f*6+1, f*6+2, f*6+5 */
+/* 凸多面体体积（散度定理，面朝向按形心归一化——面绕向不一致，须先定向）
+   hexaMesh：position 为展开顶点，每面 6 个 [a,b,c,a,c,d]；
+   prismMesh（倒角拉伸体）：userData.faces 记录各面顶点序号（3或4个一组） */
 function meshVol(mesh){
   const pos = mesh.geometry.getAttribute("position");
   const P = i => new THREE.Vector3().fromBufferAttribute(pos,i);
-  const vs = []; for(let i=0;i<pos.count;i++) vs.push(P(i));
-  const C = vs.reduce((s,v)=>s.add(v), new THREE.Vector3()).multiplyScalar(1/vs.length);
+  const tris = [];
+  if(mesh.userData && mesh.userData.faces){
+    for(const f of mesh.userData.faces)
+      for(let k=1;k+1<f.length;k++) tris.push([P(f[0]),P(f[k]),P(f[k+1])]);
+  }else{
+    for(let f=0; f*6+5 < pos.count; f++)
+      tris.push([P(f*6),P(f*6+1),P(f*6+2)], [P(f*6),P(f*6+2),P(f*6+5)]);
+  }
+  const C = new THREE.Vector3();
+  tris.forEach(t=>C.add(t[0]).add(t[1]).add(t[2]));
+  C.multiplyScalar(1/(tris.length*3));
   let V = 0;
-  for(let f=0; f*6+5 < pos.count; f++){
-    let a=P(f*6), b=P(f*6+1), c=P(f*6+2), d=P(f*6+5);
+  for(const tv of tris){
+    let a=tv[0], b=tv[1], c=tv[2];
     const n = new THREE.Vector3().subVectors(b,a).cross(new THREE.Vector3().subVectors(c,a));
-    const fc = a.clone().add(b).add(c).add(d).multiplyScalar(0.25);
-    if(n.dot(new THREE.Vector3().subVectors(fc,C)) < 0){ const t=b; b=d; d=t; }  // 反转周序 a,d,c,b
+    const fc = a.clone().add(b).add(c).multiplyScalar(1/3);
+    if(n.dot(new THREE.Vector3().subVectors(fc,C)) < 0){ const t=b; b=c; c=t; }
     V += a.dot(new THREE.Vector3().crossVectors(b,c))/6;
-    V += a.dot(new THREE.Vector3().crossVectors(c,d))/6;
   }
   return V;
 }
@@ -120,6 +129,7 @@ near(q.a1, 3.5, 1e-9, "A 一层边长(纵)=Lp+2c1=3.5");
 near(q.b1, 7, 1e-9, "A 一层边长(横)=Wp+2c1=7");
 near(q.V_fd, 24.5, 1e-6, "A 基础体积（1层）=24.5");
 near(q.capL, 7, 1e-9, "A 盖梁长=Wp+2×ec=7");
+near(q.capCh, 0, 1e-9, "A 默认无倒角 ch=0");
 near(q.V_cap, 21, 1e-9, "A 盖梁体积=Lc×bc×hc=7×2.5×1.2=21");
 near(q.total, 144.5+21, 1e-6, "A 圬工合计=盖梁21+墩身120+基础24.5=165.5");
 api.renderTable(p, q);
@@ -137,6 +147,30 @@ near(bbF.min.z, -1, 1e-6, "A 基础底 z=−fh1");
 near(bbF.max.x - bbF.min.x, 3.5, 1e-6, "A 基础纵向边长=3.5");
 near(bbF.max.y - bbF.min.y, 7, 1e-6, "A 基础横向边长=7");
 isTrue(els.assumpNote.innerHTML.indexOf("出错")<0, "A 无错误提示");
+
+/* ===== 工况A2：盖梁端部 45° 倒角（左右对称，只输一边） ===== */
+els.capch.value = "0.3";
+p = api.readP(), q = api.calcQ(p);
+near(q.capCh, 0.3, 1e-9, "A2 倒角生效值 ch=0.3");
+near(q.capCut, 0.09*2.5, 1e-9, "A2 倒角扣减=ch²·bc=0.3²×2.5=0.225");
+near(q.V_cap, 21-0.225, 1e-9, "A2 盖梁体积=21−0.225=20.775");
+try{ api.buildModel(p, q); }catch(e){ console.error("FAIL: buildModel(倒角) 异常:", e.message); process.exit(1); }
+parts = partsOf();
+isTrue((parts.cap||[]).length===1, "A2 盖梁1块（倒角拉伸体）");
+const bbCap = bb(parts.cap[0]);
+near(bbCap.min.y, -3.5, 1e-6, "A2 盖梁横向范围不变（y=±Lc/2）");
+near(bbCap.min.z, 8, 1e-6, "A2 盖梁底 z=H=8");
+near(bbCap.max.z, 9.2, 1e-6, "A2 盖梁顶 z=H+hc=9.2");
+near(sumMeshVol(parts.cap), 20.775, 1e-4, "A2 盖梁网格体积=20.775（散度定理，含倒角扣减）");
+api.renderTable(p, q);
+tbl = els.resultBody.innerHTML;
+isTrue(tbl.indexOf("45°倒角")>=0 && tbl.indexOf("0.225")>=0, "A2 表格盖梁行列出倒角扣减");
+els.capch.value = "0";
+/* ch 超过 min(hc, ec) 时按限值取用 */
+els.capch.value = "2";
+p = api.readP(), q = api.calcQ(p);
+near(q.capCh, 0.5, 1e-9, "A2 ch=2 超限 → 生效值取 min(hc=1.2, ec=0.5)=0.5");
+els.capch.value = "0";
 
 /* ===== 工况B：圆柱式（默认 d1.6 n3 s4.5） ===== */
 els.pierType.value = "圆柱式桥墩";

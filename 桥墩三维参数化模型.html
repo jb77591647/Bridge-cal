@@ -144,9 +144,10 @@
           <div class="field"><label>盖梁高 hc</label><input type="number" id="caph" value="1.20" step="0.01"></div>
           <div class="field"><label>盖梁宽 bc <small>顺桥向</small></label><input type="number" id="capb" value="2.50" step="0.01"></div>
           <div class="field"><label>横桥向悬出 ec <small>每侧，自墩身外缘</small></label><input type="number" id="cape" value="0.50" step="0.01"></div>
+          <div class="field"><label>端部倒角 ch <small>45°，左右对称各一处，0=直角</small></label><input type="number" id="capch" value="0" step="0.05"></div>
           <div class="field"><label>盖梁长 Lc <small>=墩身横桥向尺寸+2×ec，自动</small></label><input type="text" id="capLshow" value="" disabled style="background:#eef2f6; width:78px; text-align:right;"></div>
         </div>
-        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），等高矩形断面；横桥向两端自墩身外缘各悬出 ec。</div>
+        <div class="note" style="margin-top:6px;">盖梁坐于墩顶（墩顶标高即盖梁底面），等高断面：横桥向两端自墩身外缘各悬出 ec，端部下缘可设 45° 倒角 ch（左右对称，只输一边的尺寸，0=直角）；倒角取 ch≤min(hc, ec)，超出时按限值取用。</div>
       </div>
 
       <div class="card">
@@ -215,7 +216,7 @@
         <div class="note" style="margin-top:0;">
           坐标系：原点=<strong>基础最低面（最下层基础底面）中心</strong>，x=纵桥向、y=横桥向、z=竖向（向上为正）；标高以<strong>基础底面=0.000</strong> 计（墩底标高即等于基础总厚），绝对标高=相对标高+高程基准绝对标高。<br>
           基础边长=实体矩形墩身长宽 + 每侧襟边，或最外侧圆柱外缘距 + 每侧襟边；第二层在一层基础上再外放襟边。<br>
-          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），等高矩形断面：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；勾掉「设置盖梁」即不计盖梁。
+          盖梁（墩帽）坐于墩顶（墩顶即盖梁底面），等高断面：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；端部下角可设 45° 倒角 ch（左右对称、只输一边尺寸，0=直角）；勾掉「设置盖梁」即不计盖梁。
         </div>
       </div>
     </div>
@@ -306,7 +307,7 @@ function readP(){
     Lp:g("Lp"), Wp:g("Wp"),
     d:g("d"), n, s:Math.max(g("d"), g("s")),  // 中心距小于直径时按直径取值，避免柱体重叠
     useFd2:$("useFd2").checked, fh1:g("fh1"), c1:g("c1"), fh2:g("fh2"), c2:g("c2"),
-    useCap:$("useCap").checked, caph:g("caph"), capb:g("capb"), cape:g0("cape"),
+    useCap:$("useCap").checked, caph:g("caph"), capb:g("capb"), cape:g0("cape"), capch:g0("capch"),
     Nk:g0("Nk"), Hk:g0("Hk"), dH:g0("dH"), gamC:g0("gamC"), mu:g0("mu"), fa:g("fa"),
     fndRock:$("fndType").value==="岩石",
     excMs:g("excMs"), excMr:g("excMr"), excW:g("excW"), excH:g("excH"), excHs:g("excHs"),
@@ -333,10 +334,14 @@ function calcQ(p){
   q.V_fd2  = p.useFd2 ? q.a2*q.b2*p.fh2 : 0;
   q.V_fd   = q.V_fd1 + q.V_fd2;
   /* 盖梁（墩帽）：横桥向长 Lc = 墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec；
-     顺桥向宽 bc、高 hc，等高矩形断面，坐于墩顶（底面 z=H，顶面 z=H+hc） */
+     顺桥向宽 bc、高 hc，等高断面，坐于墩顶（底面 z=H，顶面 z=H+hc）。
+     端部 45° 倒角 ch（左右对称各一处，0=直角）：两端下角各切去一个直角边为 ch 的等腰直角三棱柱
+     （沿 bc 全宽贯通），扣减体积 = 2×½ch²×bc = ch²·bc；ch 生效值 ≤ min(hc, ec)，超出按限值取用 */
   q.capBase = baseB;
   q.capL = p.useCap ? baseB + 2*p.cape : 0;
-  q.V_cap = p.useCap ? q.capL * p.capb * p.caph : 0;
+  q.capCh = p.useCap ? Math.min(Math.max(p.capch || 0, 0), p.caph, Math.max(p.cape, 0)) : 0;
+  q.capCut = p.useCap ? q.capCh*q.capCh*p.capb : 0;               // 两端倒角扣减合计
+  q.V_cap = p.useCap ? q.capL*p.capb*p.caph - q.capCut : 0;
   q.capT  = p.useCap ? p.caph : 0;               // 盖梁高（不设盖梁时为 0）
   q.total  = q.V_pier + q.V_cap + q.V_fd;
   /* 开挖：坑底平面=最底层基础轮廓（矩形 边长×边长）+每侧工作宽度，坑底=基础底面（z=−fdT）。
@@ -511,6 +516,29 @@ function hexaMesh(v8, mat){
   addDualEdges(mesh, g, 12);
   return mesh;
 }
+/* 断面多边形拉伸体（盖梁端部倒角用）：poly=[[y,z],...] 为闭合凸多边形（y-z 平面断面），
+   沿 x∈[x0,x1] 拉伸；顶点按面复制保证法线平直；userData.faces 记录各面顶点序号（散度求体积用） */
+function prismMesh(poly, x0, x1, mat){
+  const n = poly.length, pos = [], faces = [];
+  const P = (i, x) => [x, poly[i][0], poly[i][1]];
+  for(let i=0;i<n;i++){                            /* 侧面 i→(i+1)%n */
+    const j = (i+1)%n, s = pos.length/3;
+    pos.push(...P(i,x0), ...P(j,x0), ...P(j,x1),  ...P(i,x0), ...P(j,x1), ...P(i,x1));
+    faces.push([s,s+1,s+2], [s+3,s+4,s+5]);        /* 两个三角形面（展开位置的两组） */
+  }
+  for(const x of [x0,x1]){                         /* 两端面：三角扇 */
+    const s0 = pos.length/3;
+    for(let k=0;k<n;k++) pos.push(...P(k,x));
+    for(let k=1;k<n-1;k++) faces.push(x===x0 ? [s0,s0+k,s0+k+1] : [s0,s0+k+1,s0+k]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.userData.faces = faces;
+  addDualEdges(mesh, g, 20);
+  return mesh;
+}
 /* 棱线双份：实线=可见轮廓，虚线=被遮挡的隐藏棱线（深度测试 GreaterDepth） */
 function addDualEdges(mesh, g, threshold){
   const eg = new TH.EdgesGeometry(g, threshold);
@@ -662,6 +690,11 @@ const PARAM_HL = {
   cape:  (p,q)=> p.useCap ? {pts:[
             p.capb/2, q.capBase/2, p.H+p.caph, p.capb/2, q.capL/2, p.H+p.caph,   /* 两端悬出段（顶面） */
            -p.capb/2, q.capBase/2, p.H+p.caph,-p.capb/2, q.capL/2, p.H+p.caph ]} : null,
+  capch: (p,q)=> (p.useCap && q.capCh>1e-9) ? {pts:[
+            p.capb/2,  q.capL/2-q.capCh, p.H,  p.capb/2,  q.capL/2, p.H+q.capCh,    /* 右端倒角斜边（两侧） */
+           -p.capb/2,  q.capL/2-q.capCh, p.H, -p.capb/2,  q.capL/2, p.H+q.capCh,
+            p.capb/2, -(q.capL/2-q.capCh), p.H,  p.capb/2, -q.capL/2, p.H+q.capCh,  /* 左端倒角斜边（对称） */
+           -p.capb/2, -(q.capL/2-q.capCh), p.H, -p.capb/2, -q.capL/2, p.H+q.capCh ]} : null,
   Hp:    (p,q)=> p.type==="实体矩形桥墩" ? {pts:[
             -p.Lp/2,-p.Wp/2,0, -p.Lp/2,-p.Wp/2,p.H,     /* 四条竖直棱（墩底→墩顶） */
              p.Lp/2,-p.Wp/2,0,  p.Lp/2,-p.Wp/2,p.H,
@@ -794,12 +827,22 @@ function buildModel(p, q){
     }
   }
 
-  /* 盖梁（墩帽）：等高矩形断面，坐于墩顶（底面 z=H、顶面 z=H+hc）；
-     横桥向长 Lc（墩身横桥向尺寸 + 两端各悬出 ec）、顺桥向宽 bc */
+  /* 盖梁（墩帽）：等高断面，坐于墩顶（底面 z=H、顶面 z=H+hc）；
+     横桥向长 Lc（墩身横桥向尺寸 + 两端各悬出 ec）、顺桥向宽 bc；
+     ch>0 时端部下角各设 45° 倒角（断面为六边形，沿 bc 拉伸） */
   if(p.useCap){
-    group.add(Object.assign(
-      box(-p.capb/2, p.capb/2, -q.capL/2, q.capL/2, p.H, p.H+p.caph, MAT.cap()),
-      {userData:{part:"cap"}}));
+    if(q.capCh > 1e-9){
+      const ch = q.capCh, yl = q.capL/2;
+      const capMesh = prismMesh(
+        [[-yl+ch, p.H], [yl-ch, p.H], [yl, p.H+ch], [yl, p.H+p.caph], [-yl, p.H+p.caph], [-yl, p.H+ch]],
+        -p.capb/2, p.capb/2, MAT.cap());
+      capMesh.userData.part = "cap";
+      group.add(capMesh);
+    }else{
+      group.add(Object.assign(
+        box(-p.capb/2, p.capb/2, -q.capL/2, q.capL/2, p.H, p.H+p.caph, MAT.cap()),
+        {userData:{part:"cap"}}));
+    }
   }
 
   /* ---- 开挖显示：分级放坡棱台带 + 现状地平面（半透明，显隐由工具栏开关控制） ----
@@ -905,6 +948,8 @@ function buildModel(p, q){
       L.add(makeDimRaw(V(p.capb/2,-q.capL/2,p.H+p.caph), V(p.capb/2,q.capL/2,p.H+p.caph), V(2.4,0,0), `Lc=${ft(q.capL)}`, DC, "cap"));
       const yE = q.capBase/2;                     /* 墩身横桥向外缘 */
       L.add(makeDimRaw(V(p.capb/2,yE,p.H+p.caph), V(p.capb/2,q.capL/2,p.H+p.caph), V(1.2,0,0), `ec=${ft(p.cape)}`, DC2, "cap"));
+      if(q.capCh > 1e-9)                          /* 倒角斜边（右端外侧，左右对称只标一处） */
+        L.add(makeDimRaw(V(p.capb/2,q.capL/2-q.capCh,p.H), V(p.capb/2,q.capL/2,p.H+q.capCh), V(1.0,0.7,0.7), `ch=${ft(q.capCh)}(45°)`, DC2, "cap"));
     }
     L.add(makeDimRaw(V(-q.a1/2,-q.b1/2,0), V(-q.a1/2,-q.b1/2,-p.fh1), V(0,-1.6,0), `fh1=${ft(p.fh1)}`, DC, "fd1"));
     if(p.useFd2) L.add(makeDimRaw(V(-q.a2/2,-q.b2/2,-p.fh1), V(-q.a2/2,-q.b2/2,-q.fdT), V(0,-1.6,0), `fh2=${ft(p.fh2)}`, DC, "fd2"));
@@ -985,7 +1030,9 @@ function renderTable(p, q){
     `<td>${mt||"—"}</td><td class="num">${f(Math.abs(val),3)}</td><td>${unit}</td></tr>`);
   const isRect = p.type==="实体矩形桥墩";
   if(p.useCap)
-    add("盖梁（墩帽）", `Lc×bc×hc = ${f(q.capL)}×${f(p.capb)}×${f(p.caph)}（横桥向长=${f(q.capBase)}墩身横桥向尺寸+2×悬出${f(p.cape)}；等高矩形断面）`, q.V_cap, "m³", mat("matCap"));
+    add("盖梁（墩帽）", q.capCh>1e-9
+      ? `Lc×bc×hc − ch²·bc（两端45°倒角）= ${f(q.capL)}×${f(p.capb)}×${f(p.caph)} − ${f(q.capCh)}²×${f(p.capb)}（倒角扣 ${f(q.capCut,3)}；横桥向长=${f(q.capBase)}墩身横桥向尺寸+2×悬出${f(p.cape)}）`
+      : `Lc×bc×hc = ${f(q.capL)}×${f(p.capb)}×${f(p.caph)}（横桥向长=${f(q.capBase)}墩身横桥向尺寸+2×悬出${f(p.cape)}；等高矩形断面）`, q.V_cap, "m³", mat("matCap"));
   if(isRect)
     add("墩身", `Lp×Wp×H = ${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}（实体矩形，竖直面）`, q.V_pier, "m³", mat("matPier"));
   else
@@ -1007,8 +1054,8 @@ function renderTable(p, q){
     `② 实体矩形桥墩：墩身四面的竖直面（无放坡），平面断面=墩身长 Lp（纵桥向）×墩身宽 Wp（横桥向），体积=断面×墩身高 H；`,
     `③ 圆柱式桥墩：n 根直径 d 的圆柱沿横桥向单排布置，相邻圆柱中心距 s；体积=n×π×d²/4×H；最外侧圆柱外缘距 Wd=(n−1)×s+d；`,
     `④ 扩大基础边长：一层平面=墩身尺寸（矩形取长宽、圆柱取最外侧圆柱外缘距 Wd）+每侧襟边 c1；设第二层时平面=一层边长+每侧襟边 c2，自上而下分层；`,
-    `⑤ 盖梁（墩帽）：等高矩形断面，横桥向长 Lc＝墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc；体积=Lc×bc×hc，坐于墩顶（墩顶即盖梁底面）；`,
-    `⑥ 体积：盖梁=Lc×bc×hc；基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=盖梁+墩身+基础各层；`,
+    `⑤ 盖梁（墩帽）：等高断面，横桥向长 Lc＝墩身横桥向尺寸（矩形取 Wp、圆柱取最外侧圆柱外缘距 Wd）＋两端各悬出 ec，顺桥向宽 bc、高 hc，坐于墩顶（墩顶即盖梁底面）；端部下角可设 45° 倒角 ch（左右对称各一处、只输一边尺寸，0=直角），倒角三棱柱沿 bc 全宽贯通，两端合计扣减体积＝2×½ch²×bc＝ch²·bc；ch 生效值≤min(hc, ec)，超出时按限值取用；`,
+    `⑥ 体积：盖梁=Lc×bc×hc−ch²·bc（设倒角时）；基础各层=平面边长（纵×横）×层高（立方体）；圬工合计=盖梁+墩身+基础各层；`,
     `⑦ 柱中心距小于直径时按直径取值（避免柱体重叠）；根数按整数取值；`,
     `⑧ 开挖：坑底平面=最底层基础轮廓（矩形墩身取长宽、圆柱取 Wd，含襟边）+每侧工作宽度 c，坑底=基础底面（标高0.000，即坐标原点所在面）；现状地面标高=坑底标高+开挖总高度 H挖；自坑底向上分层放坡（下层石方 h石、上层土方 h土，层间连续，坡比竖:横=m:1，0=竖直），土方高度超出 H挖 时按 H挖 截断；分级放坡：自坑底每累计一个分级高度 h分（默认5m）设一级分级平台（宽 b平，默认1m），平台处开挖线每侧水平外移 b平 后继续放坡至地面；`,
     `土/石方量采用**分段拟棱台体积公式** V=∑hᵢ/6·(A下+4A中+A上)（以每级平台与石土界面为分段点，段内断面面积随高度线性外放、为高度的二次函数，故该公式解析精确）。经典棱台公式 V=h/3·(S₁+S₂+√S₁S₂) 仅当顶底面相似时精确，本坑底为不等边矩形（顶底不相似），套用会产生系统性偏小，故本表不用经典公式；三维网格体积独立测量与拟棱台公式结果一致，已相互印证。`
@@ -1167,13 +1214,15 @@ function exportCSV(){
   const p = readP(), q = calcQ(p);
   const lines = [];
   lines.push(`${$("projName").value || "桥墩"} - 桥墩工程量计算表`);
-  lines.push(`标高以基础底面(坐标原点z=0)=0.000,墩底标高=基础总厚;绝对标高=相对标高+高程基准绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;盖梁长=墩身横向尺寸+2×悬出;单位m`);
+  lines.push(`标高以基础底面(坐标原点z=0)=0.000,墩底标高=基础总厚;绝对标高=相对标高+高程基准绝对标高(${ft(p.elAbs,3)});基础边长=墩身尺寸(或最外侧圆柱外缘距)+每侧襟边;盖梁长=墩身横向尺寸+2×悬出;盖梁端部45°倒角ch每侧对称(ch=0为直角);单位m`);
   lines.push(`项目,计算式,材料,数量,单位`);
   const qq = s => `"${String(s).replace(/"/g,'""')}"`;
   const row = (n2,fx,v,u,mt) => lines.push([qq(n2),qq(fx),qq(mt||""),f(Math.abs(v),3),qq(u)].join(","));
   const mt = id => { try{ return $(id).value || ""; }catch(_){ return ""; } };
   if(p.useCap)
-    row("盖梁（墩帽）", `${f(q.capL)}×${f(p.capb)}×${f(p.caph)}(横桥向长×纵桥向宽×高, +2×悬出${f(p.cape)})`, q.V_cap, "m3", mt("matCap"));
+    row("盖梁（墩帽）", q.capCh>1e-9
+      ? `${f(q.capL)}×${f(p.capb)}×${f(p.caph)}−${f(q.capCh)}^2×${f(p.capb)}(两端45°倒角ch=${f(q.capCh)},横桥向长×纵桥向宽×高−倒角扣减)`
+      : `${f(q.capL)}×${f(p.capb)}×${f(p.caph)}(横桥向长×纵桥向宽×高, +2×悬出${f(p.cape)})`, q.V_cap, "m3", mt("matCap"));
   if(p.type==="实体矩形桥墩")
     row("墩身", `${f(p.Lp)}×${f(p.Wp)}×${f(p.H)}(实体矩形)`, q.V_pier, "m3", mt("matPier"));
   else
