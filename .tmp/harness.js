@@ -721,6 +721,16 @@ isTrue(rGc.indexOf(`${qChk.total.toFixed(3)} m³`)>=0 &&
 isTrue(cChk.items.filter(it=>it.kind==="c")
          .every(it=>rGc.indexOf(it.V.toFixed(3))>=0),
        "Gc 行各 Vi 数值与 calcCheck 分项体积一致");
+/* 符号式在前、数值相加式在后：ΣVi＝V台身＋V侧墙＋…＝122.000＋57.774＋…＝合计 */
+const gcIt = cChk.items.filter(it=>it.kind === "c");
+isTrue(rGc.indexOf(gcIt.map(it=>it.V.toFixed(3)).join("＋"))>=0,
+       "Gc 行给出体积数值相加式（各 Vi 数值依序用＋相连）");
+isTrue(rGc.indexOf(gcIt.map(it=>"V" + it.n.replace(/（[^）]*）/g, "")).join("＋"))>=0,
+       "Gc 行先给符号相加式（V台身＋V侧墙＋…）");
+{
+  const iNm = rGc.indexOf("ΣV"), iNum = rGc.indexOf(gcIt[0].V.toFixed(3));
+  isTrue(iNm >= 0 && iNum > iNm, "Gc 行顺序：ΣVi＝符号式＝数值式＝合计");
+}
 const iHk  = ckTbl2.indexOf("制动力 Hk</td>");
 const iKa  = ckTbl2.indexOf("K<sub>a</sub>（库仑，α＝90°+θ）");
 const iEa  = ckTbl2.indexOf("E<sub>a</sub>（三角形分布，全高 h填）");
