@@ -57,6 +57,9 @@
   .field + .field{border-top:1px dashed #cbd5e1;}
   .field label{color:#334155; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto;}
   .field small{color:var(--sub); font-size:10.5px;}
+  /* 长提示行：主标签与输入框占第一行，说明另起一行通栏（避免被 nowrap 省略号吃掉） */
+  .field.wrap{flex-wrap:wrap; row-gap:1px;}
+  .field.wrap .hint{flex:1 1 100%; min-width:0; color:var(--sub); font-size:10.5px; line-height:1.35;}
   input[type=number]{
     width:78px; padding:3px 6px; border:1px solid #96d3ab; border-radius:5px;
     font-size:12.5px; text-align:right; background:#d6f2e0;
@@ -83,6 +86,9 @@
   td.fx{color:var(--sub); font-size:11.5px;}
   tr.total td{background:var(--accent-soft); font-weight:700;}
   tr.sep td{background:#f8fafc; font-weight:600; color:var(--sub); font-size:11.5px;}
+  /* 验算表分节行：带 1、2、3 序号，加粗，字号较常规分节行大 1px */
+  tr.sepChk td{background:#f8fafc; font-weight:700; color:#334155; font-size:12.5px;}
+  tr.sepChk td .sn{color:var(--accent); margin-right:2px;}
   .neg{color:var(--warn);}
   .note{
     font-size:11.5px; color:var(--sub); background:#fffbeb; border:1px solid #fde68a;
@@ -239,7 +245,8 @@
           <div class="field"><label>同向车道数 <small>制动力车道折减</small></label><select id="brkN"><option value="1" selected>1 车道 ×1.00</option><option value="2">2 车道 ×2.00</option><option value="3">3 车道 ×2.34</option><option value="4">4 车道 ×2.68</option></select></div>
           <div class="field"><label>台后填土高度 h填 <small>自基础顶至路基顶，留空=侧墙总高</small></label><input type="number" id="chkHf" value="" placeholder="自动" step="0.1"></div>
           <div class="field"><label>填土内摩擦角 φ <small>度，默认 30</small></label><input type="number" id="chkPhi" value="30" step="1"></div>
-          <div class="field"><label>墙背摩擦角 δ <small>度，须 ≤ φ</small></label><input type="number" id="chkDelta" value="20" step="1"></div>
+          <div class="field wrap"><label>墙背摩擦角 δ <small>度，须 ≤ φ</small></label><input type="number" id="chkDelta" value="20" step="1">
+            <div class="hint">（与填土内摩擦角 φ、墙背粗糙度有关，常取 δ=(1/2~2/3)φ）</div></div>
           <div class="field"><label>主动土压力系数 Ka <small>库仑，自动</small></label><input type="number" id="chkKaShow" value="" disabled style="background:#eef2f6;"></div>
           <div class="field"><label>台后主动土压力 Ea <small>kN，仅水平分量参与稳定</small></label><input type="number" id="chkEaShow" value="" disabled style="background:#eef2f6;"></div>
           <div class="field"><label>支座中心至背墙前缘 d支 <small>往河心侧量</small></label><input type="number" id="dBear" value="0.40" step="0.05"></div>
@@ -613,11 +620,15 @@ function calcCheck(p, q){
   const hf = p.chkHf > 1e-9 ? p.chkHf : (p.H1 + p.capH + p.bwH);
   const phiDeg = Math.min(Math.max(p.chkPhi, 0), 45);
   const phi = phiDeg * Math.PI/180;
-  const dl  = Math.min(Math.max(p.chkDelta, 0), phiDeg) * Math.PI/180;
+  /* δ 须 ≤ φ：超出时按 φ 取用（结果表显示生效值，避免"填 40° 却按 30° 算"的口径不一致） */
+  const dlDeg = Math.min(Math.max(p.chkDelta, 0), phiDeg);
+  const dl  = dlDeg * Math.PI/180;
   const cd  = Math.max(Math.cos(dl), 1e-6);
   const sq  = Math.sqrt(Math.max(Math.sin(phi + dl)*Math.sin(phi)/cd, 0));
   const Ka  = Math.pow(Math.cos(phi), 2) / (cd * Math.pow(1 + sq, 2));
   c.hf  = hf;
+  c.phiDeg = phiDeg;                    // 生效内摩擦角（限 0~45°）
+  c.dlDeg  = dlDeg;                     // 生效墙背摩擦角（≤ φ）
   c.Ka  = Ka;
   c.Ea  = p.incEa ? 0.5*p.gamS*hf*hf*Ka*p.Wf : 0;   // 土压力合力（沿墙背法线方向）
   c.EaH = c.Ea * cd;                                 // 水平分量
@@ -1493,7 +1504,9 @@ function renderCheck(p, q){
   const row = (n, fx, v, u, ok) => rows.push(
     `<tr><td>${n}</td><td class="fx">${fx}</td><td class="num">${num(v)}</td><td>${u}</td>`+
     `<td style="text-align:center;">${mk(ok)}</td></tr>`);
-  const sep = t => rows.push(`<tr class="sep"><td colspan="5">${t}</td></tr>`);
+  let sepNo = 0;                    /* 分节序号：1、2、3… 自动递增，调整顺序无需手工改号 */
+  const sep = t => rows.push(
+    `<tr class="sepChk"><td colspan="5"><span class="sn">${++sepNo}、</span>${t}</td></tr>`);
 
   sep("竖向力（标准值，基底以上全部竖向力）");
   row("支座竖向荷载 Nk", `支座中心 x=${f(c.zN,2)}（自背墙前缘向河心 ${f(c.dBear,2)}）`, p.Nk, "kN");
@@ -1510,7 +1523,7 @@ function renderCheck(p, q){
         : "手工输入（应自行叠加温度力等）",
       c.Hk, "kN");
   row("台后主动土压力 Ea", p.incEa
-        ? `Ka＝${f(c.Ka,3)}（φ=${f(p.chkPhi,0)}°、δ=${f(p.chkDelta,0)}°），0.5×${f(p.gamS,1)}×${f(c.hf,2)}²×${f(p.Wf,2)}`
+        ? `Ka＝${f(c.Ka,3)}（φ=${f(c.phiDeg,0)}°、δ=${f(c.dlDeg,0)}°≤φ），0.5×${f(p.gamS,1)}×${f(c.hf,2)}²×${f(p.Wf,2)}`
         : "按偏安全不计入",
       c.Ea, "kN");
   row("土压力水平分量 EaH", `Ea·cosδ，合力点距基底 ${f(c.yEa,2)}（h填/3＋基础厚）`, c.EaH, "kN");
@@ -1568,7 +1581,7 @@ function renderCheck(p, q){
   try{ $("chkKaShow").value = f(c.Ka, 3); $("chkEaShow").value = f(c.Ea, 1); }catch(_){}
 
   $("checkNote").innerHTML = `<b>验算依据与假定</b>` + [
-    `① 荷载均取<strong>标准值</strong>。制动力按 JTG D60—2015 第 4.3.6 条自动计算：一个设计车道取车道荷载总重力的 10%（qk=10.5 kN/m，Pk 随加载长度内插），公路—Ⅰ级不小于 165 kN、Ⅱ级不小于 90 kN，同向多车道乘 1.00/2.00/2.34/2.68；取消勾选可手输，此时应自行叠加温度力等。台后主动土压力按库仑公式自动计算（墙背竖直、填土面水平），<strong>仅取水平分量、竖向分量偏安全不计</strong>，并与制动力按同向叠加。未计入水浮力、地震作用、横桥向偏心及斜交影响。承载能力极限状态应另按 JTG D60 组合、JTG 3363 复核。`,
+    `① 荷载均取<strong>标准值</strong>。制动力按 JTG D60—2015 第 4.3.6 条自动计算：一个设计车道取车道荷载总重力的 10%（qk=10.5 kN/m，Pk 随加载长度内插），公路—Ⅰ级不小于 165 kN、Ⅱ级不小于 90 kN，同向多车道乘 1.00/2.00/2.34/2.68；取消勾选可手输，此时应自行叠加温度力等。台后主动土压力按库仑公式自动计算（墙背竖直、填土面水平；δ 须 ≤ φ，超出时按 φ 取用、表中显示生效值），<strong>仅取水平分量、竖向分量偏安全不计</strong>，并与制动力按同向叠加。未计入水浮力、地震作用、横桥向偏心及斜交影响。承载能力极限状态应另按 JTG D60 组合、JTG 3363 复核。`,
     `② 抗滑移 Kc = μ·ΣV/ΣH ≥ 1.3。抗倾覆<strong>只验算绕基底前趾（河心侧）取矩</strong>，即向河心倾覆：ΣM稳 由台身、侧墙、帽梁、背墙、牛腿、基础的自重（V×γc）、台腔回填土重（V×γs）与支座反力 Nk 各自乘以"作用点至前趾的顺桥向距离"累加而成（表中逐项列出）；ΣM倾 = Hk·hH＋EaH·yEa，其中 hH＝前墙高＋帽梁高＋dH＋基础总厚（制动力作用点至基底），yEa＝基础总厚＋h填/3（三角形土压力合力点至基底），两项水平力同向叠加、力臂均为竖向高度。K0 = ΣM稳/ΣM倾 ≥ 1.5。台后土压力恒指向河心且远大于制动力，水平力合力不可能指向台后，后趾工况不控制，故不再验算。<strong>注意：支座反力 Nk 是竖向力，其力臂是顺桥向水平距离，计入 ΣM稳 —— Nk 越大 K0 越大，它是抗倾覆力而不是倾覆力；倾覆力矩只能由水平力产生（力臂是竖向高度）。</strong>Nk 作用点偏河心时会加大基底朝河心的偏心与 p最大，那属于基底承载力范畴，与抗倾覆是两个不同的验算。基底应力按直线分布，p均 ≤ fa、p最大 ≤ 1.2fa，偏心距 e ≤ L/6（土基）或 L/4（岩石）。限值取自《公路桥涵地基与基础设计规范》JTG 3363—2019 的常规规定，项目另有规定或持力层软弱时应按实际调整。`,
     `③ 各构件自重按几何形心取矩（前墙梯形按解析形心，侧墙、回填按断面面积加权数值积分，牛腿按直角梯形断面形心），与三维模型同源；竖向力作用点、基底轮廓均随参数联动。基底弯矩 M = 竖向力偏心 [ΣV×(x形心−x作用点)] ＋ ΣM倾，两者都使前趾受压、方向相同，<strong>必须同向叠加而非相减</strong>；e>0 表示合力偏向河心（前趾），e<0 表示偏向台后（后趾）。`,
     `④ 土压力计算宽度取前墙横桥向宽度 B，高度取自基础顶至路基顶（留空时默认＝侧墙总高）。若台后设搭板并做柔性隔离、或由耳墙/翼墙独立挡土，实际传给台身者小于此值，可按实际挡土高度折减 h填，但不应取零；若路基顶高于背墙顶，应据实加大 h填。台腔回填对两侧墙的土压力左右对称、相互抵消，不产生横桥向合力。`,

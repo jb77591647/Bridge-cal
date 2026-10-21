@@ -501,6 +501,27 @@ isTrue(ckTbl.indexOf("前趾 x=-1.0")>=0 || ckTbl.indexOf("前趾 x=−1.0")>=0,
        "表中前趾 x=−1.0，与说明①「前墙前缘 x=0、帽梁前缘 x=−ec」同一原点");
 near(cChk.zN - cChk.zF, 1.3, 1e-9, "支座至前趾距离 1.3（0.3−(−1.0)，坐标平移不影响力臂）");
 
+/* ===== 验算表分节行：1、2、3… 序号 + 加粗 + 字号较常规分节行大 1px ===== */
+const sepHtmls = ckTbl.match(/<tr class="sepChk"><td colspan="5">([\s\S]*?)<\/td><\/tr>/g) || [];
+isTrue(sepHtmls.length === 6, "验算表共 6 个分节行（竖向力/水平力/抗滑移/抗倾覆①/抗倾覆②/承载力）");
+const sns = sepHtmls.map(h => (h.match(/<span class="sn">(\d+)、<\/span>/) || [])[1]);
+isTrue(sns.join(",") === "1,2,3,4,5,6" && sns.every((v,i)=>Number(v)===i+1),
+       "分节序号自 1 连续递增、无跳号无重复：" + sns.join(" "));
+isTrue(sepHtmls.every(h => /<span class="sn">\d+、<\/span>\S/.test(h)),
+       "序号位于分节标题文字之前（1、标题…）");
+isTrue(sepHtmls[0].indexOf("竖向力（标准值，基底以上全部竖向力）")>=0 &&
+       sepHtmls[1].indexOf("顺桥向水平力（标准值，均取指向河心的不利方向）")>=0 &&
+       sepHtmls[2].indexOf("抗滑移稳定")>=0, "序号与既有分节标题文字正确配对");
+/* 样式：加粗 + 字号 = 常规 sep 行 +1px */
+const cssSep = (tpl.match(/tr\.sep td\{[^}]*\}/) || [""])[0];
+const cssChk = (tpl.match(/tr\.sepChk td\{[^}]*\}/) || [""])[0];
+const pxOf = s => { const m2 = s.match(/font-size:\s*([\d.]+)px/); return m2 ? Number(m2[1]) : NaN; };
+isTrue(/font-weight:\s*(700|bold)/.test(cssChk), "分节行加粗（font-weight:700）");
+near(pxOf(cssChk) - pxOf(cssSep), 1, 1e-9, "分节行字号比常规分节行大 1px（11.5 → 12.5）");
+isTrue(els.resultBody.innerHTML.indexOf('class="sep"')>=0 &&
+       els.resultBody.innerHTML.indexOf('class="sepChk"')<0,
+       "工程量表分节行（开挖/回填）不受影响，仍用常规 sep 样式");
+
 /* ===== 制动力自动计算（JTG D60—2015 第 4.3.6 条） ===== */
 els.incEa.checked = false; els.autoHk.checked = true;
 els.brkL.value = "20"; els.brkGrade.value = "I"; els.brkN.value = "1";
@@ -555,6 +576,22 @@ isTrue(cPhi.Ka < cE.Ka && cPhi.Ea < cE.Ea, "φ 增至 40° 时 Ka、Ea 下降");
 els.chkPhi.value = "30"; els.chkDelta.value = "0";
 const cD0 = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cD0.Ka, Math.pow(Math.tan(Math.PI/4 - r30/2),2), 1e-9, "δ=0 退化为朗肯 Ka=tan²(45°−φ/2)=0.3333");
+/* δ 须 ≤ φ：超出时按 φ 取用，且表中显示生效值（不是手填值） */
+els.chkDelta.value = "40";
+const cDov = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+near(cDov.dlDeg, 30, 1e-9, "δ=40° > φ=30° 时按 φ 取用（生效 δ=30°）");
+const r30b = 30*Math.PI/180, r40 = 40*Math.PI/180;
+const KaOver = Math.pow(Math.cos(r30b),2) / (Math.cos(r30b)*Math.pow(1+Math.sqrt(Math.sin(r30b+r30b)*Math.sin(r30b)/Math.cos(r30b)),2));
+near(cDov.Ka, KaOver, 1e-12, "δ 超限后 Ka 按 δ=30° 计算（而非 40°）");
+api.renderCheck(api.readP(), api.calcQ(api.readP()));
+isTrue(els.checkBody.innerHTML.indexOf("δ=30°≤φ")>=0 && els.checkBody.innerHTML.indexOf("δ=40°")<0,
+       "结果表显示生效 δ=30°≤φ，不显示越界的 40°");
+els.chkDelta.value = "20";
+/* 参数标签：δ 须 ≤ φ，并给出常用取值区间 */
+isTrue(tpl.indexOf("须 ≤ φ")>=0 && tpl.indexOf("常取 δ=(1/2~2/3)φ")>=0,
+       "参数标签注明 δ 须 ≤ φ 及常用取值 δ=(1/2~2/3)φ");
+isTrue(/\.field\.wrap\s+\.hint\{/.test(tpl) && /<div class="hint">/.test(tpl),
+       "长提示另起一行通栏显示（field.wrap + .hint），不被 nowrap 省略号截断");
 els.chkDelta.value = "20";
 /* 默认工况：自动制动力 165kN + 土压力 */
 els.autoHk.checked = true;
