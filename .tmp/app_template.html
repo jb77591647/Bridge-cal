@@ -2165,9 +2165,9 @@ function renderCheck(p, q){
   row("基底形心距前趾", `${M("L/2=" + f(c.Lb,2) + "/2=" + f(c.Lb/2,2))}（距后趾同为 ${M("L/2=" + f(c.Lb/2,2))}）`, c.Lb/2, "m");
   row("竖向力 N", `${M("N=\\Sigma V")}＝${M("N_{k}")}＋圬工自重 ${M("G_{c}")}＋台腔回填 ${M("G_{s}")}＋土压力竖向分量 ${M("E_{aV}")}（逐项见第 1 节）`, c.Vsum, "kN");
   row("对基底形心弯矩 M",
-      `${M("M_{\\text{竖}}=\\Sigma V\\cdot \\frac{L}{2}-\\Sigma M_{\\text{稳}}")}＝` +
-      `${M(f(c.Vsum,1) + "\\times" + f(c.Lb/2,2) + "-" + f(c.MsF,1) + "=" + f(c.Vsum*c.Lb/2,1) + "-" + f(c.MsF,1) + "=" + f(c.Mc,1))}` +
-      `（ΣV＝${f(c.Vsum,1)} kN 为全部竖向力合力；L/2＝${f(c.Lb/2,2)} m 为基底形心距前趾；ΣM稳＝${f(c.MsF,1)} kN·m 为各竖向力对前趾力矩之和，即第 4 节 ΣM稳）；` +
+      `${M("M_{\\text{竖}}=\\Sigma V\\cdot(\\frac{L}{2}-\\bar{x})", "M竖＝ΣV·(L/2−x̄)")}＝` +
+      `${M(f(c.Vsum,1) + "\\times(" + f(c.Lb/2,2) + "-" + f(c.zbar,3) + ")=" + f(c.Vsum,1) + "\\times" + f(c.Lb/2 - c.zbar,3) + "=" + f(c.Mc,1))}` +
+      `（ΣV＝${f(c.Vsum,1)} kN 为全部竖向力合力；L/2＝${f(c.Lb/2,2)} m 为基底形心距前趾；x̄＝${f(c.zbar,3)} m 为竖向合力作用点距前趾，即 ΣM稳/ΣV；L/2−x̄＝${f(c.Lb/2 - c.zbar,3)} m 为竖向合力偏心距，合力偏后趾为正、使前趾受压）；` +
       `${M("M_{\\text{水}}=\\Sigma M_{\\text{倾}}=H_{k}\\cdot h_{H}+E_{aH}\\cdot y_{Ea}=" + f(c.MhB,1) + "+" + f(c.MhE,1) + "=" + f(c.Mh,1))}；` +
       `${M("M=M_{\\text{竖}}+M_{\\text{水}}=" + f(c.Mc,1) + "+" + f(c.Mh,1) + "=" + f(c.M,1), "M＝M竖＋M水＝" + f(c.Mc,1) + "＋" + f(c.Mh,1) + "＝" + f(c.M,1))}（竖向偏心与水平倾覆均使前趾受压，同向叠加）`,
       c.M, "kN·m");

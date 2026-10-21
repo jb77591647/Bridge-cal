@@ -830,12 +830,12 @@ near(cAll.Lb/2, 4.0, 1e-12, "基底形心距前趾 = L/2 = 4.000");
 isTrue(ckTbl3.indexOf("x前趾＋x后趾")<0 && ckTbl3.indexOf("x形心")<0,
        "承载力段不再出现坐标式形心算式");
 const ckPlain3 = plainify(ckTbl3);
-isTrue(ckPlain3.indexOf(`M竖＝ΣV·L/2−ΣM稳＝${d1(cAll.Vsum)}×${d2(cAll.Lb/2)}−${d1(cAll.MsF)}`)>=0,
-       "弯矩行按长度口径展开：ΣV·L/2 − ΣM稳");
+isTrue(ckPlain3.indexOf(`M竖＝ΣV·(L/2−x̄)＝${d1(cAll.Vsum)}×(${d2(cAll.Lb/2)}−${d3(cAll.zbar)})＝${d1(cAll.Vsum)}×${d3(cAll.Lb/2 - cAll.zbar)}＝${d1(cAll.Mc)}`)>=0,
+       "弯矩行按偏心距口径展开：ΣV·(L/2 − x̄)，并代入 L/2−x̄ 数值");
 isTrue(ckPlain3.indexOf(`M水＝ΣM倾＝Hk·hH+EaH·yEa＝${d1(cAll.MhB)}+${d1(cAll.MhE)}`)>=0,
        "弯矩行把 ΣM倾 展开为 Hk·hH＋EaH·yEa 并代入");
-near(cAll.Vsum*cAll.Lb/2 - cAll.MsF, cAll.Mc, 1e-9,
-     "M竖 = ΣV·L/2 − ΣM稳（与坐标口径 ΣV(x形心−x合力) 等价）");
+near(cAll.Vsum*(cAll.Lb/2 - cAll.zbar), cAll.Mc, 1e-9,
+     "M竖 = ΣV·(L/2 − x̄)（x̄ 为竖向合力作用点距前趾，与坐标口径 ΣV(zc−zbar) 等价）");
 isTrue(ckTbl3.indexOf(`L/2−e＝${d3(cAll.Lb/2)}−${d3(Math.abs(cAll.e))}`)>=0,
        "表内给出基底反力合力作用点 = L/2 − e");
 near(cAll.Lb/2 - cAll.e, 3.466454, 1e-6,
