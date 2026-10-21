@@ -1847,9 +1847,9 @@ function renderCheck(p, q){
   const okT = '<span style="color:#15803d;font-weight:700;">通过</span>';
   const noT = '<span style="color:#b91c1c;font-weight:700;">不通过</span>';
   const mk  = ok => (ok === undefined || ok === null) ? "—" : (ok ? okT : noT);
-  const num = v => v === Infinity ? "∞" : f(v, 3);
-  const row = (n, fx, v, u, ok) => rows.push(
-    `<tr><td>${n}</td><td class="fx">${fx}</td><td class="num">${num(v)}</td><td>${u}</td>`+
+  const num = (v, d = 3) => v === Infinity ? "∞" : f(v, d);
+  const row = (n, fx, v, u, ok, dec) => rows.push(
+    `<tr><td>${n}</td><td class="fx">${fx}</td><td class="num">${num(v, dec)}</td><td>${u}</td>`+
     `<td style="text-align:center;">${mk(ok)}</td></tr>`);
   let sepNo = 0;                    /* 分节序号：1、2、3… 自动递增，调整顺序无需手工改号 */
   const sep = (t, d) => {
@@ -1884,12 +1884,50 @@ function renderCheck(p, q){
         ? `车道荷载 ${f(brk.qk,1)}×${f(brk.Lk,2)}＋Pk ${f(brk.Pk,1)}＝${f(brk.G,1)} kN，×10%＝${f(0.1*brk.G,1)}；下限 ${f(brk.lo,0)}×车道系数 ${f(brk.kf,2)}`
         : "手工输入（应自行叠加温度力等）",
       c.Hk, "kN");
-  row("土压力 EaH 下段（斜墙）", p.incEa
-        ? `Ea1＝Ka1·(q·h1＋γs·h1²/2)·B，Ka1＝${f(c.Ka1,3)}（α＝90°+θ＝${f(c.alDeg,2)}°，φ=${f(c.phiDeg,0)}°、δ=${f(c.dlDeg,0)}°≤φ）；h1＝${f(c.h1,2)}、超载 q＝γs·h2＝${f(c.qOv,1)}；EaH1＝Ea1·cos(θ+δ)`
+  /* 台后主动土压力：Ka、Ea 的上/下段计算公式（紧随制动力行，逐项可复核）
+     两段同用库仑通式，差别只在挡土面与水平面夹角 α：下段 α1＝90°+θ（前墙背坡，θ＝atan(1/m1)）、上段 α2＝90°（竖直挡土面）。
+     Ka(α,φ,δ)＝sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√(sin(φ+δ)·sinφ／(sin(α−δ)·sinα)))²〕，填土面水平（β＝0）。 */
+  const kaNum = alD => {
+    const r = Math.PI/180;
+    const sa = Math.sin(alD*r), sad = Math.sin((alD - c.dlDeg)*r);
+    const sp = Math.sin((c.phiDeg + c.dlDeg)*r), sf = Math.sin(c.phiDeg*r);
+    const ctm = sp*sf/(sad*sa);
+    return {sa, sad, sp, sf, ctm, num: Math.pow(Math.sin((alD + c.phiDeg)*r), 2),
+            ka: Math.pow(Math.sin((alD + c.phiDeg)*r), 2)/(sa*sa*sad*Math.pow(1 + Math.sqrt(ctm), 2))};
+  };
+  const k1n = kaNum(c.alDeg), k2n = kaNum(90);
+  /* 数值代入式：分子／〔sin²α×sin(α−δ)×(1+√… )²〕＝Ka */
+  const kaSub = (k, sym) =>
+    `Ka${sym}＝${f(k.num,4)}／〔${f(k.sa*k.sa,4)}×${f(k.sad,4)}×(1+√(${f(k.sp,4)}×${f(k.sf,4)}／(${f(k.sad,4)}×${f(k.sa,4)})))²〕＝${f(k.ka,4)}`;
+  row("Ka 下段（斜墙，α＝90°+θ）",
+      `库仑通式（填土面水平 β＝0）：Ka＝sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√(sin(φ+δ)·sinφ／(sin(α−δ)·sinα)))²〕；` +
+      `代入 α1＝90°+θ＝${f(c.alDeg,2)}°（θ＝atan(1/m1)＝${f(c.thDeg,2)}°，m1＝${f(p.m1,2)}）、φ＝${f(c.phiDeg,0)}°、δ=${f(c.dlDeg,0)}°≤φ：${kaSub(k1n,"1")}`,
+      c.Ka1, "—", undefined, 4);
+  row("Ka 上段（竖直墙，α＝90°）",
+      `同一通式取 α＝90°（sin α＝1、sin(α−δ)＝cosδ）：Ka＝cos²φ／〔cosδ·(1+√(sin(φ+δ)·sinφ／cosδ))²〕；` +
+      `代入 φ＝${f(c.phiDeg,0)}°、δ＝${f(c.dlDeg,0)}°：${kaSub(k2n,"2")}`,
+      c.Ka2, "—", undefined, 4);
+  row("Ea 下段（梯形分布，含顶部超载 q）",
+      `墙背深度 y 处强度 p(y)＝Ka1·(q＋γs·y)，沿计算宽度 B 积分：Ea1＝Ka1·(q·h1＋½γs·h1²)·B；` +
+      `超载 q＝γs·h2＝${f(p.gamS,1)}×${f(c.h2,2)}＝${f(c.qOv,1)} kPa、h1＝min(h填,H1)＝${f(c.h1,2)}、B＝桥台计算宽 ${f(p.Wf,2)}：` +
+      (p.incEa
+        ? `Ea1＝${f(c.Ka1,4)}×(${f(c.qOv,1)}×${f(c.h1,2)}＋½×${f(p.gamS,1)}×${f(c.h1,2)}²)×${f(p.Wf,2)}＝${f(c.Ea1,1)}`
+        : "（未勾选台后土压力，按偏安全不计入，Ea1＝0）"),
+      c.Ea1, "kN");
+  row("Ea 上段（三角形分布，顶面无超载）",
+      `Ea2＝½·Ka2·γs·h2²·B，h2＝h填−h1＝${f(c.h2,2)}（帽梁＋背墙段，挡土面竖直）：` +
+      (p.incEa
+        ? `Ea2＝½×${f(c.Ka2,4)}×${f(p.gamS,1)}×${f(c.h2,2)}²×${f(p.Wf,2)}＝${f(c.Ea2,1)}`
+        : "（未勾选台后土压力，按偏安全不计入，Ea2＝0）"),
+      c.Ea2, "kN");
+  row("土压力 EaH 下段（斜墙）",
+      p.incEa
+        ? `EaH1＝Ea1·cos(θ+δ)＝${f(c.Ea1,1)}×cos(${f(c.angDeg,2)}°)＝${f(c.EaH1,1)}（θ+δ＝${f(c.thDeg,2)}°＋${f(c.dlDeg,0)}°）`
         : "按偏安全不计入",
       c.EaH1, "kN");
-  row("土压力 EaH 上段（竖直墙）", p.incEa
-        ? `Ea2＝½·Ka2·γs·h2²·B，Ka2＝${f(c.Ka2,3)}（α＝90°，帽梁/背墙竖直挡土面）；h2＝${f(c.h2,2)}；EaH2＝Ea2·cosδ（θ2＝0）`
+  row("土压力 EaH 上段（竖直墙）",
+      p.incEa
+        ? `EaH2＝Ea2·cosδ＝${f(c.Ea2,1)}×cos(${f(c.dlDeg,0)}°)＝${f(c.EaH2,1)}（θ2＝0，合力与水平成 δ）`
         : "按偏安全不计入",
       c.EaH2, "kN");
   row("土压力水平分量 EaH 合计", `下段 ${f(c.EaH1,1)}＋上段 ${f(c.EaH2,1)}（合力点距基底：下段 ${f(c.yEa1,2)}、上段 ${f(c.yEa2,2)}）`, c.EaH, "kN");
@@ -1908,9 +1946,18 @@ function renderCheck(p, q){
   });
   row("支座竖向反力 Nk", `Nk=${f(p.Nk,1)} kN；力臂 ${f(c.zN - c.zF,3)}（作用点 x=${f(c.zN,3)}，前趾 x=${f(c.zF,3)}）`,
       p.Nk*(c.zN - c.zF), "kN·m");
-  row("土压力竖向分量 EaV（下段）", `EaV1＝${f(c.EaV1,1)} kN（向下，δ>0 起稳定作用）；力臂 ${f(c.xEa1 - c.zF,3)}（作用点 x=${f(c.xEa1,3)}，前趾 x=${f(c.zF,3)}）`,
+  /* EaV 两行的力臂：下段取墙背面在下段合力点高度 y1 处的顺桥向位置（前伸＋t1＋(H1−y1)/m1）；
+     上段挡土面竖直，与帽梁后缘、背墙背面同面（前伸＋t1）。 */
+  const y1c = c.yEa1 - q.fdT;                       // 下段合力点高（自前墙底量）
+  const dBack1 = p.m1 > 1e-9 ? (p.H1 - y1c)/p.m1 : 0;
+  row("土压力竖向分量 EaV（下段）",
+      `EaV1＝Ea1·sin(θ+δ)＝${f(c.Ea1,1)}×sin(${f(c.angDeg,2)}°)＝${f(c.EaV1,1)} kN（向下，δ>0 起稳定作用）；` +
+      `力臂 ${f(c.xEa1 - c.zF,3)}＝基础前伸 ${f(c.x0,2)}＋t1 ${f(p.t1,2)}＋(H1−y1)/m1` +
+      (p.m1 > 1e-9 ? `（(${f(p.H1,2)}−${f(y1c,3)})/${f(p.m1,2)}＝${f(dBack1,3)}）` : "＝0（m1＝0，墙背竖直）"),
       c.EaV1*(c.xEa1 - c.zF), "kN·m");
-  row("土压力竖向分量 EaV（上段）", `EaV2＝${f(c.EaV2,1)} kN（向下）；力臂 ${f(c.xEa2 - c.zF,3)}（作用点 x=${f(c.xEa2,3)}，前趾 x=${f(c.zF,3)}）`,
+  row("土压力竖向分量 EaV（上段）",
+      `EaV2＝Ea2·sinδ＝${f(c.Ea2,1)}×sin(${f(c.dlDeg,0)}°)＝${f(c.EaV2,1)} kN（向下）；` +
+      `力臂 ${f(c.xEa2 - c.zF,3)}＝基础前伸 ${f(c.x0,2)}＋t1 ${f(p.t1,2)}（竖直挡土面，与帽梁后缘、背墙背面同面）`,
       c.EaV2*(c.xEa2 - c.zF), "kN·m");
   rows.push(`<tr class="total"><td>ΣM稳 合计</td><td class="fx">圬工自重＋回填土重＋支座反力＋土压力竖向分量，均对前趾取矩</td>`+
     `<td class="num">${f(c.MsF,1)}</td><td>kN·m</td><td></td></tr>`);

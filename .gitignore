@@ -30,3 +30,9 @@ desktop.ini
 .tmp/probe*.js
 .tmp/ref_text.txt
 .tmp/uabutment_ref.html
+.tmp/mathjax_tex_svg.js
+.tmp/mml2omml.xsl
+.tmp/mj_test.js
+.tmp/_top.png
+.tmp/_*.html
+.tmp/_*.txt

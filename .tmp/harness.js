@@ -714,6 +714,48 @@ isTrue(ckTbl2.indexOf("α＝90°+θ")>=0, "下段行标注 Ka1 的墙背倾角 �
 isTrue(ckTbl2.indexOf("Ka2＝")>=0 && ckTbl2.indexOf("α＝90°")>=0, "上段行标注 Ka2 与竖直墙 α＝90°");
 isTrue(ckTbl2.indexOf("超载 q＝γs·h2")>=0, "下段行注明顶部等效超载 q＝γs·h2");
 isTrue(ckTbl2.indexOf("已计入 ΣM稳")>=0, "K0 行注明 EaV 已计入 ΣM稳");
+/* 顺桥向水平力段：Ka / Ea 上、下段计算公式紧随制动力 Hk 行（逐项可复核） */
+const rowOf = (html, name) => { const i = html.indexOf(name); return i<0 ? "" : html.slice(i, i+1000); };
+const iHk  = ckTbl2.indexOf("制动力 Hk</td>");
+const iKa1 = ckTbl2.indexOf("Ka 下段（斜墙");
+const iKa2 = ckTbl2.indexOf("Ka 上段（竖直墙");
+const iEa1 = ckTbl2.indexOf("Ea 下段（梯形分布");
+const iEa2 = ckTbl2.indexOf("Ea 上段（三角形分布");
+const iEaH = ckTbl2.indexOf("土压力 EaH 下段（斜墙）");
+isTrue(iHk>=0 && iHk<iKa1 && iKa1<iKa2 && iKa2<iEa1 && iEa1<iEa2 && iEa2<iEaH,
+       "Ka/Ea 公式行紧接在制动力 Hk 行下方，顺序 Ka下→Ka上→Ea下→Ea上→EaH 分量");
+const rKa1 = rowOf(ckTbl2, "Ka 下段（斜墙");
+const rKa2 = rowOf(ckTbl2, "Ka 上段（竖直墙");
+const rEa1 = rowOf(ckTbl2, "Ea 下段（梯形分布");
+const rEa2 = rowOf(ckTbl2, "Ea 上段（三角形分布");
+isTrue(rKa1.indexOf("Ka＝sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√(sin(φ+δ)·sinφ／(sin(α−δ)·sinα)))²〕")>=0,
+       "Ka 下段行给出库仑主动土压力系数通式（sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√·)²〕）");
+isTrue(rKa1.indexOf("α1＝90°+θ＝108.43°")>=0 && rKa1.indexOf("θ＝atan(1/m1)")>=0,
+       "Ka 下段行标注 α1＝90°+θ、θ＝atan(1/m1) 及其数值");
+isTrue(rKa1.indexOf(`＝${cE.Ka1.toFixed(4)}`)>=0,
+       `Ka 下段行代入计算的 Ka1 与 calcCheck 一致（${cE.Ka1.toFixed(4)}）`);
+isTrue(rKa2.indexOf("Ka＝cos²φ／〔cosδ·(1+√(sin(φ+δ)·sinφ／cosδ))²〕")>=0,
+       "Ka 上段行把通式化到 α＝90° 的竖直墙形式（cos²φ／cosδ）");
+isTrue(rKa2.indexOf(`＝${cE.Ka2.toFixed(4)}`)>=0,
+       `Ka 上段行代入计算的 Ka2 与 calcCheck 一致（${cE.Ka2.toFixed(4)}）`);
+isTrue(rEa1.indexOf("Ea1＝Ka1·(q·h1＋½γs·h1²)·B")>=0 && rEa1.indexOf("p(y)＝Ka1·(q＋γs·y)")>=0,
+       "Ea 下段行给出梯形分布的合力公式（p(y)＝Ka1(q＋γs·y) 积分得 Ea1）");
+isTrue(rEa1.indexOf("q＝γs·h2")>=0 && rEa1.indexOf(`×${cE.h1.toFixed(2)}²`)>=0 && rEa1.indexOf(`＝${cE.Ea1.toFixed(1)}`)>=0,
+       `Ea 下段行代入 q、h1、B 与计算值（Ea1＝${cE.Ea1.toFixed(1)} kN）`);
+isTrue(rEa2.indexOf("Ea2＝½·Ka2·γs·h2²·B")>=0 && rEa2.indexOf(`＝${cE.Ea2.toFixed(1)}`)>=0,
+       `Ea 上段行给出三角形分布的合力公式与代入值（Ea2＝${cE.Ea2.toFixed(1)} kN）`);
+isTrue(rKa1.indexOf("δ=20°≤φ")>=0, "Ka 下段行标注生效 δ≤φ");
+/* ΣM稳 段：两段 EaV 的力臂也要有计算式 */
+const rEaV1 = rowOf(ckTbl2, "土压力竖向分量 EaV（下段）");
+const rEaV2 = rowOf(ckTbl2, "土压力竖向分量 EaV（上段）");
+isTrue(rEaV1.indexOf("EaV1＝Ea1·sin(θ+δ)")>=0 && rEaV1.indexOf(`×sin(${cE.angDeg.toFixed(2)}°)`)>=0,
+       "EaV 下段行给出 EaV1＝Ea1·sin(θ+δ) 及代入值");
+isTrue(rEaV1.indexOf("基础前伸")>=0 && rEaV1.indexOf("＋t1")>=0 && rEaV1.indexOf("(H1−y1)/m1")>=0,
+       "EaV 下段行的力臂展开为 前伸＋t1＋(H1−y1)/m1（墙背面在合力点高度的顺桥向位置）");
+isTrue(rEaV1.indexOf(`＝${cE.EaV1.toFixed(1)} kN`)>=0 && rEaV2.indexOf(`＝${cE.EaV2.toFixed(1)} kN`)>=0,
+       `两行 EaV 均给出代入后的数值（${cE.EaV1.toFixed(1)} / ${cE.EaV2.toFixed(1)} kN）`);
+isTrue(rEaV2.indexOf("EaV2＝Ea2·sinδ")>=0 && rEaV2.indexOf("＋t1")>=0 && rEaV2.indexOf("帽梁后缘、背墙背面同面")>=0,
+       "EaV 上段行的力臂展开为 前伸＋t1（竖直挡土面与帽梁后缘、背墙背面同面）");
 /* 参数标签：δ 须 ≤ φ，并给出常用取值区间 */
 isTrue(tpl.indexOf("须 ≤ φ")>=0 && tpl.indexOf("常取 δ=(1/2~2/3)φ")>=0,
        "参数标签注明 δ 须 ≤ φ 及常用取值 δ=(1/2~2/3)φ");
