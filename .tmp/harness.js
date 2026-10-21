@@ -393,11 +393,11 @@ let SV = 0, SZ = 0, SZF = 0, SZc = 0;
   if(it) near(it.z, st.z, 0.02, "验算形心 z：" + n + "（网格 vs 公式）");
   const W = st.V*gm;
   SV += W; SZ += W*st.z;
-  SZF += W*(st.z - cChk.zF); SZc += W*(st.z - cChk.zc);
+  SZF += W*(st.z - cChk.zF); SZc += W*(cChk.zc - st.z);
 });
 SV += pChk.Nk; SZ += pChk.Nk*cChk.zN;
 SZF += pChk.Nk*(cChk.zN - cChk.zF);
-SZc += pChk.Nk*(cChk.zN - cChk.zc);
+SZc += pChk.Nk*(cChk.zc - cChk.zN);
 near(cChk.Vsum, SV, 2.0, "验算 ΣV（网格体积×容重，侧墙含0.002显示偏移）");
 near(cChk.zbar, SZ/SV, 0.01, "验算 合力作用点（网格形心加权）");
 near(cChk.MsF, SZF, 10.0, "验算 绕前趾稳定力矩 ΣM稳（网格体积×容重×力臂）");
@@ -408,7 +408,12 @@ isTrue(cChk.MsB === undefined && cChk.K0B === undefined && cChk.K0F === undefine
        "后趾稳定力矩与 K0(后趾) 已移除");
 isTrue(cChk.items.length >= 7 && cChk.items.every(it=>it.W > 0 && it.z > -1),
        "抗倾覆明细含 7 个及以上竖向力分项（各自带 W 与作用点 z）");
-near(cChk.M, SZc + cChk.Mh, 10.0, "验算 基底弯矩（竖向偏心＋水平力）");
+near(cChk.M, SZc + cChk.Mh, 10.0, "验算 基底弯矩（竖向偏心＋水平力，同向叠加）");
+/* 独立互证：由绕前趾力矩平衡反求合力作用点 zR，再算 M=ΣV(zc−zR) */
+const zR_chk = cChk.zF + (cChk.MsF - cChk.Mh)/cChk.Vsum;
+near(cChk.M, cChk.Vsum*(cChk.zc - zR_chk), 10.0,
+     "基底弯矩 = ΣV×(形心−合力作用点)，与 Σ(M稳−M倾)=ΣV·力臂 等价");
+near(cChk.e, cChk.zc - zR_chk, 1e-6, "偏心距 e = z形心 − 合力作用点（向河心为正）");
 /* 几何基准与代数关系 */
 near(cChk.zF, -0.9, 1e-9, "基底前趾 z=ec−fd1Zf=−0.9");
 near(cChk.zB, 7.1, 1e-9, "基底后趾 z=ec+L2+fd1Zb=7.1");
@@ -423,6 +428,19 @@ near(cChk.pMean, cChk.Vsum/112, 1e-9, "p均=N/A");
 near(cChk.eLim, 8/6, 1e-9, "土基偏心距限值=Lb/6=1.333");
 near(cChk.pMax, cChk.pMean + 6*Math.abs(cChk.M)/(14*64), 1e-9, "p最大=N/A+6|M|/(B·L²)");
 isTrue(cChk.okAll, "默认工况（Nk=1000、Hk=100、μ=0.3、fa=400）三项验算全部通过");
+/* Nk 的力学性质：竖向力 → 计入 ΣM稳；倾覆力矩只来自水平力 */
+els.Nk.value = "0";
+const cN0 = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+els.Nk.value = "4000";
+const cN4 = api.calcCheck(api.readP(), api.calcQ(api.readP()));
+els.Nk.value = "1000";
+isTrue(cN4.K0 > cChk.K0 && cChk.K0 > cN0.K0, "Nk 增大 → K0 单调上升（证明 Nk 是稳定力而非倾覆力）");
+isTrue(Math.abs(cN4.Mh - cN0.Mh) < 1e-9, "Nk 不影响 ΣM倾（倾覆力矩只由制动力＋土压力产生）");
+isTrue(cN4.Mc > cChk.Mc && cChk.Mc > cN0.Mc,
+       "Nk 增大 → 竖向力偏心弯矩 Mc 上升（支座在形心河心侧，把合力往河心拉）");
+isTrue(cN4.M > cN0.M, "Nk 增大 → 基底弯矩 M 上升（水平力与竖向偏心同向叠加，不相消）");
+near(cChk.Mc, cChk.Vsum*(cChk.zc - cChk.zbar), 5.0, "Mc = ΣV×(形心−竖向合力点)");
+isTrue(cChk.M > Math.abs(cChk.Mh), "默认工况 M 大于 ΣM倾（竖向偏心与倾覆同向，不应相减）");
 /* 参数敏感性 */
 els.Hk.value = "5000";
 const cH = api.calcCheck(api.readP(), api.calcQ(api.readP()));
