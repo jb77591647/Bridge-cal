@@ -2321,7 +2321,7 @@ function inlineFromNode(el){
   }
   return out;
 }
-/* 表格单元格 */
+/* 表格单元格（内容为多段 XML 时用 wCellRaw） */
 function wCell(inline, widthTw, o){
   const op = o || {};
   let tcPr = '<w:tcPr><w:tcW w:w="' + widthTw + '" w:type="dxa"/>';
@@ -2332,19 +2332,175 @@ function wCell(inline, widthTw, o){
           '<w:vAlign w:val="center"/></w:tcPr>';
   return "<w:tc>" + tcPr + wPara(inline, op.para) + "</w:tc>";
 }
-function exportWord(){
+function wCellRaw(inner, widthTw, o){
+  const op = o || {};
+  let tcPr = '<w:tcPr><w:tcW w:w="' + widthTw + '" w:type="dxa"/>';
+  if(op.span) tcPr += '<w:gridSpan w:val="' + op.span + '"/>';
+  if(op.fill) tcPr += '<w:shd w:val="clear" w:color="auto" w:fill="' + op.fill + '"/>';
+  tcPr += '<w:tcMar><w:top w:w="28" w:type="dxa"/><w:left w:w="57" w:type="dxa"/>' +
+          '<w:bottom w:w="28" w:type="dxa"/><w:right w:w="57" w:type="dxa"/></w:tcMar>' +
+          '<w:vAlign w:val="center"/></w:tcPr>';
+  return "<w:tc>" + tcPr + (inner || wPara(wRun(""))) + "</w:tc>";
+}
+/* 完整表格框架：grid=列宽 twips 数组 */
+function wTbl(grid, bodyXml){
+  const tot = grid.reduce((a,b)=>a+b, 0);
+  const tblPr = '<w:tblPr><w:tblW w:w="' + tot + '" w:type="dxa"/>' +
+    '<w:tblBorders>' +
+      ['top','left','bottom','right','insideH','insideV'].map(s =>
+        '<w:' + s + ' w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>').join('') +
+    '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>' +
+    '<w:tblGrid>' + grid.map(w => '<w:gridCol w:w="' + w + '"/>').join('') + '</w:tblGrid>';
+  return '<w:tbl>' + tblPr + bodyXml + '</w:tbl>';
+}
+/* 分组标题行（整行合并，灰底） */
+function wSepRow(text, grid){
+  const tot = grid.reduce((a,b)=>a+b, 0);
+  return '<w:tr><w:trPr><w:tblHeader/></w:trPr>' +
+    wCell(wRun(text, {b:true, sz:19}), tot, {span:grid.length, fill:"F1F5F9", para:{before:120, after:40}}) +
+    '</w:tr>';
+}
+/* ===== 计算参数表：直接扫描左侧参数卡的 DOM（输入框当前值 + 自动计算值） ===== */
+function collectParamRows(){
+  const rows = [];
+  const txt = el => (el ? (el.textContent || "") : "").replace(/[▼▲]/g, "").trim();
+  const cards = document.querySelectorAll(".side .card");
+  for(let i=0;i<cards.length;i++){
+    const card = cards[i];
+    const h = card.querySelector("h2");
+    if(!h) continue;
+    const title = txt(h);
+    const items = [];
+    card.querySelectorAll(".chk").forEach(c => {
+      const cb = c.querySelector("input[type=checkbox]");
+      if(!cb) return;
+      items.push({n: txt(c), v: cb.checked ? "是" : "否", d: ""});
+    });
+    card.querySelectorAll(".field").forEach(f => {
+      const lb = f.querySelector("label");
+      if(!lb) return;
+      const sm = lb.querySelector("small");
+      const desc = sm ? txt(sm) : "";
+      const name = txt(sm ? lb.cloneNode(true) : lb).replace(desc, "").trim() || txt(lb);
+      const inp = f.querySelector("input,select");
+      let v = "—";
+      if(inp){
+        if(inp.type === "checkbox") v = inp.checked ? "是" : "否";
+        else v = (inp.value === "" || inp.value === null) ? "—" : String(inp.value).trim();
+      }
+      items.push({n: name, v: v, d: desc});
+    });
+    if(!items.length) continue;
+    rows.push({sep: title});
+    items.forEach(it => rows.push(it));
+  }
+  return rows;
+}
+/* ===== 计算示意图：SVG → PNG（canvas 2 倍分辨率），用于嵌入 docx ===== */
+function svgToPng(svg, scale){
+  const s = scale || 2;
+  let w = parseFloat(svg.getAttribute("width")), h = parseFloat(svg.getAttribute("height"));
+  let r = null;
+  try{ r = svg.getBoundingClientRect(); }catch(_){ }
+  if(!(w > 0)) w = (r && r.width) || 600;
+  if(!(h > 0)) h = (r && r.height) || 300;
+  const clone = svg.cloneNode(true);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+  clone.setAttribute("width", String(w));
+  clone.setAttribute("height", String(h));
+  let src;
+  try{ src = new XMLSerializer().serializeToString(clone); }
+  catch(_){ return Promise.resolve(null); }
+  return new Promise(res => {
+    let img;
+    try{ img = new Image(); }catch(_){ res(null); return; }
+    const done = v => res(v);
+    img.onload = () => {
+      try{
+        const cv = document.createElement("canvas");
+        cv.width = Math.max(1, Math.round(w * s));
+        cv.height = Math.max(1, Math.round(h * s));
+        const ctx = cv.getContext("2d");
+        if(!ctx){ done(null); return; }
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        const url = cv.toDataURL("image/png");
+        const b64 = url.slice(url.indexOf(",") + 1);
+        done({b64: b64, w: w, h: h});
+      }catch(_){ done(null); }
+    };
+    img.onerror = () => done(null);
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(src);
+  });
+}
+const b64ToU8 = b64 => {
+  const bin = atob(b64), u8 = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+};
+/* Word 浮动图（wp:inline），cx/cy 为 EMU（1px=9525 EMU @96dpi） */
+function wDrawing(rId, cx, cy, id, name){
+  const nm = xmlEsc(name || ("示意图" + id));
+  return '<w:p><w:pPr><w:spacing w:before="60" w:after="40" w:line="240" w:lineRule="auto"/>' +
+    '<w:jc w:val="center"/></w:pPr><w:r><w:drawing>' +
+    '<wp:inline distT="0" distB="0" distL="0" distR="0">' +
+      '<wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:effectExtent l="0" t="0" r="0" b="0"/>' +
+      '<wp:docPr id="' + id + '" name="' + nm + '"/><wp:cNvGraphicFramePr/>' +
+      '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>' +
+        '<pic:nvPicPr><pic:cNvPr id="0" name="' + nm + '.png"/><pic:cNvPicPr/></pic:nvPicPr>' +
+        '<pic:blipFill><a:blip r:embed="' + rId + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+        '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm>' +
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' +
+      '</pic:pic></a:graphicData></a:graphic>' +
+    '</wp:inline></w:drawing></w:r></w:p>';
+}
+async function exportWord(){
   const projEl = $("projName");
   const proj = (projEl && projEl.value ? String(projEl.value) : "U型桥台").trim() || "U型桥台";
   let trs;
   try{ trs = document.querySelectorAll("#checkBody tr"); }catch(_){ trs = null; }
   if(!trs || !trs.length){ alert("验算表尚未生成，无法导出。"); return; }
   const COLW = [1750, 4650, 1200, 700, 1000];
+  const TOTW = COLW.reduce((a,b)=>a+b, 0);           /* 9300 twips ≈ 620px @96dpi */
+  const MAXPX = 610;                                  /* 表内插图最大显示宽度（px） */
+  /* 先把验算表内的计算示意图（SVG）统一转成 PNG（2 倍分辨率），单张失败不影响其余 */
+  const figs = [], jobs = [];
+  for(let i=0;i<trs.length;i++){
+    const tr = trs[i];
+    if((tr.className || "").indexOf("diagChk") < 0) continue;
+    const sv = tr.querySelector ? tr.querySelector(".dgFig svg") : null;
+    figs.push({i: i, cap: tr.querySelector ? (tr.querySelector(".dgCap") || null) : null});
+    jobs.push(sv ? svgToPng(sv, 2).catch(()=>null) : Promise.resolve(null));
+  }
+  let pngs = [];
+  try{ pngs = await Promise.all(jobs); }catch(_){ pngs = []; }
+  const media = [], imgRels = [], pngOf = {};
+  figs.forEach((fg, k) => {
+    const d = pngs[k];
+    if(!d){ pngOf[fg.i] = null; return; }
+    const idx = media.length + 1, rid = "rId" + (10 + idx);
+    const px = Math.min(MAXPX, d.w), py = d.h * px / d.w;
+    pngOf[fg.i] = {rid: rid, cx: Math.round(px*9525), cy: Math.round(py*9525),
+                   cap: fg.cap ? String(fg.cap.textContent || "").trim() : ""};
+    media.push({name: "word/media/pic" + idx + ".png", data: b64ToU8(d.b64)});
+    imgRels.push('<Relationship Id="' + rid + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/pic' + idx + '.png"/>');
+  });
   const body = [];
-  let nRow = 0, nEq = 0;
+  let nRow = 0, nEq = 0, nFig = media.length;
   for(let i=0;i<trs.length;i++){
     const tr = trs[i];
     const cls = tr.className || "";
-    if(cls.indexOf("diagChk") >= 0) continue;            /* 示意图是 SVG，Word 版不嵌入 */
+    if(cls.indexOf("diagChk") >= 0){        /* 计算示意图：原位置嵌入 PNG，图题附于图下 */
+      const pg = pngOf[i];
+      body.push('<w:tr>' + wCellRaw(
+        (pg ? wDrawing(pg.rid, pg.cx, pg.cy, i + 1, "计算示意图" + (i + 1)) : "") +
+        wPara(wRun(pg ? (pg.cap || "计算示意图") : "计算示意图（转换失败，已省略）", {sz:16}),
+              {before:40, after:60}),
+        TOTW, {span:5}) + '</w:tr>');
+      continue;
+    }
     const tds = tr.cells || [];
     if(!tds.length) continue;
     if(cls.indexOf("sepChk") >= 0){
@@ -2371,24 +2527,41 @@ function exportWord(){
   const now = new Date();
   const stamp = now.getFullYear() + "-" + ("0"+(now.getMonth()+1)).slice(-2) + "-" + ("0"+now.getDate()).slice(-2) +
                 " " + ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2);
+  /* 表1：计算参数（直接取自左侧参数卡当前值，含自动计算项） */
+  const PW = [3100, 1400, 4800];
+  let pbody = "", nParam = 0;
+  try{
+    collectParamRows().forEach(r => {
+      if(r.sep){ pbody += wSepRow(r.sep, PW); return; }
+      nParam++;
+      pbody += '<w:tr>' +
+        wCell(wRun(r.n), PW[0], {para:{before:20, after:20}}) +
+        wCell(wRun(r.v, {b:true}), PW[1], {para:{align:"right", before:20, after:20}}) +
+        wCell(wRun(r.d, {sz:16}), PW[2], {para:{before:20, after:20}}) + '</w:tr>';
+    });
+  }catch(_){ pbody = ""; }
+  const paramTbl = pbody ? wTbl(PW, pbody) : "";
+  const nTbl = paramTbl ? 2 : 1;
   const head =
     wPara(wRun(proj + " — 稳定与承载力验算（标准值组合）", {b:true, sz:32}), {after:60}) +
     wPara(wRun("坐标原点＝基底前趾底边中点（倾覆点），x 指向台后，z 自基底底面起算；力臂即作用点坐标。", {sz:18}), {after:20}) +
-    wPara(wRun("导出时间 " + stamp + " · 共 " + nRow + " 行 · 公式 " + nEq + " 处（Word 原生公式对象，双击可编辑）", {sz:16}), {after:120});
-  const tblPr = '<w:tblPr><w:tblW w:w="' + (COLW[0]+COLW[1]+COLW[2]+COLW[3]+COLW[4]) + '" w:type="dxa"/>' +
-    '<w:tblBorders>' +
-      ['top','left','bottom','right','insideH','insideV'].map(s =>
-        '<w:' + s + ' w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>').join('') +
-    '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>' +
-    '<w:tblGrid>' + COLW.map(w => '<w:gridCol w:w="' + w + '"/>').join('') + '</w:tblGrid>';
-  const tbl = '<w:tbl>' + tblPr + body.join('') + '</w:tbl>';
+    wPara(wRun("导出时间 " + stamp + " · 计算参数 " + nParam + " 项 · 验算 " + nRow + " 行 · 公式 " + nEq +
+               " 处（Word 原生公式对象，双击可编辑） · 计算示意图 " + nFig + " 张", {sz:16}), {after:60});
+  const tblChk = wTbl(COLW, body.join(''));
+  const bodyXml =
+    (paramTbl ? wPara(wRun("表1  计算参数表", {b:true, sz:22}), {before:60, after:60}) + paramTbl + wPara(wRun("")) : "") +
+    wPara(wRun("表" + nTbl + "  稳定与承载力验算（标准值组合）", {b:true, sz:22}), {before:160, after:60}) +
+    tblChk;
   const sectPr = '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>' +
     '<w:pgMar w:top="1021" w:right="850" w:bottom="1021" w:left="850" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr>';
   const doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
     'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
-    'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body>' +
-    head + tbl + wPara(wRun("")) + sectPr + '</w:body></w:document>';
+    'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" ' +
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
+    'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>' +
+    head + bodyXml + wPara(wRun("")) + sectPr + '</w:body></w:document>';
   const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults>' +
     '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math" w:eastAsia="宋体" w:cs="Times New Roman"/>' +
@@ -2401,6 +2574,7 @@ function exportWord(){
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
     '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Default Extension="png" ContentType="image/png"/>' +
     '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
     '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
     '</Types>';
@@ -2411,6 +2585,7 @@ function exportWord(){
   const drels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    imgRels.join('') +
     '</Relationships>';
   const enc = new TextEncoder();
   let bin;
@@ -2421,7 +2596,7 @@ function exportWord(){
       {name: "word/_rels/document.xml.rels", data: enc.encode(drels)},
       {name: "word/document.xml",         data: enc.encode(doc)},
       {name: "word/styles.xml",           data: enc.encode(styles)}
-    ]);
+    ].concat(media));
   }catch(err){
     alert("生成 docx 失败：" + (err && err.message ? err.message : err));
     return;

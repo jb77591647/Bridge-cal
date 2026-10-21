@@ -1418,6 +1418,69 @@ function wNotes(el, size){
   }
   return out;
 }
+/* ===== 计算参数表：直接扫描左侧参数卡的 DOM（输入框当前值 + 自动计算值） ===== */
+function collectParamRows(){
+  const rows = [];
+  const txt = el => (el ? (el.textContent || "") : "").replace(/[▼▲]/g, "").trim();
+  const cards = document.querySelectorAll(".side .card");
+  for(let i=0;i<cards.length;i++){
+    const card = cards[i];
+    const h = card.querySelector("h2");
+    if(!h) continue;
+    const title = txt(h);
+    const items = [];
+    card.querySelectorAll(".chk").forEach(c => {
+      const cb = c.querySelector("input[type=checkbox]");
+      if(!cb) return;
+      items.push({n: txt(c), v: cb.checked ? "是" : "否", d: ""});
+    });
+    card.querySelectorAll(".field").forEach(f => {
+      const lb = f.querySelector("label");
+      if(!lb) return;
+      const sm = lb.querySelector("small");
+      const desc = sm ? txt(sm) : "";
+      const name = txt(sm ? lb.cloneNode(true) : lb).replace(desc, "").trim() || txt(lb);
+      const inp = f.querySelector("input,select");
+      let v = "—";
+      if(inp){
+        if(inp.type === "checkbox") v = inp.checked ? "是" : "否";
+        else v = (inp.value === "" || inp.value === null) ? "—" : String(inp.value).trim();
+      }
+      items.push({n: name, v: v, d: desc});
+    });
+    if(!items.length) continue;
+    rows.push({sep: title});
+    items.forEach(it => rows.push(it));
+  }
+  return rows;
+}
+/* 参数表 → Word 表格（分组标题行 + 参数/取值/说明 三列） */
+function wParamTbl(colw){
+  const sum = colw.reduce((s,w)=>s+w, 0);
+  let body = "", n = 0;
+  let rows = [];
+  try{ rows = collectParamRows(); }catch(_){ rows = []; }
+  rows.forEach(r => {
+    if(r.sep){
+      body += '<w:tr><w:trPr><w:tblHeader/></w:trPr>' +
+        wCell(wRun(r.sep, {b:true, sz:19}), sum,
+              {span:colw.length, fill:"F1F5F9", para:{before:120, after:40}}) + '</w:tr>';
+      return;
+    }
+    n++;
+    body += '<w:tr>' +
+      wCell(wRun(r.n), colw[0], {para:{before:20, after:20}}) +
+      wCell(wRun(r.v, {b:true}), colw[1], {para:{align:"right", before:20, after:20}}) +
+      wCell(wRun(r.d, {sz:16}), colw[2], {para:{before:20, after:20}}) + '</w:tr>';
+  });
+  if(!body) return {xml: "", n: 0};
+  const tblPr = '<w:tblPr><w:tblW w:w="' + sum + '" w:type="dxa"/><w:tblBorders>' +
+    ['top','left','bottom','right','insideH','insideV'].map(s =>
+      '<w:' + s + ' w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>').join('') +
+    '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>' +
+    '<w:tblGrid>' + colw.map(w => '<w:gridCol w:w="' + w + '"/>').join('') + '</w:tblGrid>';
+  return {xml: '<w:tbl>' + tblPr + body + '</w:tbl>', n: n};
+}
 function exportWord(){
   const projEl = $("projName");
   const proj = (projEl && projEl.value ? String(projEl.value) : "桥墩").trim() || "桥墩";
@@ -1436,6 +1499,7 @@ function exportWord(){
     (p.useFd2 ? `，二层 ${f(q.a2,2)}×${f(q.b2,2)}×${f(p.fh2,2)}` : "");
   const pierTxt = isRect ? `墩身 Lp ${f(p.Lp,2)}×Wp ${f(p.Wp,2)}×H ${f(p.H,2)}`
                          : `墩身 ${p.n} 根圆柱 d ${f(p.d,2)}，中心距 ${f(p.s,2)}，H ${f(p.H,2)}`;
+  const tP = wParamTbl([3400, 1600, 5300]);                  /* 表1 计算参数（取自参数卡当前值） */
   const head =
     wPara(wRun(proj + " — 桥墩工程量与稳定、承载力验算书", {b:true, sz:32}), {after:60}) +
     wPara(wRun("一、主要参数：" + p.type + "；" + pierTxt + "；" + capTxt + "；" + fdTxt +
@@ -1444,14 +1508,16 @@ function exportWord(){
                `基底摩擦系数 μ ${f(p.mu,2)}；地基承载力 fa ${f(p.fa,1)} kPa（${p.fndRock ? "岩石地基" : "土地基"}）。`, {sz:18}), {after:20}) +
     wPara(wRun("三、坐标系：原点=基础最低面（最下层基础底面）中心，标高以基础底面=0.000 计（墩底标高=基础总厚）；" +
                "基础底面为验算截面，抗倾覆绕基底纵桥向最外边缘。", {sz:16}), {after:60}) +
-    wPara(wRun("导出时间 " + stamp, {sz:16}), {after:120});
+    wPara(wRun("导出时间 " + stamp + " · 计算参数 " + tP.n + " 项", {sz:16}), {after:120});
 
+  const nT = tP.xml ? 1 : 0;
   const tQ = wTable(tbQ, [1800, 5600, 1100, 1100, 700], ["left","left","left","right","center"]);
   const tC = wTable(tbC, [1900, 5400, 1150, 800, 1050], ["left","left","right","center","center"]);
   const bodyXml =
-    wPara(wRun("表1  工程量计算表", {b:true, sz:22}), {before:120, after:60}) + tQ.xml +
+    (tP.xml ? wPara(wRun("表1  计算参数表", {b:true, sz:22}), {before:120, after:60}) + tP.xml + wPara(wRun("")) : "") +
+    wPara(wRun("表" + (1 + nT) + "  工程量计算表", {b:true, sz:22}), {before:120, after:60}) + tQ.xml +
     wPara(wRun("")) +
-    wPara(wRun("表2  稳定与承载力验算（标准值组合）", {b:true, sz:22}), {before:160, after:60}) + tC.xml +
+    wPara(wRun("表" + (2 + nT) + "  稳定与承载力验算（标准值组合）", {b:true, sz:22}), {before:160, after:60}) + tC.xml +
     wPara(wRun("")) +
     wPara(wRun("计算约定与说明", {b:true, sz:22}), {before:160, after:60}) +
     wNotes($("assumpNote"), 17) +

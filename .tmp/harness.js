@@ -897,5 +897,29 @@ isTrue(tpl.indexOf("标高以基础底面") > 0 && tpl.indexOf("标高仍以前�
 api.rebuild();
 const pEL = api.readP(), qEL = api.calcQ(pEL);
 near(parseFloat(els.nbTopShow.value), qEL.nbTop + qEL.fdT, 1e-3, "牛腿顶面标高按基底基准显示（= nbTop + 基础总厚）");
+
+/* ===== 导出验算书：先导出计算参数，并内嵌计算示意图 ===== */
+isTrue(tpl.indexOf("表1  计算参数表") >= 0 && tpl.indexOf("function collectParamRows(") >= 0 &&
+       tpl.indexOf('document.querySelectorAll(".side .card")') >= 0,
+       "验算书先输出「表1 计算参数表」（扫描参数卡 DOM 的当前值，含自动计算项）");
+isTrue(tpl.indexOf('wRun("表" + nTbl + "  稳定与承载力验算（标准值组合）"') >= 0 &&
+       tpl.indexOf("const nTbl = paramTbl ? 2 : 1") >= 0,
+       "参数表之后另表输出验算内容（表号顺延，不与参数表混排）");
+isTrue(tpl.indexOf("function svgToPng(") >= 0 && tpl.indexOf("function wDrawing(") >= 0 &&
+       tpl.indexOf("const b64ToU8 = b64 =>") >= 0,
+       "示意图导出链路齐备（SVG→PNG→Word DrawingML）");
+isTrue(tpl.indexOf("word/media/pic") >= 0 && tpl.indexOf('ContentTypes\' Extension="png"') < 0 &&
+       tpl.indexOf('<Default Extension="png" ContentType="image/png"/>') >= 0,
+       "docx 包内建 word/media/*.png 且 [Content_Types] 声明 png");
+isTrue(tpl.indexOf('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"') >= 0 &&
+       tpl.indexOf("imgRels.join('')") >= 0,
+       "document.xml.rels 为每张图登记 image 关系（rId 唯一）");
+isTrue(tpl.indexOf("计算示意图：原位置嵌入 PNG") >= 0 &&
+       tpl.indexOf('if(cls.indexOf("diagChk") >= 0){') >= 0,
+       "计算示意图按原表格行位置嵌入（不再是跳过 continue）");
+isTrue(tpl.indexOf("const px = Math.min(MAXPX, d.w)") >= 0 && tpl.indexOf("const MAXPX = 610") >= 0,
+       "图宽按表格可用宽度限幅（≤610px），不撑破横向版面");
+isTrue(tpl.indexOf("计算示意图 \" + nFig + \" 张") >= 0,
+       "页首摘要注明导出的计算示意图张数");
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail?1:0);

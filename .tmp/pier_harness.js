@@ -384,9 +384,18 @@ isTrue(tpl.indexOf('a.download = proj + "-验算书.docx"') >= 0, "J 下载文�
 isTrue(tpl.indexOf("function crc32(") >= 0 && tpl.indexOf("function zipStore(") >= 0 &&
        tpl.indexOf("word/document.xml") >= 0 && tpl.indexOf("word/styles.xml") >= 0,
   "J docx 打包链路齐备（crc32/zipStore/[Content_Types]/document/styles）");
-isTrue(tpl.indexOf("表1  工程量计算表") >= 0 && tpl.indexOf("表2  稳定与承载力验算") >= 0 &&
+isTrue(tpl.indexOf("表1  计算参数表") >= 0 &&
+       tpl.indexOf('wRun("表" + (1 + nT) + "  工程量计算表"') >= 0 &&
+       tpl.indexOf('wRun("表" + (2 + nT) + "  稳定与承载力验算（标准值组合）"') >= 0 &&
+       tpl.indexOf("const nT = tP.xml ? 1 : 0") >= 0 &&
        tpl.indexOf('wNotes($("assumpNote")') >= 0 && tpl.indexOf('wNotes($("checkNote")') >= 0,
-  "J 验算书含工程量表、验算表与两段计算约定说明");
+  "J 验算书含参数表（表1）、工程量表、验算表与两段计算约定说明（表号顺延）");
+isTrue(tpl.indexOf("function collectParamRows(") >= 0 && tpl.indexOf(".side .card") >= 0 &&
+       tpl.indexOf("function wParamTbl(") >= 0,
+  "J 计算参数表扫描参数卡 DOM（collectParamRows + wParamTbl）");
+isTrue(tpl.indexOf("导出时间 " + " " + "stamp + \" · 计算参数 \"") >= 0 ||
+       tpl.indexOf('· 计算参数 " + tP.n + " 项') >= 0,
+  "J 页首注明计算参数项数");
 
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail ? 1 : 0);
