@@ -700,6 +700,13 @@ isTrue(ckPlain2.indexOf("α＝90°+θ")>=0, "Ka 行标注墙背倾角 α＝90°+
 isTrue(ckPlain2.indexOf("三角形分布")>=0 && ckPlain2.indexOf("h填/3")>=0,
        "Ea 行注明三角形分布、合力点在 h填/3");
 isTrue(ckTbl2.indexOf("已计入 ΣM稳")>=0, "K0 行注明 EaV 已计入 ΣM稳");
+/* 竖向力段：自重与回填行带计算示意图的符号参数名（Gc / Gs） */
+isTrue(ckTbl2.indexOf("桥台圬工自重 G<sub>c</sub>")>=0,
+       "竖向力段「桥台圬工自重」行带示意图参数名 Gc");
+isTrue(ckTbl2.indexOf("台腔回填土重 G<sub>s</sub>")>=0,
+       "竖向力段「台腔回填土重」行带示意图参数名 Gs");
+isTrue(ckTbl2.indexOf("支座竖向荷载 Nk")>=0 && ckTbl2.indexOf("土压力竖向分量 E<sub>aV</sub>")>=0,
+       "竖向力段四行参数名齐全：Nk、Gc、Gs、EaV（与图 1 编号一一对应）");
 /* 顺桥向水平力段：Ka / Ea 计算公式紧随制动力 Hk 行（逐项可复核） */
 /* 窗口 4000 字符（.mj 带 data-tex 属性，HTML 比纯文本长），返回纯文本便于字面量匹配 */
 const rowOf = (html, name) => { const i = html.indexOf(name); return i<0 ? "" : plainify(html.slice(i, i+4000)); };
