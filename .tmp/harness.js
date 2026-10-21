@@ -6,9 +6,14 @@ const LIB = path.join(__dirname, "three_clean.js");
 
 const lib = fs.readFileSync(LIB, "utf8");
 const tpl = fs.readFileSync(TPL, "utf8");
-const m = tpl.match(/<script>\s*\/\*__THREE__\*\/<\/script>\s*<script>([\s\S]*?)<\/script>/);
-if(!m){ console.error("FAIL: 未找到应用脚本"); process.exit(1); }
-let app = m[1];
+/* 应用脚本是文件里最后一个 <script> 块（其前依次是 three.js、MathJax 配置、MathJax 库、MML2OMML 样式表） */
+const _end = tpl.lastIndexOf("</script>");
+const _beg = tpl.lastIndexOf("<script>", _end);
+if(_end < 0 || _beg < 0){ console.error("FAIL: 未找到应用脚本"); process.exit(1); }
+let app = tpl.slice(_beg + 8, _end);
+if(app.indexOf("__THREE__") >= 0 || app.indexOf("function renderCheck") < 0){
+  console.error("FAIL: 应用脚本定位错误"); process.exit(1);
+}
 
 /* 默认参数桩（与模板一致） */
 const vals = {
@@ -60,7 +65,7 @@ global.requestAnimationFrame = ()=>{};
 global.Blob = class {};
 
 /* 提取 api 探针 */
-app += "\n;global.__api={brakeForce,readP,calcQ,calcCheck,buildModel,renderTable,renderCheck,rebuild,applyPartVisibility,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup};";
+app += "\n;global.__api={brakeForce,readP,calcQ,calcCheck,buildModel,renderTable,renderCheck,rebuild,applyPartVisibility,setScene:(s)=>{scene=s;},groupRef:()=>group,labelRef:()=>labelGroup,M,texPlain,texToMml,texToOmml,exportWord,zipStore,crc32,wRun,inlineFromNode};";
 global.THREE = require(LIB);
 
 let pass=0, fail=0;
@@ -69,6 +74,14 @@ function near(actual, exp, tol, name){
   ok ? pass++ : fail++;
   console.log((ok?"PASS":"FAIL") + ` ${name}: 实际=${f3(actual)} 期望=${f3(exp)} ±${tol}`);
   function f3(x){ return (typeof x==="number" && isFinite(x)) ? x.toFixed(4) : String(x); }
+}
+/* HTML → 纯文本：.mj 的公式 span 会打断字面量匹配，这里还原成降级文本再去标签，
+   使「文本是否存在」类断言可以跨过 MathJax 的包裹标签 */
+function plainify(h){
+  return String(h)
+    .replace(/<span class="mj" data-tex="[^"]*">([\s\S]*?)<\/span>/g, "$1")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 }
 function isTrue(cond, name){
   cond ? pass++ : fail++;
@@ -712,10 +725,11 @@ isTrue(ckTbl2.indexOf("Ea2·cosδ")>=0 && ckTbl2.indexOf("Ea2·sinδ")>=0,
        "上段 EaH2/EaV2 分别标注 cosδ、sinδ（θ2=0）");
 isTrue(ckTbl2.indexOf("α＝90°+θ")>=0, "下段行标注 Ka1 的墙背倾角 α＝90°+θ");
 isTrue(ckTbl2.indexOf("Ka2＝")>=0 && ckTbl2.indexOf("α＝90°")>=0, "上段行标注 Ka2 与竖直墙 α＝90°");
-isTrue(ckTbl2.indexOf("超载 q＝γs·h2")>=0, "下段行注明顶部等效超载 q＝γs·h2");
+isTrue(plainify(ckTbl2).indexOf("超载 q＝γs·h2")>=0, "下段行注明顶部等效超载 q＝γs·h2");
 isTrue(ckTbl2.indexOf("已计入 ΣM稳")>=0, "K0 行注明 EaV 已计入 ΣM稳");
 /* 顺桥向水平力段：Ka / Ea 上、下段计算公式紧随制动力 Hk 行（逐项可复核） */
-const rowOf = (html, name) => { const i = html.indexOf(name); return i<0 ? "" : html.slice(i, i+1000); };
+/* 窗口 4000 字符（.mj 带 data-tex 属性，HTML 比纯文本长），返回纯文本便于字面量匹配 */
+const rowOf = (html, name) => { const i = html.indexOf(name); return i<0 ? "" : plainify(html.slice(i, i+4000)); };
 const iHk  = ckTbl2.indexOf("制动力 Hk</td>");
 const iKa1 = ckTbl2.indexOf("Ka 下段（斜墙");
 const iKa2 = ckTbl2.indexOf("Ka 上段（竖直墙");
@@ -845,5 +859,41 @@ if(process.env.DUMP){
       "  EaV1 x=" + cAll.xEa1.toFixed(4) + " EaV2 x=" + cAll.xEa2.toFixed(4));
   }
 }
+
+/* ===== 公式排版（MathJax：TeX 一份源，页面显示 SVG，导出 Word 转 OMML） ===== */
+const tp = api.texPlain;
+isTrue(tp("E_{a1}\\cdot\\cos(\\theta+\\delta)") === "Ea1·cos(θ+δ)", "texPlain：希腊字母/上下标/乘号还原为 Ea1·cos(θ+δ)");
+isTrue(tp("p_{\\text{均}}=\\frac{N}{A}") === "p均＝N/A", "texPlain：中文下标与简单分式还原为 p均＝N/A");
+isTrue(tp("\\frac{6\\left|M\\right|}{B\\cdot L^{2}}") === "6|M|/(B·L²)", "texPlain：复合分式自动加括号、^{2} 还原为上标 ²");
+isTrue(tp("\\alpha=90^{\\circ}+\\theta") === "α＝90°+θ", "texPlain：度数与全角等号（+ 保持半角，与表内 sin(θ+δ) 一致）");
+isTrue(tp("\\sqrt{\\frac{a}{b}}") === "√(a/b)", "texPlain：根号内分式可解析");
+isTrue(tp("q=\\gamma_{s}\\cdot h_{2}") === "q＝γs·h2", "texPlain：控制词后的空格被吃掉（q＝γs·h2）");
+const mjSample = api.M("K_{a1}=0.1829");
+isTrue(mjSample.indexOf('<span class="mj" data-tex="K_{a1}=0.1829">') === 0 &&
+       mjSample.indexOf("</span>") > 0, "M() 产出 .mj + data-tex（TeX 源）");
+isTrue(mjSample.indexOf("Ka1＝0.1829") > 0, "M() 内的降级文本可直接阅读（无 MathJax 时也不露控制符）");
+const ckTblMJ = els.checkBody.innerHTML;
+const nMJspan = (ckTblMJ.match(/class="mj" data-tex=/g) || []).length;
+isTrue(nMJspan >= 60, `验算表把计算式全部转为行内公式（.mj 数 = ${nMJspan} ≥ 60）`);
+const texList = [];
+ckTblMJ.replace(/data-tex="([^"]*)"/g, (m0, t) => { texList.push(t); return m0; });
+isTrue(texList.length === nMJspan, "每个公式元素都带 data-tex 源（数量一致）");
+let badTex = 0, badPlain = 0;
+texList.forEach(t => {
+  if (!t || (t.match(/\{/g)||[]).length !== (t.match(/\}/g)||[]).length) badTex++;   /* 空源或花括号不配对 */
+  const p = tp(t);
+  if (p.indexOf("\\") >= 0 || p.indexOf("{") >= 0 || p.indexOf("}") >= 0) badPlain++;
+});
+isTrue(badTex === 0, "所有 TeX 源非空且花括号配对（MathJax 解析不会因括号失衡报错）");
+isTrue(badPlain === 0, "所有降级文本都不含反斜杠/花括号（无 MathJax 环境也干净）");
+isTrue(ckTblMJ.indexOf("mjx-container") < 0, "无头环境不注入 MathJax 产物，仅保留降级文本（typeset 由浏览器完成）");
+isTrue(typeof api.exportWord === "function" && typeof api.zipStore === "function" &&
+       typeof api.texToOmml === "function", "导出 Word 链路函数齐备（exportWord / zipStore / texToOmml）");
+isTrue(api.crc32(new TextEncoder().encode("123456789")) === 0xCBF43926, "CRC32 与标准测试向量一致（0xCBF43926）");
+const zipProbe = api.zipStore([{name: "a.txt", data: new TextEncoder().encode("hi")}]);
+isTrue(zipProbe[0] === 0x50 && zipProbe[1] === 0x4B && zipProbe[2] === 0x03 && zipProbe[3] === 0x04,
+       "zipStore 输出以 PK\\x03\\x04 开头（合法 ZIP 本地文件头）");
+isTrue(tpl.indexOf('id="xslMml2Omml"') > 0 && tpl.indexOf("/*__MATHJAX__*/") > 0 &&
+       tpl.indexOf("/*__MML2OMML__*/") > 0, "模板保留 MathJax 与 MML2OMML 注入点");
 console.log(`\n=== 结果: ${pass} PASS, ${fail} FAIL ===`);
 process.exit(fail?1:0);

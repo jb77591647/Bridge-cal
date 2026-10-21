@@ -101,6 +101,11 @@
   .dgNo{display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px;
         border:1px solid #1d4ed8; border-radius:50%; color:#1d4ed8; font-size:9px; font-weight:700;
         margin-right:5px; vertical-align:1px;}
+  /* ===== 行内公式（MathJax SVG） ===== */
+  .mj{display:inline-block; vertical-align:baseline; margin:0 1.5px;}
+  .mj mjx-container[jax="SVG"]{display:inline-block; direction:ltr;}
+  .mj mjx-container[jax="SVG"] > svg{vertical-align:-0.25em; overflow:visible; max-width:none;}
+  mjx-assistive-mml{display:none !important;}   /* 无障碍副本不参与排版 */
   .neg{color:var(--warn);}
   .note{
     font-size:11.5px; color:var(--sub); background:#fffbeb; border:1px solid #fde68a;
@@ -127,6 +132,7 @@
       <label>项目名称</label>
       <input type="text" id="projName" value="U型桥台">
       <button class="btn" onclick="exportCSV()">导出CSV</button>
+      <button class="btn" onclick="exportWord()">导出Word（公式可编辑）</button>
       <button class="btn" onclick="window.print()">打印</button>
     </div>
   </header>
@@ -355,6 +361,17 @@
 </div>
 
 <script>/*__THREE__*/</script>
+<!-- ===== 公式排版：MathJax 3（TeX → SVG 显示；同一份 TeX 经 MML2OMML.XSL 转 OMML 供导出 Word） ===== -->
+<script>
+window.MathJax = {
+  options: { enableAssistiveMml: false, skipHtmlTags: ['script','noscript','style','textarea','pre'] },
+  svg: { fontCache: 'local', scale: 0.92, internalSpeechTitles: false },
+  startup: { typeset: false, ready: function(){ MathJax.startup.defaultReady(); } }
+};
+</script>
+<script>/*__MATHJAX__*/</script>
+<!-- 微软 Office 自带的 MathML→OMML 样式表（供浏览器 XSLTProcessor 调用；注释已剥离以避开 HTML 解析状态机） -->
+<script type="text/plain" id="xslMml2Omml">/*__MML2OMML__*/</script>
 <script>
 /* ================= 工具 ================= */
 const $ = id => document.getElementById(id);
@@ -364,6 +381,165 @@ const ft = (x, n=2) => {          // 三维标注用：去掉小数末尾的 0
   if(s.indexOf('.') >= 0) s = s.replace(/0+$/,'').replace(/\.$/,'');
   return s;
 };
+/* ================= 公式排版与 Word 导出 ================= */
+/* 一条公式只写一份 TeX 源，三处复用：
+   ① 页面显示：MathJax 把 TeX 排成 SVG（tex2svg），替换 span 里的降级文本；
+   ② 导出 Word：同一份 TeX 经 tex2mml 得 MathML，再用 Office 自带的 MML2OMML.XSL
+      转成 OMML（m:oMath）—— Word 里是**原生公式对象，双击即可编辑**；
+   ③ 无 MathJax 环境（无头校验、纯文本场合）：span 内保留 texPlain() 生成的可读
+      降级文本，不会露出反斜杠控制符。 */
+let mjReady = false;
+const mjCache = Object.create(null);        /* tex -> SVG 字符串 */
+const mmlCache = Object.create(null);       /* tex -> MathML 字符串 */
+
+/* TeX 命令 → 纯文本（降级文本用，风格与全表现有文案一致：全角＝＋−、半角括号） */
+const TEX_PLAIN_CMD = {
+  '\\alpha':'α', '\\beta':'β', '\\gamma':'γ', '\\delta':'δ', '\\theta':'θ',
+  '\\varphi':'φ', '\\phi':'φ', '\\lambda':'λ', '\\mu':'μ', '\\pi':'π',
+  '\\rho':'ρ', '\\sigma':'σ', '\\Sigma':'Σ', '\\omega':'ω', '\\psi':'ψ', '\\xi':'ξ',
+  '\\sin':'sin', '\\cos':'cos', '\\tan':'tan', '\\cot':'cot',
+  '\\max':'max', '\\min':'min', '\\exp':'exp', '\\ln':'ln', '\\log':'log',
+  '\\cdot':'·', '\\times':'×', '\\div':'÷', '\\pm':'±', '\\mp':'∓',
+  '\\le':'≤', '\\leq':'≤', '\\ge':'≥', '\\geq':'≥', '\\ne':'≠', '\\neq':'≠',
+  '\\approx':'≈', '\\equiv':'≡', '\\circ':'°', '\\degree':'°', '\\%':'%',
+  '\\sum':'Σ', '\\quad':'  ', '\\qquad':'   ',
+  '\\left':'', '\\right':'', '\\big':'', '\\Big':'', '\\bigg':'', '\\Bigg':'',
+  '\\,':'', '\\;':'', '\\:':'', '\\!':'', '\\ ':' ', '\\-':''
+};
+/* 读一个 {...} 分组（供 \frac、\sqrt 解析，支持嵌套） */
+function readTexGroup(s, i){
+  while(i < s.length && s[i] === " ") i++;
+  if(s[i] !== "{") return null;
+  let d = 0;
+  const start = i + 1;
+  for(let k=i;k<s.length;k++){
+    if(s[k] === "{") d++;
+    else if(s[k] === "}"){ d--; if(!d) return {text: s.slice(start, k), end: k + 1}; }
+  }
+  return null;
+}
+/* \frac{a}{b} → a/b、\sqrt{a} → √(a)；分子分母是复合式时自动加括号 */
+function texFracPlain(s){
+  let out = "", i = 0;
+  while(i < s.length){
+    if(s.startsWith("\\frac", i)){
+      const a = readTexGroup(s, i + 5);
+      const b = a ? readTexGroup(s, a.end) : null;
+      if(a && b){
+        const pa = texFracPlain(a.text), pb = texFracPlain(b.text);
+        const wrap = x => /[\\+\-·×÷/]/.test(x) ? "(" + x + ")" : x;
+        out += wrap(pa) + "/" + wrap(pb);
+        i = b.end; continue;
+      }
+    }
+    if(s.startsWith("\\sqrt", i)){
+      const a = readTexGroup(s, i + 5);
+      if(a){ out += "√(" + texFracPlain(a.text) + ")"; i = a.end; continue; }
+    }
+    out += s[i]; i++;
+  }
+  return out;
+}
+function texPlain(t){
+  let s = String(t);
+  s = s.replace(/\\left\s*/g, "").replace(/\\right\s*/g, "");
+  s = s.replace(/\\[ ,;:!]/g, " ");
+  s = s.replace(/\\(?:text|mathrm|mathbf|mathit|operatorname)\s*\{([^{}]*)\}/g, "$1");   /* 中文/正体内容原样取出 */
+  s = texFracPlain(s);
+  /* 控制词后的空格在 TeX 里不产生间距，这里一并吃掉，保证降级文本紧凑 */
+  s = s.replace(/\\([a-zA-Z]+) ?/g, (m0, nm) => {
+        const k = "\\" + nm;
+        return (TEX_PLAIN_CMD[k] !== undefined) ? TEX_PLAIN_CMD[k] : nm;
+      });
+  s = s.replace(/\^\s*\{?\s*2\s*\}?/g, "²").replace(/\^\s*\{?\s*3\s*\}?/g, "³");
+  s = s.replace(/[_^]\s*\{([^{}]*)\}/g, "$1");          /* 上下标去花括号：E_{aH1} → EaH1 */
+  s = s.replace(/[_^]\s*([A-Za-z0-9])/g, "$1");
+  s = s.replace(/[{}]/g, "").replace(/\\/g, "");
+  s = s.replace(/\s{2,}/g, " ");
+  /* 数学运算符按中文排版习惯显示（+ 保持半角，与表内 sin(θ+δ) 等写法一致） */
+  s = s.replace(/=/g, "＝").replace(/-/g, "−");
+  return s;
+}
+const mjAttr = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+/* 行内公式：M(TeX) —— 第二参数可显式给降级文本（用于保留旧文案里的特殊写法） */
+function M(tex, plain){
+  const p = (plain === undefined) ? texPlain(tex) : plain;
+  return '<span class="mj" data-tex="' + mjAttr(tex) + '">' + mjAttr(p) + '</span>';
+}
+/* 把容器内的 .mj 逐个排版成 SVG；已排过的跳过，同一条 TeX 走缓存 */
+function typesetMj(root){
+  if(!mjReady || typeof MathJax === "undefined") return;
+  let list;
+  try{ list = (root || document).querySelectorAll(".mj[data-tex]"); }catch(_){ return; }
+  if(!list) return;
+  for(let i=0;i<list.length;i++){
+    const el = list[i];
+    if(el.getAttribute("data-done") === "1") continue;
+    const tex = el.getAttribute("data-tex");
+    if(!tex) continue;
+    let svg = mjCache[tex];
+    if(svg === undefined){
+      try{
+        const node = MathJax.tex2svg(tex, {display:false});
+        const am = node.querySelector ? node.querySelector("mjx-assistive-mml") : null;
+        if(am && am.parentNode) am.parentNode.removeChild(am);   /* 无障碍副本不参与显示 */
+        svg = node.outerHTML;
+      }catch(_){ svg = null; }
+      mjCache[tex] = svg;
+    }
+    if(svg){ el.innerHTML = svg; el.setAttribute("data-done","1"); }
+  }
+}
+/* TeX → MathML（优先 tex2mml；不可用时退回 tex2svg 的 assistive-mml） */
+function texToMml(tex){
+  if(!tex) return null;
+  if(mmlCache[tex] !== undefined) return mmlCache[tex];
+  let mml = null;
+  if(mjReady && typeof MathJax !== "undefined"){
+    try{ mml = MathJax.tex2mml(tex, {display:false}) || null; }catch(_){ mml = null; }
+    if(!mml){
+      try{
+        const node = MathJax.tex2svg(tex, {display:false});
+        const m = node.querySelector ? node.querySelector("mjx-assistive-mml math") : null;
+        if(m) mml = new XMLSerializer().serializeToString(m);
+      }catch(_){ }
+    }
+  }
+  mmlCache[tex] = mml;
+  return mml;
+}
+/* 微软 Office 的 MathML→OMML 样式表（内嵌在页面里，供 XSLTProcessor 使用） */
+let xslProc = null, xslTried = false;
+function getXsl(){
+  if(xslTried) return xslProc;
+  xslTried = true;
+  try{
+    const el = document.getElementById("xslMml2Omml");
+    const txt = el && el.textContent ? el.textContent.trim() : "";
+    if(!txt) return null;
+    const xd = new DOMParser().parseFromString(txt, "text/xml");
+    if(xd.getElementsByTagName("parsererror").length) return null;
+    const pr = new XSLTProcessor();
+    pr.importStylesheet(xd);
+    xslProc = pr;
+  }catch(_){ xslProc = null; }
+  return xslProc;
+}
+/* TeX → OMML 片段（m:oMath），Word 中即原生可编辑公式 */
+function texToOmml(tex){
+  const mml = texToMml(tex);
+  if(!mml) return null;
+  const pr = getXsl();
+  if(!pr) return null;
+  try{
+    const md = new DOMParser().parseFromString(mml, "text/xml");
+    const od = pr.transformToDocument(md);
+    if(!od || !od.documentElement) return null;
+    let out = new XMLSerializer().serializeToString(od.documentElement);
+    out = out.replace(/^[\s\S]*?(<m:oMath)/, '$1');   /* 防御：去掉可能的前导处理指令 */
+    return /^<m:oMath/.test(out) ? out : null;
+  }catch(_){ return null; }
+}
 window.addEventListener("error", e => {
   try{ const el=$("assumpNote"); if(el) el.innerHTML += '<br><span class="neg">脚本错误：'+e.message+'</span>'; }catch(_){}
 });
@@ -1855,11 +2031,12 @@ function renderCheck(p, q){
   try{ ["V","H","slide","Ms","Mo","base"].forEach(kk=>{ dg[kk] = dgFig(kk, p, q, c); }); }catch(_){ }
 
   sep("竖向力（标准值，基底以上全部竖向力）", dg.V);
-  row("支座竖向荷载 Nk", `支座中心 x=${f(c.zN,2)}（自背墙前缘向河心 ${f(c.dBear,2)}）`, p.Nk, "kN");
-  row("桥台圬工自重", `ΣVi×γc = ${f(q.total,3)}×${f(p.gamC,1)}`, c.Gc, "kN");
-  row("台腔回填土重", p.incFill ? `V填×γs = ${f(q.V_fill,2)}×${f(p.gamS,1)}` : "按偏安全不计入", c.Gs, "kN");
+  row("支座竖向荷载 Nk", `支座中心 ${M("x=" + f(c.zN,2))}（自背墙前缘向河心 ${f(c.dBear,2)}）`, p.Nk, "kN");
+  row("桥台圬工自重", `${M("\\Sigma V_{i}\\times\\gamma_{c}=" + f(q.total,3) + "\\times" + f(p.gamC,1) + "=" + f(c.Gc,1))}`, c.Gc, "kN");
+  row("台腔回填土重", p.incFill ? `${M("V_{\\text{填}}\\times\\gamma_{s}=" + f(q.V_fill,2) + "\\times" + f(p.gamS,1) + "=" + f(c.Gs,1))}` : "按偏安全不计入", c.Gs, "kN");
   row("土压力竖向分量 EaV", p.incEa
-        ? `下段 EaV1＝Ea1·sin(θ+δ)＝${f(c.EaV1,1)}（θ+δ＝${f(c.angDeg,2)}°，作用点 x=${f(c.xEa1,3)}）＋上段 EaV2＝Ea2·sinδ＝${f(c.EaV2,1)}（x=${f(c.xEa2,3)}）`
+        ? `下段 ${M("E_{aV1}=E_{a1}\\cdot\\sin(\\theta+\\delta)=" + f(c.EaV1,1))}（${M("\\theta+\\delta=" + f(c.angDeg,2) + "^{\\circ}")}，作用点 x=${f(c.xEa1,3)}）＋` +
+          `上段 ${M("E_{aV2}=E_{a2}\\cdot\\sin\\delta=" + f(c.EaV2,1))}（x=${f(c.xEa2,3)}）`
         : "按偏安全不计入",
       c.EaV, "kN");
   rows.push(`<tr class="total"><td>ΣV 合计</td><td class="fx">支座反力＋自重＋回填＋土压力竖向分量</td>`+
@@ -1868,14 +2045,16 @@ function renderCheck(p, q){
      ΣVi·ai 就是绕前趾的稳定力矩 ΣM稳，故 a合＝ΣM稳/ΣV，与抗倾覆段同源、可互证 */
   const aBar = c.MsF / c.Vsum;
   row("竖向合力作用点（距前趾）",
-      `ΣVi·ai/ΣV＝${f(c.MsF,1)}/${f(c.Vsum,1)}（ai 为各竖向力至前趾的力臂，ΣVi·ai 即 ΣM稳）；` +
+      `${M("\\Sigma V_{i}\\cdot a_{i}/\\Sigma V=" + f(c.MsF,1) + "/" + f(c.Vsum,1) + "=" + f(aBar,3))}` +
+      `（${M("a_{i}")} 为各竖向力至前趾的力臂，ΣVi·ai 即 ΣM稳）；` +
       `距后趾 ${f(c.Lb - aBar,3)}`,
       aBar, "m");
 
   sep("顺桥向水平力（标准值，均取指向河心的不利方向）", dg.H);
   const brk = c.brk;
   row("制动力 Hk", (brk && p.autoHk)
-        ? `车道荷载 ${f(brk.qk,1)}×${f(brk.Lk,2)}＋Pk ${f(brk.Pk,1)}＝${f(brk.G,1)} kN，×10%＝${f(0.1*brk.G,1)}；下限 ${f(brk.lo,0)}×车道系数 ${f(brk.kf,2)}`
+        ? `车道荷载 ${M(f(brk.qk,1) + "\\times" + f(brk.Lk,2) + "+P_{k}=" + f(brk.G,1))} kN，` +
+          `${M("\\times 10\\%=" + f(0.1*brk.G,1))}；下限 ${M(f(brk.lo,0) + "\\times")} 车道系数 ${f(brk.kf,2)}`
         : "手工输入（应自行叠加温度力等）",
       c.Hk, "kN");
   /* 台后主动土压力：Ka、Ea 的上/下段计算公式（紧随制动力行，逐项可复核）
@@ -1890,135 +2069,157 @@ function renderCheck(p, q){
             ka: Math.pow(Math.sin((alD + c.phiDeg)*r), 2)/(sa*sa*sad*Math.pow(1 + Math.sqrt(ctm), 2))};
   };
   const k1n = kaNum(c.alDeg), k2n = kaNum(90);
+  /* 库仑通式（TeX 与括号式降级文本各一份：屏幕上排版成真正的分式/根式） */
+  const KA_GEN_TEX = "K_{a}=\\frac{\\sin^{2}(\\alpha+\\varphi)}{\\sin^{2}\\alpha\\cdot\\sin(\\alpha-\\delta)\\cdot\\left(1+\\sqrt{\\frac{\\sin(\\varphi+\\delta)\\cdot\\sin\\varphi}{\\sin(\\alpha-\\delta)\\cdot\\sin\\alpha}}\\right)^{2}}";
+  const KA_GEN_PLAIN = "Ka＝sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√(sin(φ+δ)·sinφ／(sin(α−δ)·sinα)))²〕";
+  const KA_V_TEX = "K_{a}=\\frac{\\cos^{2}\\varphi}{\\cos\\delta\\cdot\\left(1+\\sqrt{\\frac{\\sin(\\varphi+\\delta)\\cdot\\sin\\varphi}{\\cos\\delta}}\\right)^{2}}";
+  const KA_V_PLAIN = "Ka＝cos²φ／〔cosδ·(1+√(sin(φ+δ)·sinφ／cosδ))²〕";
   /* 数值代入式：分子／〔sin²α×sin(α−δ)×(1+√… )²〕＝Ka */
   const kaSub = (k, sym) =>
-    `Ka${sym}＝${f(k.num,4)}／〔${f(k.sa*k.sa,4)}×${f(k.sad,4)}×(1+√(${f(k.sp,4)}×${f(k.sf,4)}／(${f(k.sad,4)}×${f(k.sa,4)})))²〕＝${f(k.ka,4)}`;
+    M(`K_{a${sym}}=\\frac{${f(k.num,4)}}{${f(k.sa*k.sa,4)}\\times${f(k.sad,4)}\\times\\left(1+\\sqrt{\\frac{${f(k.sp,4)}\\times${f(k.sf,4)}}{${f(k.sad,4)}\\times${f(k.sa,4)}}}\\right)^{2}}=${f(k.ka,4)}`,
+      `Ka${sym}＝${f(k.num,4)}／〔${f(k.sa*k.sa,4)}×${f(k.sad,4)}×(1+√(${f(k.sp,4)}×${f(k.sf,4)}／(${f(k.sad,4)}×${f(k.sa,4)})))²〕＝${f(k.ka,4)}`);
   row("Ka 下段（斜墙，α＝90°+θ）",
-      `库仑通式（填土面水平 β＝0）：Ka＝sin²(α+φ)／〔sin²α·sin(α−δ)·(1+√(sin(φ+δ)·sinφ／(sin(α−δ)·sinα)))²〕；` +
-      `代入 α1＝90°+θ＝${f(c.alDeg,2)}°（θ＝atan(1/m1)＝${f(c.thDeg,2)}°，m1＝${f(p.m1,2)}）、φ＝${f(c.phiDeg,0)}°、δ=${f(c.dlDeg,0)}°≤φ：${kaSub(k1n,"1")}`,
+      `库仑通式（填土面水平 β＝0）：${M(KA_GEN_TEX, KA_GEN_PLAIN)}；` +
+      `代入 ${M("\\alpha_{1}=90^{\\circ}+\\theta=" + f(c.alDeg,2) + "^{\\circ}")}（θ＝atan(1/m1)＝${f(c.thDeg,2)}°，m1＝${f(p.m1,2)}）、` +
+      `${M("\\varphi=" + f(c.phiDeg,0) + "^{\\circ}")}、δ=${f(c.dlDeg,0)}°≤φ：${kaSub(k1n,"1")}`,
       c.Ka1, "—", undefined, 4);
   row("Ka 上段（竖直墙，α＝90°）",
-      `同一通式取 α＝90°（sin α＝1、sin(α−δ)＝cosδ）：Ka＝cos²φ／〔cosδ·(1+√(sin(φ+δ)·sinφ／cosδ))²〕；` +
-      `代入 φ＝${f(c.phiDeg,0)}°、δ＝${f(c.dlDeg,0)}°：${kaSub(k2n,"2")}`,
+      `同一通式取 α＝90°（sin α＝1、sin(α−δ)＝cosδ）：${M(KA_V_TEX, KA_V_PLAIN)}；` +
+      `代入 φ＝${f(c.phiDeg,0)}°、δ=${f(c.dlDeg,0)}°：${kaSub(k2n,"2")}`,
       c.Ka2, "—", undefined, 4);
   row("Ea 下段（梯形分布，含顶部超载 q）",
-      `墙背深度 y 处强度 p(y)＝Ka1·(q＋γs·y)，沿计算宽度 B 积分：Ea1＝Ka1·(q·h1＋½γs·h1²)·B；` +
-      `超载 q＝γs·h2＝${f(p.gamS,1)}×${f(c.h2,2)}＝${f(c.qOv,1)} kPa、h1＝min(h填,H1)＝${f(c.h1,2)}、B＝桥台计算宽 ${f(p.Wf,2)}：` +
+      `墙背深度 ${M("y")} 处强度 ${M("p(y)=K_{a1}\\cdot(q+\\gamma_{s}\\cdot y)", "p(y)＝Ka1·(q＋γs·y)")}，沿计算宽度 B 积分：` +
+      `${M("E_{a1}=K_{a1}\\cdot\\left(q\\cdot h_{1}+\\frac{1}{2}\\gamma_{s}\\cdot h_{1}^{2}\\right)\\cdot B", "Ea1＝Ka1·(q·h1＋½γs·h1²)·B")}；` +
+      `超载 ${M("q=\\gamma_{s}\\cdot h_{2}=" + f(p.gamS,1) + "\\times" + f(c.h2,2) + "=" + f(c.qOv,1))} kPa、` +
+      `${M("h_{1}=\\min(h_{\\text{填}},H_{1})=" + f(c.h1,2))}、B＝桥台计算宽 ${f(p.Wf,2)}：` +
       (p.incEa
-        ? `Ea1＝${f(c.Ka1,4)}×(${f(c.qOv,1)}×${f(c.h1,2)}＋½×${f(p.gamS,1)}×${f(c.h1,2)}²)×${f(p.Wf,2)}＝${f(c.Ea1,1)}`
+        ? M(`E_{a1}=${f(c.Ka1,4)}\\times\\left(${f(c.qOv,1)}\\times${f(c.h1,2)}+\\frac{1}{2}\\times${f(p.gamS,1)}\\times${f(c.h1,2)}^{2}\\right)\\times${f(p.Wf,2)}=${f(c.Ea1,1)}`)
         : "（未勾选台后土压力，按偏安全不计入，Ea1＝0）"),
       c.Ea1, "kN");
   row("Ea 上段（三角形分布，顶面无超载）",
-      `Ea2＝½·Ka2·γs·h2²·B，h2＝h填−h1＝${f(c.h2,2)}（帽梁＋背墙段，挡土面竖直）：` +
+      `${M("E_{a2}=\\frac{1}{2}\\cdot K_{a2}\\cdot\\gamma_{s}\\cdot h_{2}^{2}\\cdot B", "Ea2＝½·Ka2·γs·h2²·B")}，` +
+      `h2＝h填−h1＝${f(c.h2,2)}（帽梁＋背墙段，挡土面竖直）：` +
       (p.incEa
-        ? `Ea2＝½×${f(c.Ka2,4)}×${f(p.gamS,1)}×${f(c.h2,2)}²×${f(p.Wf,2)}＝${f(c.Ea2,1)}`
+        ? M(`E_{a2}=\\frac{1}{2}\\times${f(c.Ka2,4)}\\times${f(p.gamS,1)}\\times${f(c.h2,2)}^{2}\\times${f(p.Wf,2)}=${f(c.Ea2,1)}`)
         : "（未勾选台后土压力，按偏安全不计入，Ea2＝0）"),
       c.Ea2, "kN");
   row("土压力 EaH 下段（斜墙）",
       p.incEa
-        ? `EaH1＝Ea1·cos(θ+δ)＝${f(c.Ea1,1)}×cos(${f(c.angDeg,2)}°)＝${f(c.EaH1,1)}（θ+δ＝${f(c.thDeg,2)}°＋${f(c.dlDeg,0)}°）`
+        ? M(`E_{aH1}=E_{a1}\\cdot\\cos(\\theta+\\delta)=${f(c.Ea1,1)}\\times\\cos(${f(c.angDeg,2)}^{\\circ})=${f(c.EaH1,1)}`) +
+          `（${M("\\theta+\\delta=" + f(c.thDeg,2) + "^{\\circ}+" + f(c.dlDeg,0) + "^{\\circ}")}）`
         : "按偏安全不计入",
       c.EaH1, "kN");
   row("土压力 EaH 上段（竖直墙）",
       p.incEa
-        ? `EaH2＝Ea2·cosδ＝${f(c.Ea2,1)}×cos(${f(c.dlDeg,0)}°)＝${f(c.EaH2,1)}（θ2＝0，合力与水平成 δ）`
+        ? M(`E_{aH2}=E_{a2}\\cdot\\cos\\delta=${f(c.Ea2,1)}\\times\\cos(${f(c.dlDeg,0)}^{\\circ})=${f(c.EaH2,1)}`) +
+          `（${M("\\theta_{2}=0")}，合力与水平成 δ）`
         : "按偏安全不计入",
       c.EaH2, "kN");
-  row("土压力水平分量 EaH 合计", `下段 ${f(c.EaH1,1)}＋上段 ${f(c.EaH2,1)}（合力点距基底：下段 ${f(c.yEa1,2)}、上段 ${f(c.yEa2,2)}）`, c.EaH, "kN");
+  row("土压力水平分量 EaH 合计",
+      `${M("E_{aH}=E_{aH1}+E_{aH2}=" + f(c.EaH1,1) + "+" + f(c.EaH2,1) + "=" + f(c.EaH,1))}` +
+      `（合力点距基底：下段 ${f(c.yEa1,2)}、上段 ${f(c.yEa2,2)}）`, c.EaH, "kN");
   rows.push(`<tr class="total"><td>ΣH 合计</td><td class="fx">制动力＋土压力水平分量</td>`+
     `<td class="num">${f(c.Htot,3)}</td><td>kN</td><td></td></tr>`);
 
   sep("抗滑移稳定", dg.slide);
-  row("Kc = μ·ΣV / ΣH", `= ${f(p.fric,2)}×${f(c.Vsum,1)} / ${f(c.Htot,1)}，要求 ≥ ${f(K_SLIDE,1)}`,
+  row("Kc = μ·ΣV / ΣH",
+      `${M(`K_{c}=\\frac{\\mu\\Sigma V}{\\Sigma H}=\\frac{${f(p.fric,2)}\\times${f(c.Vsum,1)}}{${f(c.Htot,1)}}=${f(c.Kc,3)}`)}，` +
+      `要求 ${M("\\ge " + f(K_SLIDE,1))}`,
       c.Kc, "—", c.okKc);
 
   sep("抗倾覆稳定 ①——稳定力矩 ΣM稳＝Σ（竖向力×该力至倾覆点的顺桥向力臂），绕倾覆点（基底前趾，x=0、z=0）取矩，即向河心倾覆", dg.Ms);
   c.items.forEach(it=>{
     const gm = it.kind === "s" ? p.gamS : p.gamC;
-    row(it.n + "自重", `V=${f(it.V,3)}×${f(gm,1)}＝${f(it.W,1)} kN；力臂 ${f(it.z - c.zF,3)}（作用点 x=${f(it.z,3)}，前趾 x=${f(c.zF,3)}）`,
+    row(it.n + "自重", `${M("V=" + f(it.V,3) + "\\times" + f(gm,1) + "=" + f(it.W,1))} kN；力臂 ${f(it.z - c.zF,3)}（作用点 x=${f(it.z,3)}，前趾 x=${f(c.zF,3)}）`,
         it.W*(it.z - c.zF), "kN·m");
   });
-  row("支座竖向反力 Nk", `Nk=${f(p.Nk,1)} kN；力臂 ${f(c.zN - c.zF,3)}（作用点 x=${f(c.zN,3)}，前趾 x=${f(c.zF,3)}）`,
+  row("支座竖向反力 Nk", `${M("N_{k}=" + f(p.Nk,1))} kN；力臂 ${f(c.zN - c.zF,3)}（作用点 x=${f(c.zN,3)}，前趾 x=${f(c.zF,3)}）`,
       p.Nk*(c.zN - c.zF), "kN·m");
   /* EaV 两行的力臂：下段取墙背面在下段合力点高度 y1 处的顺桥向位置（前伸＋t1＋(H1−y1)/m1）；
      上段挡土面竖直，与帽梁后缘、背墙背面同面（前伸＋t1）。 */
   const y1c = c.yEa1 - q.fdT;                       // 下段合力点高（自前墙底量）
   const dBack1 = p.m1 > 1e-9 ? (p.H1 - y1c)/p.m1 : 0;
   row("土压力竖向分量 EaV（下段）",
-      `EaV1＝Ea1·sin(θ+δ)＝${f(c.Ea1,1)}×sin(${f(c.angDeg,2)}°)＝${f(c.EaV1,1)} kN（向下，δ>0 起稳定作用）；` +
-      `力臂 ${f(c.xEa1 - c.zF,3)}＝基础前伸 ${f(c.x0,2)}＋t1 ${f(p.t1,2)}＋(H1−y1)/m1` +
-      (p.m1 > 1e-9 ? `（(${f(p.H1,2)}−${f(y1c,3)})/${f(p.m1,2)}＝${f(dBack1,3)}）` : "＝0（m1＝0，墙背竖直）"),
+      `${M(`E_{aV1}=E_{a1}\\cdot\\sin(\\theta+\\delta)=${f(c.Ea1,1)}\\times\\sin(${f(c.angDeg,2)}^{\\circ})=${f(c.EaV1,1)}`)} kN` +
+      `（向下，δ>0 起稳定作用）；力臂 ${f(c.xEa1 - c.zF,3)}＝基础前伸 ${f(c.x0,2)}＋${M("t_{1}")} ${f(p.t1,2)}＋${M("(H_{1}-y_{1})/m_{1}")}` +
+      (p.m1 > 1e-9 ? `（${M("(" + f(p.H1,2) + "-" + f(y1c,3) + ")/" + f(p.m1,2) + "=" + f(dBack1,3))}）` : "＝0（m1＝0，墙背竖直）"),
       c.EaV1*(c.xEa1 - c.zF), "kN·m");
   row("土压力竖向分量 EaV（上段）",
-      `EaV2＝Ea2·sinδ＝${f(c.Ea2,1)}×sin(${f(c.dlDeg,0)}°)＝${f(c.EaV2,1)} kN（向下）；` +
-      `力臂 ${f(c.xEa2 - c.zF,3)}＝基础前伸 ${f(c.x0,2)}＋t1 ${f(p.t1,2)}（竖直挡土面，与帽梁后缘、背墙背面同面）`,
+      `${M(`E_{aV2}=E_{a2}\\cdot\\sin\\delta=${f(c.Ea2,1)}\\times\\sin(${f(c.dlDeg,0)}^{\\circ})=${f(c.EaV2,1)}`)} kN（向下）；` +
+      `力臂 ${f(c.xEa2 - c.zF,3)}＝基础前伸 ${f(c.x0,2)}＋${M("t_{1}")} ${f(p.t1,2)}（竖直挡土面，与帽梁后缘、背墙背面同面）`,
       c.EaV2*(c.xEa2 - c.zF), "kN·m");
   rows.push(`<tr class="total"><td>ΣM稳 合计</td><td class="fx">圬工自重＋回填土重＋支座反力＋土压力竖向分量，均对前趾取矩</td>`+
     `<td class="num">${f(c.MsF,1)}</td><td>kN·m</td><td></td></tr>`);
 
   sep("抗倾覆稳定 ②——倾覆力矩 ΣM倾＝Σ（水平力×该力至倾覆点的竖向力臂），力臂即距基础底面的高度（倾覆点 z=0）", dg.Mo);
   row("制动力力臂 hH",
-      `作用点标高 yH=${f(c.yH,3)}（前墙高 ${f(p.H1,2)}＋帽梁高 ${f(p.capH,2)}＋dH ${f(p.dH,2)}）＋前墙底至基底 ${f(q.fdT,3)}（基础总厚）`,
+      `作用点标高 ${M("y_{H}=" + f(c.yH,3))}（前墙高 ${f(p.H1,2)}＋帽梁高 ${f(p.capH,2)}＋dH ${f(p.dH,2)}）＋前墙底至基底 ${f(q.fdT,3)}（基础总厚）`,
       c.hH, "m");
   row("制动力倾覆力矩 Hk·hH",
-      `Hk ${f(c.Hk,1)} kN × hH ${f(c.hH,3)} m`, c.MhB, "kN·m");
+      `${M("H_{k}\\times h_{H}=" + f(c.Hk,1) + "\\times" + f(c.hH,3) + "=" + f(c.MhB,1))}`, c.MhB, "kN·m");
   row("土压力力臂 yEa1（下段斜墙）",
-      `前墙底至基底 ${f(q.fdT,3)}＋下段合力点 y1＝${f(c.yEa1 - q.fdT,3)}（梯形分布：顶部超载 q 抬高合力点，介于 h1/2＝${f(c.h1/2,3)} 与 h1/3＝${f(c.h1/3,3)} 之间）` +
+      `前墙底至基底 ${f(q.fdT,3)}＋下段合力点 ${M("y_{1}=" + f(c.yEa1 - q.fdT,3))}` +
+      `（梯形分布：顶部超载 ${M("q")} 抬高合力点，介于 ${M("h_{1}/2=" + f(c.h1/2,3))} 与 ${M("h_{1}/3=" + f(c.h1/3,3))} 之间）` +
       (p.incEa ? "" : "（土压力未计入，仅列力臂）"),
       c.yEa1, "m");
   row("下段土压力倾覆力矩 EaH1·yEa1",
-      `EaH1 ${f(c.EaH1,1)} kN × yEa1 ${f(c.yEa1,3)} m` +
+      `${M("E_{aH1}\\times y_{Ea1}=" + f(c.EaH1,1) + "\\times" + f(c.yEa1,3) + "=" + f(c.MhE1,1))}` +
       (p.incEa ? "" : "（按偏安全不计入）"),
       c.MhE1, "kN·m");
   row("土压力力臂 yEa2（上段竖直墙）",
-      `前墙底至基底 ${f(q.fdT,3)}＋下段高 h1＝${f(c.h1,2)}＋三角形分布 h2/3＝${f(c.h2,2)}/3＝${f(c.h2/3,3)}` +
+      `前墙底至基底 ${f(q.fdT,3)}＋下段高 ${M("h_{1}=" + f(c.h1,2))}＋三角形分布 ${M("h_{2}/3=" + f(c.h2,2) + "/3=" + f(c.h2/3,3))}` +
       (p.incEa ? "" : "（土压力未计入，仅列力臂）"),
       c.yEa2, "m");
   row("上段土压力倾覆力矩 EaH2·yEa2",
-      `EaH2 ${f(c.EaH2,1)} kN × yEa2 ${f(c.yEa2,3)} m` +
+      `${M("E_{aH2}\\times y_{Ea2}=" + f(c.EaH2,1) + "\\times" + f(c.yEa2,3) + "=" + f(c.MhE2,1))}` +
       (p.incEa ? "" : "（按偏安全不计入）"),
       c.MhE2, "kN·m");
-  rows.push(`<tr class="total"><td>ΣM倾 合计</td><td class="fx">Hk·hH＋EaH1·yEa1＋EaH2·yEa2＝${f(c.Hk,1)}×${f(c.hH,3)}＋${f(c.EaH1,1)}×${f(c.yEa1,3)}＋${f(c.EaH2,1)}×${f(c.yEa2,3)}＝${f(c.MhB,1)}＋${f(c.MhE1,1)}＋${f(c.MhE2,1)}</td>`+
+  rows.push(`<tr class="total"><td>ΣM倾 合计</td><td class="fx">` +
+    `${M("\\Sigma M_{\\text{倾}}=H_{k}\\cdot h_{H}+E_{aH1}\\cdot y_{Ea1}+E_{aH2}\\cdot y_{Ea2}")}` +
+    `＝${M(f(c.Hk,1) + "\\times" + f(c.hH,3) + "+" + f(c.EaH1,1) + "\\times" + f(c.yEa1,3) + "+" + f(c.EaH2,1) + "\\times" + f(c.yEa2,3))}` +
+    `＝${M(f(c.MhB,1) + "+" + f(c.MhE1,1) + "+" + f(c.MhE2,1) + "=" + f(c.Mh,1), f(c.MhB,1) + "＋" + f(c.MhE1,1) + "＋" + f(c.MhE2,1) + "＝" + f(c.Mh,1))}</td>`+
     `<td class="num">${f(c.Mh,1)}</td><td>kN·m</td><td></td></tr>`);
   row("K0 = ΣM稳 / ΣM倾",
-      `= ${f(c.MsF,1)} / ${f(c.Mh,1)}，要求 ≥ ${f(K_OVER,1)}；土压力竖向分量 EaV＝${f(c.EaV,1)} kN 已计入 ΣM稳`,
+      `${M(`K_{0}=\\frac{\\Sigma M_{\\text{稳}}}{\\Sigma M_{\\text{倾}}}=\\frac{${f(c.MsF,1)}}{${f(c.Mh,1)}}=${f(c.K0,2)}`)}，` +
+      `要求 ${M("\\ge " + f(K_OVER,1))}；土压力竖向分量 ${M("E_{aV}=" + f(c.EaV,1))} kN 已计入 ΣM稳`,
       c.K0, "—", c.okK0);
 
   sep("基底承载力（直线分布假定）", dg.base);
   const s6 = 6*Math.abs(c.M)/(c.Wb*c.Lb*c.Lb);   /* 6|M|/(B·L²)，最大/最小应力的偏心应力项 */
-  row("基底面积 A", `B×L＝${f(c.Wb,2)}×${f(c.Lb,2)}＝${f(c.A,2)}`, c.A, "m²");
-  row("基底长度 L", `基础前伸 ${f(c.x0,2)}＋桥台长 L2 ${f(p.L2,2)}＋基础后伸 ${f(c.zB - c.x0 - p.L2,2)}（前趾 x=0.000，后趾 x=${f(c.zB,3)}）`, c.Lb, "m");
-  row("基底形心距前趾", `L/2＝${f(c.Lb,2)}/2＝${f(c.Lb/2,2)}（距后趾同为 L/2＝${f(c.Lb/2,2)}）`, c.Lb/2, "m");
-  row("竖向力 N", `ΣV＝Nk＋圬工自重＋台腔回填＋土压力竖向分量 EaV（逐项见第 1 节）`, c.Vsum, "kN");
+  row("基底面积 A", `${M("A=B\\times L=" + f(c.Wb,2) + "\\times" + f(c.Lb,2) + "=" + f(c.A,2))}`, c.A, "m²");
+  row("基底长度 L", `基础前伸 ${f(c.x0,2)}＋桥台长 L2 ${f(p.L2,2)}＋基础后伸 ${f(c.zB - c.x0 - p.L2,2)}＝${M("L=" + f(c.Lb,2))}（前趾 x=0.000，后趾 x=${f(c.zB,3)}）`, c.Lb, "m");
+  row("基底形心距前趾", `${M("L/2=" + f(c.Lb,2) + "/2=" + f(c.Lb/2,2))}（距后趾同为 ${M("L/2=" + f(c.Lb/2,2))}）`, c.Lb/2, "m");
+  row("竖向力 N", `${M("N=\\Sigma V")}＝${M("N_{k}")}＋圬工自重＋台腔回填＋土压力竖向分量 ${M("E_{aV}")}（逐项见第 1 节）`, c.Vsum, "kN");
   row("对基底形心弯矩 M",
-      `M竖＝ΣV·L/2−ΣVi·ai＝${f(c.Vsum,1)}×${f(c.Lb/2,2)}−${f(c.MsF,1)}＝${f(c.Vsum*c.Lb/2,1)}−${f(c.MsF,1)}＝${f(c.Mc,1)}（合力距前趾 ${f(aBar,3)}＜L/2，偏前趾侧）；` +
-      `M水＝ΣM倾＝${f(c.Mh,1)}；` +
-      `M＝M竖＋M水＝${f(c.Mc,1)}＋${f(c.Mh,1)}（同向叠加，均使前趾受压）`,
+      `${M("M_{\\text{竖}}=\\Sigma V\\cdot L/2-\\Sigma V_{i}\\cdot a_{i}=" + f(c.Vsum,1) + "\\times" + f(c.Lb/2,2) + "-" + f(c.MsF,1) + "=" + f(c.Vsum*c.Lb/2,1) + "-" + f(c.MsF,1) + "=" + f(c.Mc,1))}` +
+      `（竖向合力距前趾 ${f(aBar,3)}＜L/2，偏前趾侧）；` +
+      `${M("M_{\\text{水}}=\\Sigma M_{\\text{倾}}=" + f(c.Mh,1))}；` +
+      `${M("M=M_{\\text{竖}}+M_{\\text{水}}=" + f(c.Mc,1) + "+" + f(c.Mh,1) + "=" + f(c.M,1), "M＝M竖＋M水＝" + f(c.Mc,1) + "＋" + f(c.Mh,1) + "＝" + f(c.M,1))}（同向叠加，均使前趾受压）`,
       c.M, "kN·m");
   row("偏心距 e",
-      `e＝|M|/N＝${f(Math.abs(c.M),1)}/${f(c.Vsum,1)}＝${f(Math.abs(c.e),3)}；` +
-      `合力偏${c.e >= 0 ? "河心（前趾）" : "台后（后趾）"}，限值 L/${p.fndRock ? 4 : 6}＝${f(c.Lb,2)}/${p.fndRock ? 4 : 6}＝${f(c.eLim,3)}（${p.fndRock ? "岩石 b/4" : "土基 b/6"}）`,
+      `${M("e=\\frac{\\left|M\\right|}{N}=\\frac{" + f(Math.abs(c.M),1) + "}{" + f(c.Vsum,1) + "}=" + f(Math.abs(c.e),3))}；` +
+      `合力偏${c.e >= 0 ? "河心（前趾）" : "台后（后趾）"}，限值 ${M("L/" + (p.fndRock ? 4 : 6) + "=" + f(c.Lb,2) + "/" + (p.fndRock ? 4 : 6) + "=" + f(c.eLim,3))}` +
+      `（${p.fndRock ? "岩石 b/4" : "土基 b/6"}）`,
       Math.abs(c.e), "m", c.okE);
   row("基底反力合力作用点（距前趾）",
-      `L/2${c.e >= 0 ? "−" : "＋"}e＝${f(c.Lb/2,3)}${c.e >= 0 ? "−" : "＋"}${f(Math.abs(c.e),3)}（自基底形心向${c.e >= 0 ? "前趾" : "后趾"}偏移 e）；` +
-      `基底应力直线分布，前趾受压区由此确定`,
+      `${M("L/2" + (c.e >= 0 ? "-" : "+") + "e=" + f(c.Lb/2,3) + (c.e >= 0 ? "-" : "+") + f(Math.abs(c.e),3) + "=" + f(c.Lb/2 - c.e,3))}` +
+      `（自基底形心向${c.e >= 0 ? "前趾" : "后趾"}偏移 ${M("e")}）；基底应力直线分布，前趾受压区由此确定`,
       c.Lb/2 - c.e, "m");
   row("平均应力 p均",
-      `p均＝N/A＝${f(c.Vsum,1)}/(${f(c.Wb,2)}×${f(c.Lb,2)})＝${f(c.Vsum,1)}/${f(c.A,2)}；要求 ≤ fa＝${f(p.fa,0)}`,
+      `${M("p_{\\text{均}}=\\frac{N}{A}=\\frac{" + f(c.Vsum,1) + "}{" + f(c.Wb,2) + "\\times" + f(c.Lb,2) + "}=\\frac{" + f(c.Vsum,1) + "}{" + f(c.A,2) + "}=" + f(c.pMean,4))}；要求 ${M("\\le f_{a}=" + f(p.fa,0))}`,
       c.pMean, "kPa", c.okPm);
   row("最大应力 p最大",
-      `p最大＝N/A＋6|M|/(B·L²)＝${f(c.pMean,4)}＋6×${f(Math.abs(c.M),3)}/(${f(c.Wb,2)}×${f(c.Lb,2)}²)` +
-      `＝${f(c.pMean,4)}＋${f(6*Math.abs(c.M),1)}/${f(c.Wb*c.Lb*c.Lb,1)}＝${f(c.pMean,4)}＋${f(s6,4)}；` +
-      `要求 ≤ 1.2fa＝${f(P_MAX_RATIO*p.fa,0)}`,
+      `${M("p_{\\text{最大}}=\\frac{N}{A}+\\frac{6\\left|M\\right|}{B\\cdot L^{2}}=" + f(c.pMean,4) + "+\\frac{6\\times" + f(Math.abs(c.M),3) + "}{" + f(c.Wb,2) + "\\times" + f(c.Lb,2) + "^{2}}")}` +
+      `${M("=" + f(c.pMean,4) + "+" + f(s6,4) + "=" + f(c.pMax,4), "＝" + f(c.pMean,4) + "＋" + f(s6,4) + "＝" + f(c.pMax,4))}；要求 ${M("\\le 1.2f_{a}=" + f(P_MAX_RATIO*p.fa,0))}`,
       c.pMax, "kPa", c.okPx);
   row("最小应力 p最小",
-      `p最小＝N/A−6|M|/(B·L²)＝${f(c.pMean,4)}−6×${f(Math.abs(c.M),3)}/(${f(c.Wb,2)}×${f(c.Lb,2)}²)` +
-      `＝${f(c.pMean,4)}−${f(s6,4)}；要求 ≥ 0`,
+      `${M("p_{\\text{最小}}=\\frac{N}{A}-\\frac{6\\left|M\\right|}{B\\cdot L^{2}}=" + f(c.pMean,4) + "-" + f(s6,4) + "=" + f(c.pMin,4))}；要求 ${M("\\ge 0")}`,
       c.pMin, "kPa", c.pMin >= -1e-9);
 
   rows.push(`<tr class="total"><td>验算结论</td><td class="fx">抗滑移 / 抗倾覆 / 承载力</td>`+
     `<td class="num">—</td><td>—</td><td style="text-align:center;">${mk(c.okAll)}</td></tr>`);
   $("checkBody").innerHTML = rows.join("");
+  typesetMj($("checkBody"));            /* MathJax 就绪后把 .mj 排成 SVG；未就绪则保留降级文本 */
   try{ $("chkKaShow").value = f(c.Ka1, 3); $("chkKaShow2").value = f(c.Ka2, 3); $("chkEaShow").value = f(c.EaH, 1); }catch(_){}
 
   $("checkNote").innerHTML = `<b>验算依据与假定</b>` + [
@@ -2073,6 +2274,213 @@ function rebuild(){
   }
 }
 
+/* ================= 导出 Word（.docx，公式为 OMML 原生对象，可编辑） ================= */
+const crcTab = (function(){
+  const t = new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let c = n;
+    for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(u8){
+  let c = 0xFFFFFFFF;
+  for(let i=0;i<u8.length;i++) c = crcTab[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+/* 极简 ZIP 打包（仅 STORE 不压缩）：docx 允许，省掉 pako/JSZip 依赖 */
+function zipStore(files){
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  files.forEach(fl => {
+    const name = enc.encode(fl.name), data = fl.data, crc = crc32(data);
+    const lh = new Uint8Array(30 + name.length), dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true); dv.setUint16(10, 0, true); dv.setUint16(12, 0x21, true);
+    dv.setUint32(14, crc, true); dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+    dv.setUint16(26, name.length, true); dv.setUint16(28, 0, true);
+    lh.set(name, 30);
+    chunks.push(lh, data);
+    const ch = new Uint8Array(46 + name.length), dv2 = new DataView(ch.buffer);
+    dv2.setUint32(0, 0x02014b50, true); dv2.setUint16(4, 20, true); dv2.setUint16(6, 20, true);
+    dv2.setUint16(8, 0x0800, true); dv2.setUint16(10, 0, true); dv2.setUint16(12, 0, true);
+    dv2.setUint16(14, 0x21, true); dv2.setUint32(16, crc, true);
+    dv2.setUint32(20, data.length, true); dv2.setUint32(24, data.length, true);
+    dv2.setUint16(28, name.length, true); dv2.setUint16(30, 0, true); dv2.setUint16(32, 0, true);
+    dv2.setUint16(34, 0, true); dv2.setUint16(36, 0, true); dv2.setUint32(38, 0, true);
+    dv2.setUint32(42, offset, true);
+    ch.set(name, 46);
+    central.push(ch);
+    offset += lh.length + data.length;
+  });
+  let cdSize = 0; central.forEach(c => { cdSize += c.length; });
+  const eocd = new Uint8Array(22), dv3 = new DataView(eocd.buffer);
+  dv3.setUint32(0, 0x06054b50, true); dv3.setUint16(4, 0, true); dv3.setUint16(6, 0, true);
+  dv3.setUint16(8, files.length, true); dv3.setUint16(10, files.length, true);
+  dv3.setUint32(12, cdSize, true); dv3.setUint32(16, offset, true); dv3.setUint16(20, 0, true);
+  const all = chunks.concat(central, [eocd]);
+  let total = 0; all.forEach(a => { total += a.length; });
+  const out = new Uint8Array(total);
+  let p = 0; all.forEach(a => { out.set(a, p); p += a.length; });
+  return out;
+}
+const xmlEsc = s => String(s === null || s === undefined ? "" : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* 一个文本 run（可选加粗/斜体/上下标） */
+function wRun(text, o){
+  if(text === null || text === undefined || text === "") return "";
+  const op = o || {};
+  let pr = "";
+  if(op.b) pr += "<w:b/>";
+  if(op.i) pr += "<w:i/>";
+  if(op.va) pr += '<w:vertAlign w:val="' + op.va + '"/>';
+  if(op.sz) pr += '<w:sz w:val="' + op.sz + '"/><w:szCs w:val="' + op.sz + '"/>';
+  return "<w:r>" + (pr ? "<w:rPr>" + pr + "</w:rPr>" : "") +
+         '<w:t xml:space="preserve">' + xmlEsc(text) + '</w:t></w:r>';
+}
+function wPara(inline, o){
+  const op = o || {};
+  let pPr = '<w:pPr><w:spacing w:before="' + (op.before || 0) + '" w:after="' + (op.after || 0) +
+            '" w:line="240" w:lineRule="auto"/>';
+  if(op.align) pPr += '<w:jc w:val="' + op.align + '"/>';
+  pPr += '</w:pPr>';
+  return "<w:p>" + pPr + (inline || wRun("")) + "</w:p>";
+}
+/* 浏览器 DOM 内容 → Word 行内序列：.mj 走 OMML（可编辑），其余按 run 输出 */
+function inlineFromNode(el){
+  let out = "";
+  const kids = (el && el.childNodes) ? el.childNodes : [];
+  for(let i=0;i<kids.length;i++){
+    const nd = kids[i];
+    if(nd.nodeType === 3){ out += wRun(nd.nodeValue); continue; }
+    if(nd.nodeType !== 1) continue;
+    const tag = (nd.tagName || "").toLowerCase();
+    if(nd.classList && nd.classList.contains("mj")){
+      const tex = nd.getAttribute("data-tex");
+      const om = tex ? texToOmml(tex) : null;
+      out += om || wRun(nd.textContent);
+    }else if(tag === "sub"){ out += wRun(nd.textContent, {va:"subscript"}); }
+    else if(tag === "sup"){ out += wRun(nd.textContent, {va:"superscript"}); }
+    else if(tag === "br"){ out += wRun(" "); }
+    else if(nd.querySelector && nd.querySelector(".mj")){ out += inlineFromNode(nd); }
+    else { out += wRun(nd.textContent, {b: tag === "b" || tag === "strong", i: tag === "i" || tag === "em"}); }
+  }
+  return out;
+}
+/* 表格单元格 */
+function wCell(inline, widthTw, o){
+  const op = o || {};
+  let tcPr = '<w:tcPr><w:tcW w:w="' + widthTw + '" w:type="dxa"/>';
+  if(op.span) tcPr += '<w:gridSpan w:val="' + op.span + '"/>';
+  if(op.fill) tcPr += '<w:shd w:val="clear" w:color="auto" w:fill="' + op.fill + '"/>';
+  tcPr += '<w:tcMar><w:top w:w="28" w:type="dxa"/><w:left w:w="57" w:type="dxa"/>' +
+          '<w:bottom w:w="28" w:type="dxa"/><w:right w:w="57" w:type="dxa"/></w:tcMar>' +
+          '<w:vAlign w:val="center"/></w:tcPr>';
+  return "<w:tc>" + tcPr + wPara(inline, op.para) + "</w:tc>";
+}
+function exportWord(){
+  const projEl = $("projName");
+  const proj = (projEl && projEl.value ? String(projEl.value) : "U型桥台").trim() || "U型桥台";
+  let trs;
+  try{ trs = document.querySelectorAll("#checkBody tr"); }catch(_){ trs = null; }
+  if(!trs || !trs.length){ alert("验算表尚未生成，无法导出。"); return; }
+  const COLW = [1750, 4650, 1200, 700, 1000];
+  const body = [];
+  let nRow = 0, nEq = 0;
+  for(let i=0;i<trs.length;i++){
+    const tr = trs[i];
+    const cls = tr.className || "";
+    if(cls.indexOf("diagChk") >= 0) continue;            /* 示意图是 SVG，Word 版不嵌入 */
+    const tds = tr.cells || [];
+    if(!tds.length) continue;
+    if(cls.indexOf("sepChk") >= 0){
+      const t = tds[0].textContent || "";
+      body.push('<w:tr><w:trPr><w:tblHeader/></w:trPr>' +
+        wCell(wRun(t, {b:true, sz:19}), COLW[0]+COLW[1]+COLW[2]+COLW[3]+COLW[4],
+              {span:5, fill:"F1F5F9", para:{before:120, after:40}}) + '</w:tr>');
+      continue;
+    }
+    const isTot = cls.indexOf("total") >= 0;
+    let cells = "";
+    for(let k=0;k<tds.length && k<5;k++){
+      const td = tds[k];
+      let inline;
+      if(k === 1 || (k === 0 && cls.indexOf("sepChk") < 0)) inline = inlineFromNode(td);
+      else inline = wRun(td.textContent, {b: isTot});
+      if(k === 1 && td.querySelectorAll) nEq += td.querySelectorAll(".mj").length;
+      const para = {align: (k === 2 || k === 3) ? "right" : (k === 4 ? "center" : "left")};
+      cells += wCell(inline, COLW[k], {fill: isTot ? "F8FAFC" : null, para: para});
+    }
+    body.push('<w:tr>' + cells + '</w:tr>');
+    nRow++;
+  }
+  const now = new Date();
+  const stamp = now.getFullYear() + "-" + ("0"+(now.getMonth()+1)).slice(-2) + "-" + ("0"+now.getDate()).slice(-2) +
+                " " + ("0"+now.getHours()).slice(-2) + ":" + ("0"+now.getMinutes()).slice(-2);
+  const head =
+    wPara(wRun(proj + " — 稳定与承载力验算（标准值组合）", {b:true, sz:32}), {after:60}) +
+    wPara(wRun("坐标原点＝基底前趾底边中点（倾覆点），x 指向台后，z 自基底底面起算；力臂即作用点坐标。", {sz:18}), {after:20}) +
+    wPara(wRun("导出时间 " + stamp + " · 共 " + nRow + " 行 · 公式 " + nEq + " 处（Word 原生公式对象，双击可编辑）", {sz:16}), {after:120});
+  const tblPr = '<w:tblPr><w:tblW w:w="' + (COLW[0]+COLW[1]+COLW[2]+COLW[3]+COLW[4]) + '" w:type="dxa"/>' +
+    '<w:tblBorders>' +
+      ['top','left','bottom','right','insideH','insideV'].map(s =>
+        '<w:' + s + ' w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>').join('') +
+    '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>' +
+    '<w:tblGrid>' + COLW.map(w => '<w:gridCol w:w="' + w + '"/>').join('') + '</w:tblGrid>';
+  const tbl = '<w:tbl>' + tblPr + body.join('') + '</w:tbl>';
+  const sectPr = '<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>' +
+    '<w:pgMar w:top="1021" w:right="850" w:bottom="1021" w:left="850" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr>';
+  const doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+    'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body>' +
+    head + tbl + wPara(wRun("")) + sectPr + '</w:body></w:document>';
+  const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults>' +
+    '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Cambria Math" w:hAnsi="Cambria Math" w:eastAsia="宋体" w:cs="Times New Roman"/>' +
+    '<w:sz w:val="18"/><w:szCs w:val="18"/><w:lang w:val="en-US" w:eastAsia="zh-CN"/></w:rPr></w:rPrDefault>' +
+    '<w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
+    '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:qFormat/></w:style>' +
+    '</w:styles>';
+  const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+    '</Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>';
+  const drels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '</Relationships>';
+  const enc = new TextEncoder();
+  let bin;
+  try{
+    bin = zipStore([
+      {name: "[Content_Types].xml",       data: enc.encode(ct)},
+      {name: "_rels/.rels",               data: enc.encode(rels)},
+      {name: "word/_rels/document.xml.rels", data: enc.encode(drels)},
+      {name: "word/document.xml",         data: enc.encode(doc)},
+      {name: "word/styles.xml",           data: enc.encode(styles)}
+    ]);
+  }catch(err){
+    alert("生成 docx 失败：" + (err && err.message ? err.message : err));
+    return;
+  }
+  const blob = new Blob([bin], {type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = proj + "稳定与承载力验算.docx";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
 function exportCSV(){
   const p = readP(), q = calcQ(p);
   const lines = [];
@@ -2124,6 +2532,18 @@ Object.keys(PARAM_HL).forEach(id=>{
 })();
 init3D();
 rebuild();
+/* MathJax 就绪后把当前已渲染的 .mj 全部排版（此前显示的是降级文本，不会白屏） */
+function mjBoot(){
+  try{
+    if(typeof MathJax === "undefined" || !MathJax.startup || !MathJax.startup.promise) return;
+    MathJax.startup.promise.then(function(){
+      mjReady = true;
+      typesetMj(document);
+      try{ document.body.setAttribute("data-mj", "ready"); }catch(_){ }
+    }).catch(function(){ });
+  }catch(_){ }
+}
+mjBoot();
 </script>
 </body>
 </html>

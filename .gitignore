@@ -36,3 +36,7 @@ desktop.ini
 .tmp/_top.png
 .tmp/_*.html
 .tmp/_*.txt
+.tmp/_*.py
+.tmp/_*.js
+.tmp/_*.docx
+.tmp/_*.err
