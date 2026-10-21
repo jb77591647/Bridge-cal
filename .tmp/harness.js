@@ -131,9 +131,11 @@ function checkBox(part, e, tol, name){
 
 const zb0 = 1.2+5/3;                 // 前墙底宽/前端缘底 2.866667（显示+0.002）
 const xi0 = 6-(0.5+5/3);             // 侧墙内缘底 3.833333（m2=0：t2b=t2=0.5，下段m3放坡）
-/* 场景轴：x=纵桥向(前墙前缘=0向台后, 帽梁前缘=−ec), y=横桥向, z=竖向(墙底=0) */
-checkBox("fw", {"min.x":0,"max.x":zb0,"min.y":-6,"max.y":6,"min.z":0,"max.z":5}, 0.01, "前墙 bbox(梯形)");
-const swB = checkBox("sw", {"min.x":1.202,"max.x":6.0,"min.y":-6,"max.y":6,"min.z":0,"max.z":6.5}, 0.01, "侧墙 bbox");
+/* 场景原点已改为「基底前趾中点」：旧口径（前墙前缘=0）的坐标一律加 OX＝基础前伸 fd1Zf=1.0。
+   场景轴：x=纵桥向(基底前趾=0向台后, 前墙前缘=+1.0, 帽梁前缘=+0.9), y=横桥向, z=竖向(墙底=0) */
+const OX = 1.0;
+checkBox("fw", {"min.x":OX,"max.x":OX+zb0,"min.y":-6,"max.y":6,"min.z":0,"max.z":5}, 0.01, "前墙 bbox(梯形)");
+const swB = checkBox("sw", {"min.x":OX+1.202,"max.x":OX+6.0,"min.y":-6,"max.y":6,"min.z":0,"max.z":6.5}, 0.01, "侧墙 bbox");
 /* 逐 mesh 检查 +y 侧墙内缘：min.y 应为 xi0=7.0747（内坡 3:1 生效） */
 let swInnerMin = Infinity;
 (parts.sw||[]).forEach(mm=>{
@@ -152,8 +154,8 @@ let swFrontTop = Infinity, swFrontBot = Infinity;
     if(pos.getZ(i) < 0.01) swFrontBot = Math.min(swFrontBot, pos.getX(i));
   }
 });
-near(swFrontTop, 1.202, 0.01, "侧墙前端缘顶部 x=t1+0.002（竖直段，贴前墙背）");
-near(swFrontBot, zb0+0.002, 0.01, "侧墙前端缘底部 x=2.8687（贴前墙背坡面）");
+near(swFrontTop, OX+1.202, 0.01, "侧墙前端缘顶部 x=OX+t1+0.002（竖直段，贴前墙背）");
+near(swFrontBot, OX+zb0+0.002, 0.01, "侧墙前端缘底部 x=OX+2.8687（贴前墙背坡面）");
 
 /* ===== 网格体积独立校核：凸多面体散度定理（面方向先按质心归一化，规避顶点序不一致） ===== */
 function meshVol(m){
@@ -181,8 +183,8 @@ near(vol.cap,  q.V_cap,  0.001, "网格体积:帽梁");
 near(vol.bw,   q.V_bw,   0.001, "网格体积:背墙");
 near(vol.nb,   q.V_nb,   0.001, "网格体积:牛腿(直角梯形断面×全长)");
 isTrue((parts.nb||[]).length===1, "牛腿 1 块");
-checkBox("nb", {"min.x":1.2,"max.x":1.5,"min.y":-3.5,"max.y":3.5,"min.z":5.6,"max.z":6.2}, 0.01,
-  "牛腿 bbox(x 背墙背面1.2→外端1.5、y 以帽梁中心±L腿/2=±3.5、z 根部底5.6→顶面6.2)");
+checkBox("nb", {"min.x":OX+1.2,"max.x":OX+1.5,"min.y":-3.5,"max.y":3.5,"min.z":5.6,"max.z":6.2}, 0.01,
+  "牛腿 bbox(x 背墙背面2.2→外端2.5、y 以帽梁中心±L腿/2=±3.5、z 根部底5.6→顶面6.2)");
 near(q.nbTop, 6.2, 1e-9, "牛腿顶面标高=背墙顶−h槽=6.5−0.3=6.2");
 near(q.nbH, 0.3, 1e-9, "牛腿高度=外端竖面高=0.3");
 near(q.nbRoot, 0.6, 1e-9, "根部总高=牛腿高度+加腋高度=0.6");
@@ -248,10 +250,10 @@ near(vol.fd,   q.V_fd,   0.001, "网格体积:基础");
 near(vol.fill, q.V_fill, 0.10,  "网格体积:回填");
 near(vol.exR, q.V_exRock, 0.001, "网格体积:石方开挖棱台");
 near(vol.exS, q.V_exSoil, 0.001, "网格体积:土方开挖棱台");
-checkBox("cap", {"min.x":-0.1,"max.x":1.2,"min.y":-6.1,"max.y":6.1,"min.z":5,"max.z":5.6}, 0.01, "帽梁 bbox(全宽立方体)");
-checkBox("bw", {"min.x":0.7,"max.x":1.2,"min.y":-6.1,"max.y":6.1,"min.z":5.6,"max.z":6.5}, 0.01, "背墙 bbox(全宽立方体)");
-checkBox("fd", {"min.x":-1.0,"max.x":7.0,"min.y":-7,"max.y":7,"min.z":-1,"max.z":0}, 0.01, "基础 bbox");
-checkBox("fill", {"min.x":1.2,"max.x":6.0,"min.y":-5.5,"max.y":5.5,"min.z":0,"max.z":6.5}, 0.02, "回填 bbox");
+checkBox("cap", {"min.x":OX-0.1,"max.x":OX+1.2,"min.y":-6.1,"max.y":6.1,"min.z":5,"max.z":5.6}, 0.01, "帽梁 bbox(全宽立方体)");
+checkBox("bw", {"min.x":OX+0.7,"max.x":OX+1.2,"min.y":-6.1,"max.y":6.1,"min.z":5.6,"max.z":6.5}, 0.01, "背墙 bbox(全宽立方体)");
+checkBox("fd", {"min.x":0,"max.x":8.0,"min.y":-7,"max.y":7,"min.z":-1,"max.z":0}, 0.01, "基础 bbox（前趾 x=0，后趾 x=8.0）");
+checkBox("fill", {"min.x":OX+1.2,"max.x":OX+6.0,"min.y":-5.5,"max.y":5.5,"min.z":0,"max.z":6.5}, 0.02, "回填 bbox");
 
 /* 工程量（手算期望值） */
 near(q.t1b, 2.8666667, 0.001, "前墙底宽 t1b=t1+H1/m1");
@@ -407,8 +409,8 @@ near(cChk.MsF, sumArm, 1e-9, "ΣM稳 = Σ(各竖向力×至前趾的力臂)，�
 near(cChk.K0, cChk.MsF/cChk.Mh, 1e-9, "K0 = ΣM稳/ΣM倾（只验算前趾）");
 isTrue(cChk.MsB === undefined && cChk.K0B === undefined && cChk.K0F === undefined,
        "后趾稳定力矩与 K0(后趾) 已移除");
-isTrue(cChk.items.length >= 7 && cChk.items.every(it=>it.W > 0 && it.z > -1),
-       "抗倾覆明细含 7 个及以上竖向力分项（各自带 W 与作用点 x）");
+isTrue(cChk.items.length >= 7 && cChk.items.every(it=>it.W > 0 && it.z >= -1e-9),
+       "抗倾覆明细含 7 个及以上竖向力分项（各自带 W 与作用点 x），且作用点 x 全部非负");
 near(cChk.M, SZc + cChk.Mh, 10.0, "验算 基底弯矩（竖向偏心＋水平力，同向叠加）");
 /* 独立互证：由绕前趾力矩平衡反求合力作用点 xR，再算 M=ΣV(xc−xR) */
 const zR_chk = cChk.zF + (cChk.MsF - cChk.Mh)/cChk.Vsum;
@@ -416,11 +418,11 @@ near(cChk.M, cChk.Vsum*(cChk.zc - zR_chk), 10.0,
      "基底弯矩 = ΣV×(形心−合力作用点)，与 Σ(M稳−M倾)=ΣV·力臂 等价");
 near(cChk.e, cChk.zc - zR_chk, 1e-6, "偏心距 e = x形心 − 合力作用点（向河心为正）");
 /* 几何基准与代数关系 */
-near(cChk.zF, -1.0, 1e-9, "基底前趾 x=−fd1Zf=−1.0（原点=前墙前缘）");
-near(cChk.zB, 7.0, 1e-9, "基底后趾 x=L2+fd1Zb=7.0");
+near(cChk.zF, 0, 1e-9, "基底前趾 x=0（坐标原点＝基底前趾中点）");
+near(cChk.zB, 8.0, 1e-9, "基底后趾 x＝前伸1.0＋L2 6.0＋后伸1.0＝8.0（＝基底长 L）");
 near(cChk.A, 112, 1e-9, "基底面积 A=(W+2×1)×(L2+1+1)=14×8=112");
-near(cChk.zc, 3.0, 1e-9, "基底形心 x=3.0");
-near(cChk.zN, 0.3, 1e-9, "支座作用点 x=背墙前缘0.7−d支0.4=0.3");
+near(cChk.zc, 4.0, 1e-9, "基底形心 x＝L/2＝4.0（同时等于距前趾的距离）");
+near(cChk.zN, 1.3, 1e-9, "支座作用点 x＝基础前伸1.0＋背墙前缘0.7−d支0.4＝1.3");
 near(cChk.yH, 5.7, 1e-9, "水平力作用点标高=H1+capH+dH=5.7");
 near(cChk.hH, 6.7, 1e-9, "水平力对基底的力臂=5.7+fdT1.0=6.7");
 near(cChk.Mh, 670, 1e-6, "水平力力矩 Hk×h=100×6.7=670");
@@ -462,7 +464,7 @@ els.incFill.checked = true;
 els.dBear.value = "5";
 const cD = api.calcCheck(api.readP(), api.calcQ(api.readP()));
 near(cD.dBear, pChk.capWid - pChk.bwT, 1e-9, "d支超限时按背墙前缘距离截断(0.8)");
-near(cD.zN, -0.1, 1e-9, "d支超限后支座落在帽梁前缘 x=−ec=−0.1");
+near(cD.zN, 0.9, 1e-9, "d支超限后支座落在帽梁前缘 x＝前伸1.0−ec0.1＝0.9");
 els.dBear.value = "0.40";
 /* 验算表渲染 */
 api.renderCheck(pChk, qChk);
@@ -496,14 +498,18 @@ near(cChk.yEa2, qChk.fdT + cChk.h1 + cChk.h2/3, 1e-9,
      "yEa2 ＝ 基础总厚＋h1＋h2/3（表中所列算式与计算值一致）");
 isTrue(cChk.yEa1 - qChk.fdT > cChk.h1/3 - 1e-9 && cChk.yEa1 - qChk.fdT < cChk.h1/2 + 1e-9,
        "下段合力点介于 h1/3（纯三角形）与 h1/2（纯均布超载）之间");
-/* 坐标符号与原点口径：顺桥向一律记作 x，竖向才是 z；表中 x 以「前墙前缘=0」为原点 */
+/* 坐标符号与原点口径：顺桥向一律记作 x，竖向才是 z；
+   表中 x 以「基底前趾中点 = 0」为原点，故坐标数值＝距前趾的距离，且全部非负 */
 isTrue(ckTbl.indexOf("前趾 x=")>=0 && ckTbl.indexOf("作用点 x=")>=0,
        "结果表把顺桥向坐标标为 x（作用点 x= / 前趾 x=）");
 isTrue(ckTbl.indexOf("前趾 z=")<0 && ckTbl.indexOf("作用点 z=")<0,
        "结果表不再把顺桥向坐标误标为 z");
-isTrue(ckTbl.indexOf("前趾 x=-1.0")>=0 || ckTbl.indexOf("前趾 x=−1.0")>=0,
-       "表中前趾 x=−1.0，与说明①「前墙前缘 x=0、帽梁前缘 x=−ec」同一原点");
-near(cChk.zN - cChk.zF, 1.3, 1e-9, "支座至前趾距离 1.3（0.3−(−1.0)，坐标平移不影响力臂）");
+isTrue(ckTbl.indexOf("前趾 x=0.000")>=0,
+       "表中前趾 x=0.000（坐标原点＝基底前趾中点）");
+isTrue(ckTbl.indexOf("前趾 x=-")<0 && ckTbl.indexOf("前趾 x=−")<0 &&
+       ckTbl.indexOf("作用点 x=-")<0 && ckTbl.indexOf("作用点 x=−")<0,
+       "表中不再出现任何负的顺桥向坐标（前趾/作用点均非负）");
+near(cChk.zN - cChk.zF, 1.3, 1e-9, "支座至前趾距离 1.3（＝支座坐标 1.3 − 前趾 0，坐标即距离）");
 
 /* ===== 验算表分节行：1、2、3… 序号 + 加粗 + 字号较常规分节行大 1px ===== */
 const sepHtmls = ckTbl.match(/<tr class="sepChk"><td colspan="5">([\s\S]*?)<\/td><\/tr>/g) || [];
@@ -583,15 +589,15 @@ near(cE.EaH1, cE.Ea1*Math.cos(angD*Math.PI/180), 1e-9, "下段 EaH1 = Ea1·cos(�
 near(cE.EaV1, cE.Ea1*Math.sin(angD*Math.PI/180), 1e-9, "下段 EaV1 = Ea1·sin(θ+δ)");
 near(cE.yEa1 - qChk.fdT, (KaGenExp*(27*25/2 + 0.5*18*125/3))/k1u, 1e-9,
      "下段合力点 y1 = ΣM/ΣF = 1.979（梯形分布，介于 h1/3 与 h1/2 之间）");
-near(cE.xEa1, 1.2 + (5 - (cE.yEa1 - qChk.fdT))/3, 1e-9,
-     "下段作用点 x = t1+(H1−y1)/m1（墙背面在该高度处）");
+near(cE.xEa1, 1.0 + 1.2 + (5 - (cE.yEa1 - qChk.fdT))/3, 1e-9,
+     "下段作用点 x = 前伸1.0+t1+(H1−y1)/m1（墙背面在该高度处）");
 /* 上段：三角形分布（顶面无超载） */
 const k2u = 0.5*KaVert*18*2.25;
 near(cE.Ea2, k2u*12, 1e-6, "上段 Ea2 = ½Ka2·γs·h2²·B = " + (k2u*12).toFixed(1) + " kN");
 near(cE.EaH2, cE.Ea2*Math.cos(r20), 1e-9, "上段 EaH2 = Ea2·cosδ（θ2=0）");
 near(cE.EaV2, cE.Ea2*Math.sin(r20), 1e-9, "上段 EaV2 = Ea2·sinδ");
 near(cE.yEa2, qChk.fdT + 5 + 1.5/3, 1e-9, "上段合力点距基底 = 基础厚＋h1＋h2/3 = 6.500");
-near(cE.xEa2, 1.2, 1e-9, "上段作用点 x = t1 = 1.200（帽梁后缘、背墙背面与之同面）");
+near(cE.xEa2, 2.2, 1e-9, "上段作用点 x = 前伸1.0+t1 = 2.200（帽梁后缘、背墙背面与之同面）");
 /* 合计与分段叠加口径 */
 near(cE.EaH, cE.EaH1 + cE.EaH2, 1e-12, "EaH 合计 = 下段＋上段水平分量");
 near(cE.EaV, cE.EaV1 + cE.EaV2, 1e-12, "EaV 合计 = 下段＋上段竖向分量");
@@ -632,7 +638,7 @@ near(cHf.h2, 0, 1e-9, "h填 ≤ 前墙高时上段高 h2 = 0（无竖直墙段�
 near(cHf.qOv, 0, 1e-9, "h2 = 0 时上段超载 q = 0");
 near(cHf.Ea2, 0, 1e-12, "h2 = 0 时上段土压力 Ea2 = 0，退化为单段斜墙");
 near(cHf.Ea, 0.5*18*9*KaGenExp*12, 1e-6, "退化单段斜墙：Ea = ½γs·h填²·Ka1·B = 177.7kN");
-near(cHf.xEa, 1.2 + (5 - 1)/3, 1e-9, "h填 减小时 EaV 作用点随墙面下移（x=2.533）");
+near(cHf.xEa, 1.0 + 1.2 + (5 - 1)/3, 1e-9, "h填 减小时 EaV 作用点随墙面下移（x=3.533）");
 els.chkHf.value = "";
 els.chkPhi.value = "40";
 const cPhi = api.calcCheck(api.readP(), api.calcQ(api.readP()));
@@ -706,6 +712,8 @@ const SxAll = cAll.items.reduce((a,it)=>a + it.W*it.z, 0) + Number(els.Nk.value)
 const aBarAll = cAll.MsF/cAll.Vsum;
 near(cAll.zbar, SxAll/cAll.Vsum, 1e-9, "竖向合力作用点坐标 = ΣWi·xi/ΣV（含 Nk 与 EaV 各按自身作用点）");
 near(aBarAll, cAll.zbar - cAll.zF, 1e-9, "距前趾口径与坐标口径等价：ΣM稳/ΣV = zbar − zF");
+isTrue(cAll.zF === 0 && Math.abs(cAll.zbar - aBarAll) < 1e-12,
+       "原点＝基底前趾后两项合一：竖向合力点坐标值 3.699 就是它距前趾的距离");
 near(aBarAll, 3.698861, 1e-6, "竖向合力点距前趾 = 50676.5/13700.6 = 3.699");
 isTrue(ckTbl3.indexOf(`ΣVi·ai/ΣV＝${d1(cAll.MsF)}/${d1(cAll.Vsum)}`)>=0,
        "表内给出竖向合力作用点的距离口径代入值（ΣM稳/ΣV），不再用坐标");
@@ -713,7 +721,7 @@ isTrue(ckTbl3.indexOf(`距后趾 ${d3(cAll.Lb - aBarAll)}`)>=0,
        "表内给出距后趾 4.301（3.699＋4.301 = L = 8.000）");
 isTrue(ckTbl3.indexOf("基底形心距前趾")>=0 &&
        ckTbl3.indexOf(`L/2＝${d2(cAll.Lb)}/2＝${d2(cAll.Lb/2)}`)>=0,
-       "形心按 L/2 计：8.00/2 = 4.000（长度口径，不是坐标 3.000）");
+       "形心按 L/2 计：8.00/2 = 4.000（新原点下坐标 4.000 与距前趾距离完全一致）");
 near(cAll.Lb/2, 4.0, 1e-12, "基底形心距前趾 = L/2 = 4.000");
 isTrue(ckTbl3.indexOf("x前趾＋x后趾")<0 && ckTbl3.indexOf("x形心")<0,
        "承载力段不再出现坐标式形心算式");
