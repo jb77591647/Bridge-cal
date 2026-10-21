@@ -5458,7 +5458,7 @@ function renderCheck(p, q){
       `${M("\\Sigma V_{i}")}＝${gcNm}＝${gcNum}＝${f(q.total,3)} m³；` +
       `${M("G_{c}=\\Sigma V_{i}\\times\\gamma_{c}=" + f(q.total,3) + "\\times" + f(p.gamC,1) + "=" + f(c.Gc,1))}`,
       c.Gc, "kN");
-  row("台腔回填土重 G<sub>s</sub>", p.incFill ? `${M("V_{\\text{填}}\\times\\gamma_{s}=" + f(q.V_fill,2) + "\\times" + f(p.gamS,1) + "=" + f(c.Gs,1))}` : "按偏安全不计入", c.Gs, "kN");
+  row("台腔回填土重 G<sub>s</sub>", p.incFill ? `${M("G_{s}=V_{\\text{填}}\\times\\gamma_{s}=" + f(q.V_fill,2) + "\\times" + f(p.gamS,1) + "=" + f(c.Gs,1))}` : "按偏安全不计入", c.Gs, "kN");
   row("土压力竖向分量 E<sub>aV</sub>", p.incEa
         ? `${M("E_{aV}=E_{a}\\cdot\\sin(\\theta+\\delta)=" + f(c.EaV,1))}（${M("\\theta+\\delta=" + f(c.angDeg,2) + "^{\\circ}")}，作用点 x=${f(c.xEa,3)}）`
         : "按偏安全不计入",
@@ -5577,7 +5577,7 @@ function renderCheck(p, q){
   row("基底面积 A", `${M("A=B\\times L=" + f(c.Wb,2) + "\\times" + f(c.Lb,2) + "=" + f(c.A,2))}`, c.A, "m²");
   row("基底长度 L", `基础前伸 ${f(c.x0,2)}＋桥台长 L2 ${f(p.L2,2)}＋基础后伸 ${f(c.zB - c.x0 - p.L2,2)}＝${M("L=" + f(c.Lb,2))}（前趾 x=0.000，后趾 x=${f(c.zB,3)}）`, c.Lb, "m");
   row("基底形心距前趾", `${M("L/2=" + f(c.Lb,2) + "/2=" + f(c.Lb/2,2))}（距后趾同为 ${M("L/2=" + f(c.Lb/2,2))}）`, c.Lb/2, "m");
-  row("竖向力 N", `${M("N=\\Sigma V")}＝${M("N_{k}")}＋圬工自重＋台腔回填＋土压力竖向分量 ${M("E_{aV}")}（逐项见第 1 节）`, c.Vsum, "kN");
+  row("竖向力 N", `${M("N=\\Sigma V")}＝${M("N_{k}")}＋圬工自重 ${M("G_{c}")}＋台腔回填 ${M("G_{s}")}＋土压力竖向分量 ${M("E_{aV}")}（逐项见第 1 节）`, c.Vsum, "kN");
   row("对基底形心弯矩 M",
       `${M("M_{\\text{竖}}=\\Sigma V\\cdot L/2-\\Sigma V_{i}\\cdot a_{i}=" + f(c.Vsum,1) + "\\times" + f(c.Lb/2,2) + "-" + f(c.MsF,1) + "=" + f(c.Vsum*c.Lb/2,1) + "-" + f(c.MsF,1) + "=" + f(c.Mc,1))}` +
       `（竖向合力距前趾 ${f(aBar,3)}＜L/2，偏前趾侧）；` +
